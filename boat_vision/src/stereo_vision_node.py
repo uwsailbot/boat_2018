@@ -98,8 +98,9 @@ def get_buoy_coords(img, pub):
 	
 	# HSV Threshold
 	hsv_img = cv2.cvtColor(filtered, cv2.COLOR_BGR2HSV);
-	#threshold_img = cv2.inRange(hsv_img, np.array([0, 165, 130]), np.array([15, 255, 255]));
-	threshold_img = cv2.inRange(hsv_img, np.array([0, 125, 100]), np.array([25, 255, 255]));
+	#threshold_img = cv2.inRange(hsv_img, np.array([0, 165, 130]), np.array([15, 255, 255])); # Good, old
+	#threshold_img = cv2.inRange(hsv_img, np.array([0, 125, 100]), np.array([25, 255, 255])); # Wide
+	threshold_img = cv2.inRange(hsv_img, np.array([0, 165, 200]), np.array([14, 245, 255]));  # Overcast
 	
 	# Blur
 	threshold_img = cv2.medianBlur(threshold_img, 3);
@@ -236,13 +237,17 @@ def initialize_node():
 			polar = process_cams(points[0], points[1], CAM_SPACING)
 			msg = VisionTarget()
 			msg.header.stamp = rospy.Time.now()
-			if polar is not False:
+			if polar is not False and polar.dist < 3:
 				msg.has = True
 				msg.pt = polar
 			else:
 				msg.has = False
 			vision_pub.publish(msg)
-		
+		else:
+			msg = VisionTarget()
+			msg.has = False
+			vision_pub.publish(msg)
+
 		rate.sleep()
 	
 	left.stop()

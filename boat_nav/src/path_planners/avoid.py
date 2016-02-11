@@ -31,6 +31,8 @@ class AvoidPlanner(Planner):
 	
 	
 	def _obstacle_callback(self, targets):
+		print len(targets.points)
+
 		self.has_obstacle = len(targets.points) > 0
 		
 		if Planner.state.challenge is BoatState.CHA_AVOID:
