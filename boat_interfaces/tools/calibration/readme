@@ -1,19 +1,6 @@
-Must have these installed and working:
-- The "Command Line Compass Calibration Program" found here:
-    https://www.phidgets.com/?tier=3&catid=10&pcid=8&prodid=32
-    (make sure all the required drivers are installed)
-
-- The Phidgets IMU launch file "imu.launch", which should exist in
-    catkin_ws/src/phidgets_drivers/phidgets_imu/launch/
-    if you build this ROS package (https://github.com/ccny-ros-pkg/phidgets_drivers)
-    with catkin.
-    If this the command "rosdep install libphidgets" fails to install, try
-    cloning in the libphidgets package
-    (https://github.com/ipa320/cob_extern/tree/hydro_release_candidate)
-
-This script runs the Command Line Compass Calibration Program above and stores
+This script runs the Command Line Compass Calibration Program and stores
 the results into the imu.launch file in the ROS node above. So when the imu is
-started (roslaunch phidgets_imu imu.launch), it will use the values from the
+started (roslaunch boat_nav imu.launch), it will use the values from the
 latest calibration.
 
 Usage:
