@@ -1,5 +1,5 @@
 # boat_2018
-2018 UWaterloo Autonomous Sailboat ROS Architecture
+2018 UW Sailbot ROS Architecture
 
 To build, clone this repo as your src folder 
 
