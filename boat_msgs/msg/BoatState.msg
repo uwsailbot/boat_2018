@@ -1,0 +1,10 @@
+uint32 MAJ_DISABLED=0
+uint32 MAJ_RC=1
+uint32 MAJ_AUTONOMOUS=2
+
+uint32 MIN_COMPLETE=0
+uint32 MIN_PLANNING=1
+uint32 MIN_TACKING=2
+
+uint32 major
+uint32 minor

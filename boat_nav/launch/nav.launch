@@ -1,0 +1,10 @@
+<launch>
+ <arg name="boat_control" default="/dev/ttyACM0" />
+ <node pkg="rosserial_python" type="serial_node.py"
+    args="_port:=$(arg boat_control) _baud:=57600" name="rosserial_boat_control" output="screen">
+ </node>
+ <node pkg="boat_nav" type="path_planning_node.py"
+    name="path_planning" >
+  </node>
+ <node pkg="boat_nav" type="gps_parser.py" name="gps_parser"/>
+</launch>

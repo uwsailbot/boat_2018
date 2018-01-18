@@ -1,0 +1,34 @@
+Must have these installed and working:
+- The "Command Line Compass Calibration Program" found here:
+    https://www.phidgets.com/?tier=3&catid=10&pcid=8&prodid=32
+    (make sure all the required drivers are installed)
+
+- The Phidgets IMU launch file "imu.launch", which should exist in
+    catkin_ws/src/phidgets_drivers/phidgets_imu/launch/
+    if you build this ROS package (https://github.com/ccny-ros-pkg/phidgets_drivers)
+    with catkin.
+    If this the command "rosdep install libphidgets" fails to install, try
+    cloning in the libphidgets package
+    (https://github.com/ipa320/cob_extern/tree/hydro_release_candidate)
+
+This script runs the Command Line Compass Calibration Program above and stores
+the results into the imu.launch file in the ROS node above. So when the imu is
+started (roslaunch phidgets_imu imu.launch), it will use the values from the
+latest calibration.
+
+Usage:
+- Place the script ("calibrate.cpp") in the same folder as the Command Line Compass
+    Calibration Program ("compasscal").
+- Edit the script: change the FILEPATH and BACKUP_FILEPATH constants to match
+    the path of the imu.launch file on your system. BACKUP_FILEPATH is the path
+    where a backup copy of imu.launch is to be created before it is modified.
+- Compile using the command "g++ calibrate.cpp -o calibrate" in that directory.
+- Plug in the IMU and run using the command "./calibrate"
+
+Limitations:
+- If no imu is detected, the program will pretend to work and then not say anything
+    after it finishes. (If the program is successful, it should spit out a bunch of
+    stuff.) Therefore it is recommended to run the compasscal program first to
+    check if the IMU can be calibrated manually.
+- If sampling is started and stopped in rapid succession, a math error will occur
+    causing the calibration program to run into an infinite loop. To prevent this the script force sampling to last a minimum of 3 seconds before it can be stopped.
