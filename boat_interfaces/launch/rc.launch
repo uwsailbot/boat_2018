@@ -1,21 +1,30 @@
 <launch>
 <arg name="controller" default="/dev/ttyUSB0" />
 <arg name="arduino" default="/dev/ttyACM0" />
-  <node pkg="boat_interfaces" type="receiver_reader.py" 
-    args="$(arg controller)" name="receiver" output="screen">
-  </node>
- <node pkg="boat_interfaces" type="rudder_node.py"
-    name="rudder" >
-  </node> 
+  
+  <!-- rosserial_python allows topics to be published and subscribed to across the serial link to the arduino -->
   <node pkg="rosserial_python" type="serial_node.py"
     args="_port:=$(arg arduino) _baud:=57600" name="rosserial_arduino" output="screen">
   </node>
+  
+  <!-- receiver_reader.py interfaces with the RC controller's receiver over serial -->
+  <!-- Not that this will be replaced with futaba_reader.py soon -->
+  <node pkg="boat_interfaces" type="receiver_reader.py" 
+    args="$(arg controller)" name="receiver" output="screen">
+  </node>
+  
+  <!-- Main nodes for this package -->
   <node pkg="boat_interfaces" type="boat_state_controller_node.py"
     name="boat_state_controller" >
   </node>
+  <node pkg="boat_interfaces" type="rudder_node.py"
+    name="rudder" >
+  </node> 
   <node pkg="boat_interfaces" type="winch_node.py"
     name="winch" >
   </node>
+  
+  <!-- Soon to be deprecated -->
   <node pkg="boat_interfaces" type="tacking_node.py"
     name="tack" >
   </node>
