@@ -1,14 +1,14 @@
 <launch>
 <arg name="controller" default="/dev/ttyUSB0" />
-<arg name="rudder" default="/dev/ttyACM0" />
-  <node pkg="boat_control" type="receiver_reader.py" 
+<arg name="arduino" default="/dev/ttyACM0" />
+  <node pkg="boat_interfaces" type="receiver_reader.py" 
     args="$(arg controller)" name="receiver" output="screen">
   </node>
  <node pkg="boat_interfaces" type="rudder_node.py"
     name="rudder" >
   </node> 
   <node pkg="rosserial_python" type="serial_node.py"
-    args="_port:=$(arg rudder) _baud:=57600" name="rosserial_rudder" output="screen">
+    args="_port:=$(arg arduino) _baud:=57600" name="rosserial_arduino" output="screen">
   </node>
   <node pkg="boat_interfaces" type="boat_state_controller_node.py"
     name="boat_state_controller" >
