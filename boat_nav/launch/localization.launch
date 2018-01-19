@@ -1,0 +1,97 @@
+<launch>
+  <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform" clear_params="true">
+
+    <!--Params currently set to default-->
+    <param name="delay" value=3.0>
+    <param name="magnetic_declination_radians" value=0>
+    <param name="yaw_offset" value=0.0>
+    <param name="broadcast_utm_transform" value=false>
+    <param name="broadcast_utm_transform_as_parent_frame" value=false>
+    <param name="use_odometry_yaw" value=false>
+    <param name="wait_for_datum" value=false>
+    <param name="datum" value=[0.0, 0.0, 0.0]><!--[latitude,longitude,heading(0.0=east)]-->
+
+    <!--publishes to gps/filtered-->
+    <param name="publish_filtered_gps" value=true>
+
+    <!--Dont know where imu data is pusblished-->
+    <remap from="imu/data" to="imu/data"/>
+    <!--odometry/filtered is output from ekf-->
+    <remap from="odometry/filtered" to="">
+    <!--Assuming /odometry_navsatfix is topic of raw_gps converted to navsatfix msg__>
+    <remap from="gps/fix" to="/odometry_navsatfix"/>
+  </node>
+
+
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_se" clear_params="true">
+
+    <!--
+    Robot localization package:
+        https://github.com/cra-ros-pkg/robot_localization
+    Filtering without odom described here:
+        https://answers.ros.org/question/200071/how-to-fuse-imu-gps-using-robot_localization/
+      Current unknowns:
+          imu topic name
+          imu configuration
+      -->
+
+      <!--Params currently set to default-->
+    <param name="frequency" value=3.0>
+    <param name="sensor_timeout" value=0.1>
+    <param name="two_d_mode" value=false>
+    <param name="sensor_timeout" value=0.1>
+    <param name="map_frame" value=map>
+    <param name="odom_frame" value=odom>
+    <param name="base_link_frame" value=base_link>
+    <param name="world_frame" value=map>
+    <param name="transform_time_offset" value=0.0>
+    <param name="transform_offset" value=0.0>
+    <rosparam param="initial_state">[0.0, 0.0, 0.0,
+          0.0, 0.0, 0.0,
+          0.0, 0.0, 0.0,
+          0.0, 0.0, 0.0,
+          0.0, 0.0, 0.0]</rosparam>  
+
+    <!--Next section is for a single IMU
+    Don't know where imu data is, currently set to imu/data
+    Don't know imu config, currently set to all false
+    Everything else set to default-->  
+    <param name = "imu0" value="imu/data">
+    <param name = "imu0_queue_size" value=0>
+    <param name = "imu0_nodelay" value=false>
+    <param name = "imu0_differential" value=false>
+    <param name = "imu0_relative" value=false>
+    <param name = "imu0_remove_gravitational_acceleration" value=false>
+    <rosparam param="imu0_config">[false, false, false,
+          false, false, false,
+          false, false, false,
+          false, false, false,
+          false, false, false]</rosparam>
+    
+    <!--Odom input from GPS, only used initially
+    Takes published GPS data from navsat_transform at gps/filtered
+    Everything else set to default-->
+    <param name = "odom0" value="gps/filtered">
+    <param name = "odom0_queue_size" value=0>
+    <param name = "odom0_nodelay" value=false>
+    <param name = "odom0_differential" value=false>
+    <param name = "odom0_relative" value=false>
+    <param name = "odom0_remove_gravitational_acceleration" value=false>
+    <rosparam param="odom0_config">[true, true, false,
+          false, false, false,
+          false, false, false,
+          false, false, false,
+          false, false, false]</rosparam>
+      
+    <param name = "publish_tf" value=true>
+    <param name = "publish_acceleration" value=false>
+    
+    <param name = "print_diagnostics" value=true>
+
+    <!--  Placeholder for output topic remapping
+    <remap from="odometry/filtered" to=""/>
+    <remap from="accel/filtered" to=""/>
+    -->
+
+  </node>
+</launch>
