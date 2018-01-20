@@ -22,7 +22,7 @@ Package containing all nodes and files relevant to communication with the onboar
 ## boat_nav 
 Package for planning boat path given gps waypoints, as well as controlling the onboard IMU and doing neccessary position filtering.  The package "that is the brains" and decides how the boat should sail autonomously.  NOTE: required compass calibration for use in using the imu can be found in the tools section of the boat_interfaces package, along with a readme on how to use it.
 
-This package relies on phidgets_imu and imu_filter_madgwick in order to compile.  Clone it from https://github.com/ros-drivers/phidgets_driver.git and https://github.com/ccny-ros-pkg/imu_tools (into your catkin_ws/src folder) or download both using (if the following command doesn't work, just download the above git repos):
+This package relies on phidgets_imu and imu_filter_madgwick in order to compile.  Clone it from https://github.com/ros-drivers/phidgets_drivers.git and https://github.com/ccny-ros-pkg/imu_tools (into your catkin_ws/src folder) or download both using (if the following command doesn't work, just download the above git repos):
 
 	$ rosdep install boat_nav
 
