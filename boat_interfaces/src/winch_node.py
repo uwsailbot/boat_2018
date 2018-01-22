@@ -13,7 +13,7 @@ request = "Hold"
 winch_pos = 0
 max_angle = 30  # Closest angle we can sail to the wind
 pub = rospy.Publisher('winch', Int32, queue_size=10)
-state = 0
+state = BoatState()
 
 
 def state_callback(new_state):

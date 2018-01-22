@@ -19,19 +19,19 @@ def joy_callback(controller):
     rate = rospy.Rate(10)
 
     # If R1 is pushed and L1 is not the set autonomous mode
-    if controller.buttons[5] == 1 and controller.buttons[4] == 0 and state.major != MAJ_AUTONOMOUS:
+    if controller.buttons[5] == 1 and controller.buttons[4] == 0 and state.major != BoatState.MAJ_AUTONOMOUS:
         state.major = BoatState.MAJ_AUTONOMOUS
         pub.publish(state)
         
     # If L1 is pushed and R1 is not then set manual mode
-    elif controller.buttons[5] == 0 and controller.buttons[4] == 1 and state.major != MAJ_RC:
+    elif controller.buttons[5] == 0 and controller.buttons[4] == 1 and state.major != BoatState.MAJ_RC:
         state.major = BoatState.MAJ_RC
         pub.publish(state)
         
-    # Add a button to set the state to disabled!
-    elif false:
-        state.major = BoatState.MAJ_DISABLED
-        pub.publish(state)
+    # TODO: Add a button to set the state to disabled!
+#    elif false:
+#        state.major = BoatState.MAJ_DISABLED
+#        pub.publish(state)
     
     rate.sleep()
 
