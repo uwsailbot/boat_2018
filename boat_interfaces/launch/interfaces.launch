@@ -23,9 +23,4 @@
   <node pkg="boat_interfaces" type="winch_node.py"
     name="winch" >
   </node>
-  
-  <!-- Soon to be deprecated -->
-  <node pkg="boat_interfaces" type="tacking_node.py"
-    name="tack" >
-  </node>
 </launch>
