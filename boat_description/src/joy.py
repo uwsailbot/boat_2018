@@ -82,10 +82,14 @@ if __name__=="__main__":
 	wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 1)
 	rospy.init_node('keyboard_node')
 	rate = rospy.Rate(100)
+	
 	status = 0
 	rudder_pos = 90
 	auto = 0
+	tack_prev_request = 0
 	tack = 0
+	cancel = 0
+	cancel_prev_request = 0
 	actuating_angle = 45
 	anemometer = 0
 
@@ -106,7 +110,15 @@ if __name__=="__main__":
 
 			# One of the tacking keys hit, update tacking state
 			elif key in tackBinding.keys():
-				tack = tackBinding[key]
+				if tackBinding[key]:
+					tack = True
+					tack_prev_request = True
+					cancel = False
+				else:
+					tack = False
+					cancel = True
+					cancel_prev_request = True
+				rudder_pos = 90
 				writeLine(rudder_pos, tack, actuating_angle, auto, anemometer)
 
 			# One of the angle keys hit, update max angle
@@ -134,21 +146,30 @@ if __name__=="__main__":
 
 			else:
 				rudder_pos = 90
+				writeLine(rudder_pos, tack, actuating_angle, auto, anemometer)
 				# Control C quit
 				if (key == '\x03'):
 					break
 				
-			# Create new joy message to mimc requested rudder values
+			# Publish new joy message to mimic requested values
 			joy = Joy()
 			joy_axes = [((90 - rudder_pos)/60.0), 0,0,0,0,0,0,0]
-			joy_buttons = [tack,0,(not tack),0,(not auto),auto,0,0,0,0,0]
+			joy_buttons = [tack,0,cancel,0,(not auto),auto,0,0,0,0,0]
 			joy.axes = joy_axes
 			joy.buttons = joy_buttons
 			joy_pub.publish(joy)
 
+			# Publish new anemometer message to relay requested wind data
 			wind = Float32()
 			wind.data = anemometer
 			wind_pub.publish(wind)
+
+			# Reset state buttons
+			if tack_prev_request:
+				tack = False
+			elif cancel_prev_request:
+				cancel = False
+
 			rate.sleep()
 
 	except rospy.ROSInterruptException:

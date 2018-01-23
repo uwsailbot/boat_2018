@@ -16,7 +16,6 @@ state = BoatState()
 pid_is_enabled = False
 tack_request = False
 tacking_direction = 0
-wind_dir = 0
 
 # Declare the publishers for the node
 rudder_pos_pub = rospy.Publisher('rudder', Float32, queue_size=10)
@@ -48,7 +47,7 @@ def wind_callback(heading):
 
 	# Based on direction of tack, keep the rudder turned while the boat crosses wind and passes 30 		# degrees to the other side, then set the rudder back to 90
 	if tacking_direction == 1:
-		if direction.data > 150:
+		if wind_heading > 150:
 			if not rudder_pos == 150.0:
 				rudder_pos_msg.data = 150.0
 				rudder_pos = rudder_pos_msg.data
@@ -63,7 +62,7 @@ def wind_callback(heading):
 
 
 	elif tacking_direction == -1:
-		if direction.data < 210:
+		if wind_heading < 210:
 			if not rudder_pos == 30.0:
 				rudder_pos_msg.data = 30.0
 				rudder_pos = rudder_pos_msg.data
@@ -167,7 +166,7 @@ def joy_callback(controller):
 		state.minor = BoatState.MIN_TACKING
 
 		# If a tack is requested, figure out which side we are tacking and set the rudder accordingly
-		if wind_dir < 180:
+		if wind_heading < 180:
 			rudder_pos_pub.publish(30.0)
 			rudder_pos = 30.0
 			tacking_direction = -1
