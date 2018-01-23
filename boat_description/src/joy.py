@@ -8,6 +8,9 @@ from sensor_msgs.msg import Joy
 from boat_msgs.msg import BoatState
 import time
 
+CURSOR_UP_ONE = '\x1b[1A'
+ERASE_LINE = '\x1b[2K'
+
 msg = """
 Reading from the keyboard  and Publishing to Joy!
 ---------------------------
@@ -60,6 +63,14 @@ def getKey():
 	termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
 	return key
 
+def writeLine(rudder, tacking, angle, auto):
+	sys.stdout.write(CURSOR_UP_ONE)
+	sys.stdout.write(ERASE_LINE)
+	sys.stdout.write(CURSOR_UP_ONE)
+	sys.stdout.write(ERASE_LINE)
+	print "Limits: %s, Tacking: %s, AutoMode: %s" % (angle, tacking, auto)
+	print "Rudder: %s" % rudder
+
 if __name__=="__main__":
 	settings = termios.tcgetattr(sys.stdin)
 	pub = rospy.Publisher('joy', Joy, queue_size = 1)
@@ -79,27 +90,31 @@ if __name__=="__main__":
 			# One of the rudder pos keys is hit, update rudder position
 			if key in rudderBinding.keys():
 				rudder_pos = 90 + rudderBinding[key]*actuating_angle
-				if rudder_pos < 30:
-					rudder_pos = 30
-				elif rudder_pos > 150:
-					rudder_pos = 150
+				writeLine(rudder_pos, tack, actuating_angle, auto)
 
 			# One of the state setting keys hit, update state
 			elif key in autoBinding.keys():
 				auto = autoBinding[key]
+				writeLine(rudder_pos, tack, actuating_angle, auto)
 
 			# One of the tacking keys hit, update tacking state
 			elif key in tackBinding.keys():
 				tack = tackBinding[key]
+				writeLine(rudder_pos, tack, actuating_angle, auto)
 
 			# One of the angle keys hit, update max angle
 			elif key in angleBinding.keys():
 				actuating_angle = actuating_angle + angleBinding[key]
+				if actuating_angle < 5:
+					actuating_angle = 5
+				elif actuating_angle > 60:
+					actuating_angle = 60
 				rudder_pos = 90
-				print "Actuating Angle: %s, Rudder Reset" % (actuating_angle)
+				
 				if (status == 14):
 					print msg
 				status = (status + 1) % 15
+				writeLine(rudder_pos, tack, actuating_angle, auto)
 			else:
 				rudder_pos = 90
 				# Control C quit
