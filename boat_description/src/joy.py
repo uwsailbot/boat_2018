@@ -19,6 +19,9 @@ Any other key recenters the rudder
 1 sets RC Mode
 2 sets Auto Mode
 
+t: tack
+g: cancel tack
+
 To change the angle at which the rudder moves,
 Update the movement factor:
 w: increase + 5 degrees
@@ -44,6 +47,11 @@ angleBinding={
 		'x':-5
 	      }
 
+tackBinding={
+		't':1,
+		'g':0
+	      }
+
 
 def getKey():
 	tty.setraw(sys.stdin.fileno())
@@ -60,21 +68,30 @@ if __name__=="__main__":
 	status = 0
 	rudder_pos = 90
 	auto = 0
+	tack = 0
 	actuating_angle = 45
 
 	try:
 		print msg
 		while(1):
 			key = getKey()
-			# If one of the rudder pos keys is hit, update rudder position
+
+			# One of the rudder pos keys is hit, update rudder position
 			if key in rudderBinding.keys():
 				rudder_pos = 90 + rudderBinding[key]*actuating_angle
 				if rudder_pos < 30:
 					rudder_pos = 30
 				elif rudder_pos > 150:
 					rudder_pos = 150
+
+			# One of the state setting keys hit, update state
 			elif key in autoBinding.keys():
 				auto = autoBinding[key]
+
+			# One of the tacking keys hit, update tacking state
+			elif key in tackBinding.keys():
+				tack = tackBinding[key]
+
 			# One of the angle keys hit, update max angle
 			elif key in angleBinding.keys():
 				actuating_angle = actuating_angle + angleBinding[key]
@@ -92,7 +109,7 @@ if __name__=="__main__":
 			# Create new joy message to mimc requested rudder values
 			joy = Joy()
 			joy_axes = [((90 - rudder_pos)/60.0), 0,0,0,0,0,0,0]
-			joy_buttons = [0,0,0,0,(not auto),auto,0,0,0,0,0]
+			joy_buttons = [tack,0,(not tack),0,(not auto),auto,0,0,0,0,0]
 			joy.axes = joy_axes
 			joy.buttons = joy_buttons
 			pub.publish(joy)

@@ -58,8 +58,8 @@ def wind_callback(heading):
 			state.minor = BoatState.MIN_COMPLETE
 			tacking_direction = 0
 			rudder_pos_msg.data = 90.0
-			pub_rudder.publish(rudder_pos_msg)
-			pub_state.publish(state)
+			rudder_pos_pub.publish(rudder_pos_msg)
+			boat_state_pub.publish(state)
 
 
 	elif tacking_direction == -1:
@@ -67,14 +67,14 @@ def wind_callback(heading):
 			if not rudder_pos == 30.0:
 				rudder_pos_msg.data = 30.0
 				rudder_pos = rudder_pos_msg.data
-				pub_rudder.publish(rudder_pos_msg)
+				rudder_pos_pub.publish(rudder_pos_msg)
 			rate.sleep()
 		else:
 			state.minor = BoatState.MIN_COMPLETE
 			tacking_direction = 0
 			rudder_pos_msg.data = 90.0
-			pub_rudder.publish(rudder_pos_msg)
-			pub_state.publish(state)
+			rudder_pos_pub.publish(rudder_pos_msg)
+			boat_state_pub.publish(state)
 
 	rate.sleep()
 
@@ -168,15 +168,15 @@ def joy_callback(controller):
 
 		# If a tack is requested, figure out which side we are tacking and set the rudder accordingly
 		if wind_dir < 180:
-			pub_rudder.publish(30.0)
+			rudder_pos_pub.publish(30.0)
 			rudder_pos = 30.0
 			tacking_direction = -1
 		else:
-			pub_rudder.publish(150.0)
+			rudder_pos_pub.publish(150.0)
 			rudder_pos = 150.0
 			tacking_direction = 1
 
-		pub_state.publish(state)
+		boat_state_pub.publish(state)
 
 	# o is pressed, therefore cancelling a previously requested tack
 	elif controller.buttons[2] and not tacking_direction == 0:
@@ -186,8 +186,8 @@ def joy_callback(controller):
 		state.minor = BoatState.MIN_COMPLETE
 		rudder_pos_msg = Float32()
 		rudder_pos_msg.data = 90.0
-		pub_rudder.publish(rudder_pos_msg)
-		pub_state.publish(state)
+		rudder_pos_pub.publish(rudder_pos_msg)
+		boat_state_pub.publish(state)
 		rudder_pos = rudder_pos_msg.data
 
 	# Whenever the boat is in RC mode, except for RC - Tacking...
