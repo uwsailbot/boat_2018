@@ -76,7 +76,9 @@ void setup(){
     GPS.sendCommand("$PMTK301,2*2E");
     // Set the update rate
     GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);   // 1 Hz update rate
-  
+
+    bubbleSortlookupTable();
+    
     pinMode(WIND_VANE_PIN, INPUT);
 }
 
@@ -91,7 +93,10 @@ void loop(){
         calWindDirection = calWindDirection - 360.0;
     while(calWindDirection < 0)
         calWindDirection = calWindDirection + 360;
- 
+
+    // Convert to true value through lookup table
+    calWindDirection = lookupTrueWindDirection(calWindDirection);
+    
     // Only update the topic if change greater than 5 degrees. 
     if(abs(calWindDirection - lastWindDirection) > 5)
     { 
