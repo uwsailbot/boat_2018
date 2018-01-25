@@ -1,5 +1,3 @@
-// TODO: ADD ANEMOMETER FILTER IN
-
 #if (ARDUINO >= 100)
  #include <Arduino.h>
 #else
@@ -22,9 +20,11 @@
 // The pin the wind vane sensor is connected to
 #define WIND_VANE_PIN (A4)       
 
+const int anemometerInterval = 100; //ms between anemometer reads
+
 ros::NodeHandle nh;
 std_msgs::Float32 winddir;
-boat_nav::GPS gpsData;
+boat_msgs::GPS gpsData;
 
 SoftwareSerial mySerial(GPS_TX_PIN, GPS_RX_PIN);
 Adafruit_GPS GPS(&mySerial);
@@ -35,6 +35,7 @@ float lastWindDirection = 0;
 uint32_t GPS_timer = millis();
 float last_lat = 0, last_long = 0;
 int last_status = 0;
+unsigned long previousMillis = 0;
 
 
 float mapf(float value, float fromLow, float fromHigh, float toLow, float toHigh){
@@ -83,27 +84,31 @@ void setup(){
 }
 
 void loop(){
-    GPS.read();
-
-    // Map 0-1023 ADC value to 0-360
-    calWindDirection = mapf(analogRead(WIND_VANE_PIN), 0.0, 1023.0, 0.0, 360.0);
+    if ((millis() - previousMillis) > anemometerInterval){
+        // Map 0-1023 ADC value to 0-360
+        calWindDirection = mapf(analogRead(WIND_VANE_PIN), 0.0, 1023.0, 0.0, 360.0);
+      
+        // Ensure the wind direction is between 0 and 360
+        while(calWindDirection >= 360.0)
+            calWindDirection = calWindDirection - 360.0;
+        while(calWindDirection < 0)
+            calWindDirection = calWindDirection + 360;
   
-    // Ensure the wind direction is between 0 and 360
-    while(calWindDirection >= 360.0)
-        calWindDirection = calWindDirection - 360.0;
-    while(calWindDirection < 0)
-        calWindDirection = calWindDirection + 360;
-
-    // Convert to true value through lookup table
-    calWindDirection = lookupTrueWindDirection(calWindDirection);
+        calWindDirection = medianFilter(exponentialFilter(calWindDirection));
     
-    // Only update the topic if change greater than 5 degrees. 
-    if(abs(calWindDirection - lastWindDirection) > 5)
-    { 
-         lastWindDirection = calWindDirection;
-         winddir.data = calWindDirection;
-         anemometer.publish(&winddir);       
+        // Convert to true value through lookup table
+        calWindDirection = lookupTrueWindDirection(calWindDirection);
+        
+        // Only update the topic if change greater than 5 degrees. 
+        if(abs(calWindDirection - lastWindDirection) > 5)
+        { 
+             lastWindDirection = calWindDirection;
+             winddir.data = calWindDirection;
+             anemometer.publish(&winddir);       
+        }
     }
+
+    GPS.read();
 
     // if a sentence is received, we can check the checksum, parse it...
     if (GPS.newNMEAreceived()) {
