@@ -80,6 +80,7 @@ if __name__=="__main__":
 	settings = termios.tcgetattr(sys.stdin)
 	joy_pub = rospy.Publisher('joy', Joy, queue_size = 1)
 	wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 1)
+	rudder_pub = rospy.Publisher('rudder', Float32, queue_size = 1)
 	rospy.init_node('keyboard_node')
 	rate = rospy.Rate(100)
 	
@@ -163,6 +164,11 @@ if __name__=="__main__":
 			wind = Float32()
 			wind.data = anemometer
 			wind_pub.publish(wind)
+			
+			# Publish rudder pos
+			rudder = Float32()
+			rudder.data = rudder_pos
+			rudder_pub.publish(rudder)
 
 			# Reset state buttons
 			if tack_prev_request:
