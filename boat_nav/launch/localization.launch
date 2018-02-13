@@ -14,9 +14,8 @@
     <!--publishes to gps/filtered-->
     <param name="publish_filtered_gps" value="true"/>
 
-    <!--Dont know where imu data is pusblished-->
     <remap from="imu/data" to="imu/data"/>
-    <!--odometry/filtered is output from ekf-->
+    <!--Drops subscription after first message-->
     <remap from="odometry/filtered" to="odometry/filtered"/>
     <remap from="gps/fix" to="odometry_navsatfix"/>
   </node>
