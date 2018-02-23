@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import rospy
 import time
+import math
+import numpy as np
 from std_msgs.msg import Float32
 from boat_msgs.msg import Point
 from boat_msgs.msg import PointArray
@@ -11,7 +13,7 @@ new_wind = False
 wind_heading = 0
 state = BoatState()
 waypoints = []
-cur_point = Point()
+cur_point = 0
 target_heading = 0
 rate = 0
 
@@ -26,21 +28,26 @@ def boat_state_callback(new_state):
 	global state
 	state = new_state
 
-def wind_callback(heading):
+def wind_callback(headingMsg):
 	global wind_heading
 	global new_wind
 	
-	wind_heading = heading
+	wind_heading = headingMsg.data
 	new_wind = True
 
-def waypoints_callback(points):
+def waypoints_callback(pointsMsg):
 	global waypoints
-	waypoints = points
+	waypoints = pointsMsg.points
 
 def position_callback(position):
 	global state
 	global wind_heading
 	global new_wind
+	global cur_point
+	global waypoints
+	global target_heading
+	global rate
+
 	buoy_tolerance = 5
 
 	rate = rospy.Rate(100)
