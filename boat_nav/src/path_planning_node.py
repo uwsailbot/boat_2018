@@ -28,16 +28,16 @@ def boat_state_callback(new_state):
 	global state
 	state = new_state
 
-def wind_callback(headingMsg):
+def wind_callback(new_heading):
 	global wind_heading
 	global new_wind
 	
-	wind_heading = headingMsg.data
+	wind_heading = new_heading.data
 	new_wind = True
 
-def waypoints_callback(pointsMsg):
+def waypoints_callback(new_waypoint):
 	global waypoints
-	waypoints = pointsMsg.points
+	waypoints = new_waypoint.points
 
 def position_callback(position):
 	global state
