@@ -8,7 +8,7 @@ from boat_msgs.msg import BoatState
       
 import time
 
-wind_dir = 0
+ane_reading = 0
 request = "Hold"
 winch_pos = 0
 max_angle = 30  # Closest angle we can sail to the wind
@@ -49,23 +49,23 @@ def joy_callback(controller):
     rate.sleep()
 
 
-def anemometer_callback(wind_direction):
+def anemometer_callback(anemometer):
     global winch_pos
     global state
-    global wind_dir
+    global ane_reading
     global pub
 
-    wind_dir = wind_direction.data
+    ane_reading = anemometer.data
     rate = rospy.Rate(10)
 
     # If we are in autonomous mode, set the sail based on the wind direction given by the anemometer
     if state.major is BoatState.MAJ_AUTONOMOUS:
-        if wind_dir < (180 + max_angle) and wind_dir > (180 - max_angle):
+        if ane_reading < (180 + max_angle) and ane_reading > (180 - max_angle):
             new_position = 0
-        elif wind_dir >= (180 - max_angle):
-            new_position = (600 / (180 - max_angle)) * abs(wind_dir-(max_angle + 180)) + 1000
+        elif ane_reading >= (180 - max_angle):
+            new_position = (600 / (180 - max_angle)) * abs(ane_reading-(max_angle + 180)) + 1000
         else:
-            new_position = (600 / (180 - max_angle)) * abs(wind_dir-(180 - max_angle)) + 1000
+            new_position = (600 / (180 - max_angle)) * abs(ane_reading-(180 - max_angle)) + 1000
 
         # If the change in sail position is significant, then publish a new position
         if abs(new_position - winch_pos) > 100:

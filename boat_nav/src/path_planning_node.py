@@ -10,7 +10,7 @@ from boat_msgs.msg import BoatState
 
 # Declare global variables needed for the node
 new_wind = False
-wind_heading = 0
+ane_reading = 0
 state = BoatState()
 waypoints = []
 cur_point = 0
@@ -28,11 +28,11 @@ def boat_state_callback(new_state):
 	global state
 	state = new_state
 
-def wind_callback(new_heading):
-	global wind_heading
+def anemometer_callback(new_heading):
+	global ane_reading
 	global new_wind
 	
-	wind_heading = new_heading.data
+	ane_reading = new_heading.data
 	new_wind = True
 
 def waypoints_callback(new_waypoint):
@@ -41,7 +41,7 @@ def waypoints_callback(new_waypoint):
 
 def position_callback(position):
 	global state
-	global wind_heading
+	global ane_reading
 	global new_wind
 	global cur_point
 	global waypoints
@@ -74,17 +74,17 @@ def position_callback(position):
 	best_heading = np.arctan2(waypoints[cur_point].y - position.y, waypoints[cur_point].x - position.x) * 180 / np.pi
 			
 	# If the direct path isn't possible...
-	if best_heading > wind_heading-layline and best_heading < wind_heading+layline:
+	if best_heading > ane_reading-layline and best_heading < ane_reading+layline:
 		
 		# ... and there's new wind data, update the heading
 		if new_wind:
 			new_wind = False
 			
 			# If the waypoint is to the right of the wind...
-			if best_heading > wind_heading:
-				target_heading = wind_heading + layline
+			if best_heading > ane_reading:
+				target_heading = ane_reading + layline
 			else:
-				target_heading = wind_heading - layline
+				target_heading = ane_reading - layline
 				
 		# If there isn't new wind data, DON'T update the heading
 		else:
@@ -111,7 +111,7 @@ def is_within_dist(p1, p2, dist):
 def listener():
     rospy.init_node('path_planning')
     rospy.Subscriber('boat_state', BoatState, boat_state_callback)
-    rospy.Subscriber('anemometer', Float32, wind_callback)
+    rospy.Subscriber('anemometer', Float32, anemometer_callback)
     rospy.Subscriber('waypoints', PointArray, waypoints_callback)
 
 	# If the filters work, change lps to use /odometry/filtered
