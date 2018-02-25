@@ -61,8 +61,9 @@ def compass_callback(compass):
 	global ane_reading
 	global wind_heading_pub
 
-	wind_reading = (ane_reading + 180) % 360
-	wind_heading = (ane_reading + compass.data) % 360
+	wind_reading = Float32()
+	wind_reading.data = (ane_reading + 180) % 360
+	wind_heading.data = (ane_reading + compass.data) % 360
 	wind_heading_pub.publish(wind_heading)
 	
 # Convert from gps to lps

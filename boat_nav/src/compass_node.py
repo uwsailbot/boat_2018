@@ -20,7 +20,9 @@ def orientation_callback(imu):
 	if yaw >= 360:
 		yaw = yaw % 360
 	
-	compass_filtered_pub.publish(yaw)
+	heading = Float32()
+	heading.data = yaw
+	compass_filtered_pub.publish(heading)
 
 def mag_callback(mag):
 	global compass_mag_pub
@@ -29,7 +31,8 @@ def mag_callback(mag):
 	x = -1 * mag.magnetic_field.x
 	y = mag.magnetic_field.y
 
-	heading = math.degrees(math.atan2(y, x))
+	heading = Float32()
+	heading.data = math.degrees(math.atan2(y, x))
 	compass_mag_pub.publish(heading)
 
 def listener():
