@@ -1,4 +1,4 @@
 <launch>
  <node pkg="boat_nav" type="path_planning_node.py" name="path_planning" />
- <node pkg="boat_nav" type="gps_parser.py" name="gps_parser"/>
+ <node pkg="boat_nav" type="sensor_parser_node.py" name="sensor_parser"/>
 </launch>

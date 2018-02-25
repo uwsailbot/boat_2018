@@ -12,11 +12,13 @@ import math
 # Declare global variables needed for the node
 origin_lps = Point()
 RADIUS = 6378137 # Radius of earth, in meters
+ane_reading = 0
 
 # Declare the publishers for the node
 gps_pub = rospy.Publisher('odometry_navsatfix', NavSatFix, queue_size=10)
 lps_pub = rospy.Publisher('lps', Point, queue_size=10)
 waypoints_pub = rospy.Publisher('waypoints', PointArray, queue_size=10)
+wind_heading_pub = rospy.Publisher('wind_heading', Float32, queue_size=10)
 
 # Convert the current boat location from gps to lps
 # Convert GPS to NavSatFix msg for filtering
@@ -50,6 +52,18 @@ def waypoints_callback(waypoints_raw):
 		
 	rospy.loginfo(rospy.get_caller_id() + " Converted waypoints to local positioning system")
 	waypoints_pub.publish(waypoints)
+
+def anemometer_callback(anemometer):
+	global ane_reading
+	ane_reading = anemometer.data
+
+def compass_callback(compass):
+	global ane_reading
+	global wind_heading_pub
+
+	wind_reading = (ane_reading + 180) % 360
+	wind_heading = (ane_reading + compass.data) % 360
+	wind_heading_pub.publish(wind_heading)
 	
 # Convert from gps to lps
 def gpsToLps(coords):
@@ -75,19 +89,23 @@ def sind(angle):
 
 # Initialize the node
 def listener():
-    global origin_lps
+	global origin_lps
     
-    rospy.init_node('gps_parser')
+	rospy.init_node('sensor_parser')
     
     # setup the origin
-    origin_coords = rospy.wait_for_message('gps_raw', GPS)
-    origin_lps = gpsToLps(getCoords(origin_coords))
-    rospy.loginfo("Got origin: x:%f y:%f", origin_lps.x, origin_lps.y)
+	origin_coords = rospy.wait_for_message('gps_raw', GPS)
+	origin_lps = gpsToLps(getCoords(origin_coords))
+	rospy.loginfo("Got origin: x:%f y:%f", origin_lps.x, origin_lps.y)
     
     
-    rospy.Subscriber('gps_raw', GPS, gps_callback)
-    rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
-    rospy.spin()
+	rospy.Subscriber('gps_raw', GPS, gps_callback)
+	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
+	rospy.Subscriber('anemometer', Float32, anemometer_callback)
+	
+	# TODO: Change to whichever compass topic is more accurate
+	rospy.Subscriber('compass_mag', Float32, compass_callback)
+	rospy.spin()
 
 
 if __name__ == '__main__':
