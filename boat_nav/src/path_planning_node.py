@@ -47,6 +47,8 @@ def position_callback(position):
 	global waypoints
 	global target_heading
 	global rate
+	global boat_state_pub
+    global heading_pub
 
 	buoy_tolerance = 5
 

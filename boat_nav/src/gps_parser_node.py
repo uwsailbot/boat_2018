@@ -21,6 +21,9 @@ waypoints_pub = rospy.Publisher('waypoints', PointArray, queue_size=10)
 # Convert the current boat location from gps to lps
 # Convert GPS to NavSatFix msg for filtering
 def gps_callback(gps):
+	global gps_pub
+	global lps_pub
+
 	gps_parsed = NavSatFix()
 	gps_parsed.header = gps.header
 	gps_parsed.status = gps.status
@@ -39,6 +42,7 @@ def gps_callback(gps):
 
 # Convert the list of waypoints from gps to lps
 def waypoints_callback(waypoints_raw):
+	global waypoints_pub
 	waypoints = PointArray()
 
 	for curpoint in waypoints_raw.points:
