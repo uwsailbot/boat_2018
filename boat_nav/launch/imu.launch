@@ -46,4 +46,8 @@
     <param name="use_magnetic_field_msg" value="true"/>
   </node>
 
+  #### Compass Heading Publisher ###############################################
+
+  <node pkg="boat_nav" type="compass_node.py" name="compass"/>
+
 </launch>
