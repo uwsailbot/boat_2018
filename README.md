@@ -28,13 +28,14 @@ This package relies on phidgets_imu and imu_filter_madgwick in order to compile.
 
 Either way make sure to read the README.md in their repo and follow some extra steps.
 
-You must download the python phidgets API [See here](https://www.phidgets.com/docs/Language_-_Python#Install_Phidget_Python_module_for_Linux)
+Also be sure to download the phidgets compass calibration program [See here](https://www.phidgets.com/?tier=3&catid=10&pcid=8&prodid=32)
 
-Run this in the libphidget folder to build it:
+### Phidgets API (OPTIONAL)
+If you want to download the python phidgets API [See here](https://www.phidgets.com/docs/Language_-_Python#Install_Phidget_Python_module_for_Linux)
+
+You can also download the library from that same link and you must run this in the libphidget folder to build it:
 
 	$ ./configure --prefix=/usr && make && sudo make install
-
-Also be sure to download the phidgets compass calibration program [See here](https://www.phidgets.com/?tier=3&catid=10&pcid=8&prodid=32)
 
 ## boat_msgs
 Custom messages for path planning, gps coordinates and boat states in order to facilitate the communication of other packages.
