@@ -42,9 +42,5 @@ Also be sure to download the phidgets compass calibration program [See here](htt
 ### Phidgets API (OPTIONAL)
 If you want to download the python phidgets API [See here](https://www.phidgets.com/docs/Language_-_Python#Install_Phidget_Python_module_for_Linux)
 
-You can also download the library from that same link and you must run this in the libphidget folder to build it:
-
-	$ ./configure --prefix=/usr && make && sudo make install
-
 ## boat_msgs
 Custom messages for path planning, gps coordinates and boat states in order to facilitate the communication of other packages.
