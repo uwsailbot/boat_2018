@@ -121,7 +121,7 @@ def listener():
     rospy.Subscriber('boat_state', BoatState, boat_state_callback)
     rospy.Subscriber('anemometer', Float32, anemometer_callback)
     rospy.Subscriber('waypoints', PointArray, waypoints_callback)
-	rospy.Subscriber('compass', Float32, compass_callback)
+    rospy.Subscriber('compass', Float32, compass_callback)
 
 	# If the filters work, change lps to use /odometry/filtered
     rospy.Subscriber('lps', Point, position_callback)
