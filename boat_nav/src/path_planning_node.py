@@ -62,8 +62,8 @@ def position_callback(position):
 
 	rate = rospy.Rate(100)
 
-	# If the boat isn't in the autonomous planning state, exit
-	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
+	# If the boat isn't in the autonomous planning state, or there are no waypoints, exit
+	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING or len(waypoints) is 0:
 		return
 	
 	# If the boat is close enough to the waypoint...
