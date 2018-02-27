@@ -7,6 +7,35 @@
 
 using namespace std;
 
+/* Expected message to parse:
+
+Choose:
+    2: 2-axis calibration
+    3: 3-axis calibration
+
+::>3
+Clearing any previous calibration data...
+Press Enter to start sampling...
+
+Sampling... Press Enter to stop...
+
+Estimates: gains(0.000, 0.046, 0.007) offsets(89299676.752, 0.106, 0.412)
+
+
+Compass calibration finished
+    Vars: 56.846573, 89299676.752301, 0.105974, 0.411768, 0.000000, 0.045985, 0.006789, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000
+
+These arguments are in the right order to be passed direcly into the PhidgetSpatial_setCompassCorrectionParameters function.
+
+You may wish to use a more accurate value for magnetic field strength as the number provided here is only an estimate.
+
+Calibration values have been written to firmware on your spatial.
+These values will be maintained from now on, across power cycles, until explicitely reset or changed.
+
+Enter to exit
+
+*/
+
 const char PROGNAME[] = "compasscal"; //name of calibration program, no path, must be in same directory
 const char FILEPATH[] = "/home/cliff/catkin_ws/src/phidgets_drivers/phidgets_imu/launch/imu.launch"; //launch file
 const char BACKUP_FILEPATH[] = "/home/cliff/catkin_ws/src/phidgets_drivers/phidgets_imu/launch/imu_old.launch";
@@ -19,13 +48,17 @@ bool writeToFile (const char filepath[], const char* const lines[], const int li
 bool replaceValueInLine (const char line[], char changedLine[], const char newValue[]);
 bool makeBackup (const char filepath[], const char backupFilepath[]);
 
+
 int main (){
-	char* arguments[SIZE];
+        //---------run calibration program-----------//
+        char* arguments[SIZE];
 	cout << "Running calibration program." << endl;
 	if (!getVals (PROGNAME, arguments, SIZE)) {
 		cerr << "Error running calibration program." << endl;
 		return -1;
 	}
+
+        //---------save results to file-------------//
 	cout << "Beginning process to save these value to launch file:" << endl;
 	cout << "Creating backup..." << endl;
 	if (makeBackup (FILEPATH, BACKUP_FILEPATH)) {
@@ -142,24 +175,41 @@ bool getVals (const char progname[], char* arguments[], const int size){
 			return false;
 		}
 
-		//now we read everything.
-		//has to read two times, first time will go up to Estimates,
-		//second time will start with "Compass calibration finished ..." and the the variables
-		char line[1001];
-		for (int i = 0; i < 2; i++) {
+                //now we read everything.
+                char allLines[1001];
+                int curIndex=0;
+                for (int i = 0; i < 100; i++) {
+                        char line[1001];
+                        for (int j=0;j<1001;j++){
+                            line[j]=0;
+                        }
 			if (read (c2p[0], line, 1000) < 0) {
 				cerr << "Error reading output message from calibration program." << endl;
-				return false;
+                                return false;
 			}
-			cout << line;
+
+                        if(line[0]==0){
+                            break;
+                        }
+
+                        cout <<"["<<i<<"] "<< line;
+                        for(int j=0;j<1001;j++){
+                            allLines[curIndex+j]=line[j];
+                            if(line[j]==0){
+                                curIndex = curIndex + j;
+                                break;
+                            }
+                        }
+
 		}
+                cout << endl << endl;
 		cout << "Finished running calibration program." << endl;
 		if (close (p2c[1]) < 0 || close (c2p[0]) < 0) {
 			cout << "Error closing pipes." << endl;
 			return false;
 		}
 
-		if (!parseLine (line, arguments, size)) {
+                if (!parseLine (allLines, arguments, size)) {
 			return false;
 		}
 
@@ -169,19 +219,19 @@ bool getVals (const char progname[], char* arguments[], const int size){
 }
 
 
-/* Sample input for parsing:
-
+/* For parsing, start by detected "Vars", then read numbers in order:
+   ...
+   ...
+   ...
+   ...
    Compass calibration finished
     Vars: 0.004434, -0.084885, 0.319036, 0.266376, 8.716262, 269.402878, 398.528180, -0.014981, -0.100216, -0.453510, 0.764028, -4.634166, 1.167096
 
    These arguments are in the right order to be passed direcly into the PhidgetSpatial_setCompassCorrectionParameters function.
-
-   You may wish to use a more accurate value for magnetic field strength as the number provided here is only an estimate.
-
-   Calibration values have been written to firmware on your spatial.
-   These values will be maintained from now on, across power cycles, until explicitely reset or changed.
-
-   Enter to exit
+   ...
+   ...
+   ...
+   ...
  */
 
 bool parseLine (const char* line, char* arguments[], const int size){
@@ -197,6 +247,21 @@ bool parseLine (const char* line, char* arguments[], const int size){
 
 	int count = 0; //number of values found
 	bool startedReadingNumbers = false; //once we hit the list of values this should become true
+
+        //goto "Vars:"
+
+        while (line[lineIndex] && lineIndex < 9996) {
+            if(line[lineIndex] == 'V' &&
+                    line[lineIndex+1] == 'a' &&
+                    line[lineIndex+2] == 'r' &&
+                    line[lineIndex+3] == 's' &&
+                    line[lineIndex+4] == ':'){
+                lineIndex = lineIndex +5;
+                break;
+            }
+            lineIndex++;
+        }
+
 
 	while (line[lineIndex] && lineIndex < 1001 && count < size) {
 		switch (line[lineIndex]) {
