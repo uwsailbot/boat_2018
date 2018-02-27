@@ -79,10 +79,10 @@ def anemometer_callback(anemometer):
 
 
 # If the gps topic changes, update the pid controller's input value
-def gps_callback(gps):
+def compass_callback(compass):
 	global cur_boat_heading
 	
-	cur_boat_heading = gps.track
+	cur_boat_heading = compass.data
 	heading_msg = Float64()
 	heading_msg.data = cur_boat_heading
 	pid_input_pub.publish(heading_msg)
@@ -93,7 +93,7 @@ def gps_callback(gps):
 def pid_callback(output):
 	global rudder_pos
 	
-	rudder_pos = output
+	rudder_pos = output + 90.0
 	position_msg = Float32()
 	position_msg.data = rudder_pos
 	rudder_pos_pub.publish(position_msg)
@@ -228,7 +228,7 @@ def listener():
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
 	rospy.Subscriber('anemometer', Float32, anemometer_callback)
 	rospy.Subscriber('target_heading', Float32, target_heading_callback)
-	rospy.Subscriber('gps_raw', GPS, gps_callback)
+	rospy.Subscriber('compass', Float32, compass_callback)
 	rospy.Subscriber('rudder_pid/output', Float64, pid_callback)
 	rospy.spin()
 	
