@@ -12,9 +12,9 @@ import time
 rudder_pos = 90  # What the rudder position is (0-180)
 cur_boat_heading = 0
 ane_reading = 0
+wind_heading = 0
 state = BoatState()
 pid_is_enabled = False
-tack_request = False
 tacking_direction = 0
 
 # Declare the publishers for the node
@@ -41,11 +41,17 @@ def anemometer_callback(anemometer):
 	global rudder_pos
 	global state
 
-	rate = rospy.Rate(10)
-	rudder_pos_msg = Float32()
 	ane_reading = anemometer.data
 
-	# Based on direction of tack, keep the rudder turned while the boat crosses wind and passes 30 		# degrees to the other side, then set the rudder back to 90
+	# No need to check tacking directions if we are in autonomous or not tacking
+	if state.major is not BoatState.MAJ_RC or state.minor is not BoatState.MIN_TACKING:
+		return
+
+	rate = rospy.Rate(10)
+	rudder_pos_msg = Float32()
+
+	# Based on direction of tack, keep the rudder turned while the boat crosses wind and passes 30 		
+	# degrees to the other side, then set the rudder back to 90
 	if tacking_direction == 1:
 		if ane_reading > 150:
 			if not rudder_pos == 150.0:
@@ -81,7 +87,11 @@ def anemometer_callback(anemometer):
 # If the gps topic changes, update the pid controller's input value
 def compass_callback(compass):
 	global cur_boat_heading
+	global wind_heading
 	
+	wind_heading = (ane_reading + 180) % 360
+	wind_heading = (ane_reading + compass.data) % 360
+
 	cur_boat_heading = compass.data
 	heading_msg = Float64()
 	heading_msg.data = cur_boat_heading
@@ -102,7 +112,7 @@ def pid_callback(output):
 	
 # If the target boat heading topic changes, update rudder PID setpoint
 def target_heading_callback(target_heading):
-	global ane_reading
+	global wind_heading
 	global state
 	global cur_boat_heading
 	global pid_is_enabled
@@ -124,9 +134,9 @@ def target_heading_callback(target_heading):
 	rospy.loginfo(rospy.get_caller_id() + " New rudder setpoint: %f", target_heading)
 
 	# If the current heading and the new heading are on opposite sides of the wind, we need to tack
-	opp_wind = (ane_reading+180)%360
-	if (is_in_bounds(target_heading, ane_reading, opp_wind) and not is_in_bounds(cur_boat_heading, ane_reading, opp_wind)) or\
-		(is_in_bounds(cur_boat_heading, ane_reading, opp_wind) and not is_in_bounds(target_heading, ane_reading, opp_wind)):
+	opp_wind = (wind_heading+180)%360
+	if (is_in_bounds(target_heading, wind_heading, opp_wind) and not is_in_bounds(cur_boat_heading, wind_heading, opp_wind)) or\
+		(is_in_bounds(cur_boat_heading, wind_heading, opp_wind) and not is_in_bounds(target_heading, wind_heading, opp_wind)):
 		
 		state.minor = BoatState.MIN_TACKING
 		boat_state_pub.publish(state)
