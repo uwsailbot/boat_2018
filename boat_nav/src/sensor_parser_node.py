@@ -7,6 +7,8 @@ from boat_msgs.msg import PointArray
 from boat_msgs.msg import GPS
 from sensor_msgs.msg import NavSatFix
 from sensor_msgs.msg import NavSatStatus
+from sensor_msgs.msg import Imu
+from tf.transformations import euler_from_quaternion
 import math
 
 # Declare global variables needed for the node
@@ -19,6 +21,7 @@ gps_pub = rospy.Publisher('odometry_navsatfix', NavSatFix, queue_size=10)
 lps_pub = rospy.Publisher('lps', Point, queue_size=10)
 waypoints_pub = rospy.Publisher('waypoints', PointArray, queue_size=10)
 wind_heading_pub = rospy.Publisher('wind_heading', Float32, queue_size=10)
+compass_pub = rospy.Publisher('compass', Float32, queue_size=10)
 
 # Convert the current boat location from gps to lps
 # Convert GPS to NavSatFix msg for filtering
@@ -56,15 +59,6 @@ def waypoints_callback(waypoints_raw):
 def anemometer_callback(anemometer):
 	global ane_reading
 	ane_reading = anemometer.data
-
-def compass_callback(compass):
-	global ane_reading
-	global wind_heading_pub
-
-	wind_reading = Float32()
-	wind_reading.data = (ane_reading + 180) % 360
-	wind_heading.data = (ane_reading + compass.data) % 360
-	wind_heading_pub.publish(wind_heading)
 	
 # Convert from gps to lps
 def gpsToLps(coords):
@@ -88,6 +82,18 @@ def cosd(angle):
 def sind(angle):
 	return math.sin(math.radians(angle))
 
+def orientation_callback(imu):
+	global compass_pub
+
+	explicit_quat = [imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w]
+	roll, pitch, yaw = euler_from_quaternion(explicit_quat)
+
+	yaw = math.degrees(yaw) % 360
+	
+	heading = Float32()
+	heading.data = yaw
+	compass_pub.publish(heading)
+
 # Initialize the node
 def listener():
 	global origin_lps
@@ -99,13 +105,10 @@ def listener():
 	origin_lps = gpsToLps(getCoords(origin_coords))
 	rospy.loginfo("Got origin: x:%f y:%f", origin_lps.x, origin_lps.y)
     
-    
+    	rospy.Subscriber('imu/data', Imu, orientation_callback)
 	rospy.Subscriber('gps_raw', GPS, gps_callback)
 	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
 	rospy.Subscriber('anemometer', Float32, anemometer_callback)
-	
-	# TODO: Change to whichever compass topic is more accurate
-	rospy.Subscriber('compass_mag', Float32, compass_callback)
 	rospy.spin()
 
 

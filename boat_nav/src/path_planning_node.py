@@ -11,6 +11,7 @@ from boat_msgs.msg import BoatState
 # Declare global variables needed for the node
 new_wind = False
 ane_reading = 0
+wind_heading = 0
 state = BoatState()
 waypoints = []
 cur_point = 0
@@ -35,20 +36,27 @@ def anemometer_callback(new_heading):
 	ane_reading = new_heading.data
 	new_wind = True
 
+def compass_callback(compass):
+	global ane_reading
+	global wind_heading_pub
+
+	wind_heading = (ane_reading + 180) % 360
+	wind_heading = (ane_reading + compass.data) % 360
+
 def waypoints_callback(new_waypoint):
 	global waypoints
 	waypoints = new_waypoint.points
 
 def position_callback(position):
 	global state
-	global ane_reading
+	global wind_heading
 	global new_wind
 	global cur_point
 	global waypoints
 	global target_heading
 	global rate
 	global boat_state_pub
-    global heading_pub
+	global heading_pub
 
 	buoy_tolerance = 5
 
@@ -74,17 +82,17 @@ def position_callback(position):
 	best_heading = np.arctan2(waypoints[cur_point].y - position.y, waypoints[cur_point].x - position.x) * 180 / np.pi
 			
 	# If the direct path isn't possible...
-	if best_heading > ane_reading-layline and best_heading < ane_reading+layline:
+	if best_heading > wind_heading-layline and best_heading < wind_heading+layline:
 		
 		# ... and there's new wind data, update the heading
 		if new_wind:
 			new_wind = False
 			
 			# If the waypoint is to the right of the wind...
-			if best_heading > ane_reading:
-				target_heading = ane_reading + layline
+			if best_heading > wind_heading:
+				target_heading = wind_heading + layline
 			else:
-				target_heading = ane_reading - layline
+				target_heading = wind_heading - layline
 				
 		# If there isn't new wind data, DON'T update the heading
 		else:
@@ -113,6 +121,7 @@ def listener():
     rospy.Subscriber('boat_state', BoatState, boat_state_callback)
     rospy.Subscriber('anemometer', Float32, anemometer_callback)
     rospy.Subscriber('waypoints', PointArray, waypoints_callback)
+	rospy.Subscriber('compass', Float32, compass_callback)
 
 	# If the filters work, change lps to use /odometry/filtered
     rospy.Subscriber('lps', Point, position_callback)
