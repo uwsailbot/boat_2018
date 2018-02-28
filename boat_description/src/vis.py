@@ -3,13 +3,14 @@
 import rospy
 import sys, select, termios, tty
 from sensor_msgs.msg import Joy
-from sensor_msgs.msg import MagneticField
+from sensor_msgs.msg import Imu
 from boat_msgs.msg import BoatState
 from boat_msgs.msg import GPS
 from boat_msgs.msg import Point
 from boat_msgs.msg import PointArray
 from std_msgs.msg import Float32
 from std_msgs.msg import Int32
+from tf.transformations import quaternion_from_euler
 import time
 import sys
 import numpy
@@ -33,26 +34,31 @@ state = BoatState()
 rudderPos = 90
 winchPos = 0
 points = PointArray()
+RADIUS = 6378137 # Radius of earth, in meters
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
 state_pub = rospy.Publisher('boat_state', BoatState, queue_size = 1)
 waypoint_pub = rospy.Publisher('waypoints', PointArray, queue_size = 1)
 wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 1)
-gps_pub = rospy.Publisher('lps', Point, queue_size = 1)
-compass_pub = rospy.Publisher('imu/mag', MagneticField, queue_size = 1)
+gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 1)
+orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 1)
 
 
 def updateGPS():
-    # Change to use actual GPS coords
-    gps_pub.publish(pos)
-    
-    field = MagneticField()
-    field.magnetic_field.x = numpy.cos(numpy.radians(heading))
-    field.magnetic_field.y = numpy.sin(numpy.radians(heading))
-    field.magnetic_field.z = 0
-    compass_pub.publish(field)
+    gps = GPS()
+    gps.status = GPS.STATUS_FIX
 
+    # Vaguely uncertain of this math https://sciencing.com/convert-xy-coordinates-longitude-latitude-8449009.html
+    gps.longitude = numpy.arctan2(pos.y, pos.x)
+    gps.lattitude = numpy.arccos((pos.y/RADIUS) / numpy.sin(gps.longitude))
+    gps_pub.publish(gps)
+    
+    orientation = quaternion_from_euler(0,0,heading)
+    imu = Imu()
+    imu.orientation = orientation
+    orientation_pub.publish(imu)
+ 
 def updateWind(offset):
     global wind_heading
     global heading
