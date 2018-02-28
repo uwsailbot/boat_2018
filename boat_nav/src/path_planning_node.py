@@ -11,7 +11,7 @@ from boat_msgs.msg import BoatState
 # Declare global variables needed for the node
 new_wind = False
 ane_reading = 0
-wind_heading = 0
+wind_heading = 0 # Direction the wind is pointing
 state = BoatState()
 waypoints = []
 cur_point = 0
@@ -40,7 +40,6 @@ def compass_callback(compass):
 	global ane_reading
 	global wind_heading_pub
 
-	wind_heading = (ane_reading + 180) % 360
 	wind_heading = (ane_reading + compass.data) % 360
 
 def waypoints_callback(new_waypoint):

@@ -26,7 +26,7 @@ clock = 0
 lastTime = -1
 boatSpeed = 4 # px/s
 
-windDir = 90
+wind_heading = 90
 pos = Point()
 heading = 90
 state = BoatState()
@@ -44,6 +44,7 @@ compass_pub = rospy.Publisher('imu/mag', MagneticField, queue_size = 1)
 
 
 def updateGPS():
+    # Change to use actual GPS coords
     gps_pub.publish(pos)
     
     field = MagneticField()
@@ -53,17 +54,21 @@ def updateGPS():
     compass_pub.publish(field)
 
 def updateWind(offset):
-    global windDir
+    global wind_heading
+    global heading
 
     # Publish new anemometer message to relay requested wind data
-    windDir = windDir + offset
-    if windDir >= 360:
-        windDir = windDir - 360
-    elif windDir < 0:
-        windDir = windDir + 360
-    wind = Float32()
-    wind.data = windDir
-    wind_pub.publish(wind)
+    wind_heading = wind_heading + offset
+    if wind_heading >= 360:
+        wind_heading = wind_heading - 360
+    elif wind_heading < 0:
+        wind_heading = wind_heading + 360
+    
+    ane_reading = Float32()
+    ane_reading.data = (wind_heading - heading) % 360
+    if ane_reading.data < 0:
+        ane_reading.data + 360
+    wind_pub.publish(ane_reading)
     
 def update_boat_state(newMaj):
     global state
@@ -223,7 +228,7 @@ def drawStatus():
     
     # Draw the wind readout
     glColor3f(0.0, 0.0, 0.0)
-    drawText("Wind: " + str(windDir), winWidth-110, winHeight-20)
+    drawText("Wind: " + str(wind_heading), winWidth-110, winHeight-20)
     drawWindArrow(winWidth-60,winHeight-50)
     
     # Draw the boat pos
@@ -271,7 +276,7 @@ def drawWindArrow(x,y):
     glColor3f(0.0, 1.0, 0.0)
     drawCircle(65,0,0)
     
-    glRotatef(windDir-90,0,0,1)
+    glRotatef(wind_heading-90,0,0,1)
     glTranslatef(0,35,0)
     
     glColor3f(1.0, 0.0, 0.0)
