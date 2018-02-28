@@ -38,7 +38,7 @@ def anemometer_callback(new_heading):
 
 def compass_callback(compass):
 	global ane_reading
-	global wind_heading_pub
+	global wind_heading
 
 	wind_heading = (ane_reading + compass.data) % 360
 
@@ -61,8 +61,8 @@ def position_callback(position):
 
 	rate = rospy.Rate(100)
 
-	# If the boat isn't in the autonomous planning state, exit
-	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
+	# If the boat isn't in the autonomous planning state, or there are no waypoints, exit
+	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING or len(waypoints) is 0:
 		return
 	
 	# If the boat is close enough to the waypoint...
@@ -120,7 +120,7 @@ def listener():
     rospy.Subscriber('boat_state', BoatState, boat_state_callback)
     rospy.Subscriber('anemometer', Float32, anemometer_callback)
     rospy.Subscriber('waypoints', PointArray, waypoints_callback)
-	rospy.Subscriber('compass', Float32, compass_callback)
+    rospy.Subscriber('compass', Float32, compass_callback)
 
 	# If the filters work, change lps to use /odometry/filtered
     rospy.Subscriber('lps', Point, position_callback)
