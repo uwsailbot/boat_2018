@@ -88,8 +88,7 @@ def anemometer_callback(anemometer):
 def compass_callback(compass):
 	global cur_boat_heading
 	global wind_heading
-	
-	wind_heading = (ane_reading + 180) % 360
+
 	wind_heading = (ane_reading + compass.data) % 360
 
 	cur_boat_heading = compass.data
