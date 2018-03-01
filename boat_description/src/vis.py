@@ -26,6 +26,7 @@ speed = 10
 clock = 0
 lastTime = -1
 boatSpeed = 4 # px/s
+RADIUS = 6378137 # Radius of earth, in meters
 
 wind_heading = 90
 pos = Point()
@@ -34,15 +35,18 @@ state = BoatState()
 rudderPos = 90
 winchPos = 0
 points = PointArray()
-RADIUS = 6378137 # Radius of earth, in meters
+joy = Joy()
+joy.axes = [0]*8
+joy.buttons = [0]*11
+
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
-state_pub = rospy.Publisher('boat_state', BoatState, queue_size = 1)
 waypoint_pub = rospy.Publisher('waypoints', PointArray, queue_size = 1)
 wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 1)
 gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 1)
 orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 1)
+joy_pub = rospy.Publisher('/joy', Joy, queue_size = 1)
 
 
 def updateGPS():
@@ -85,9 +89,6 @@ def updateWind(offset):
         ane_reading.data + 360
     wind_pub.publish(ane_reading)
     
-def update_boat_state(newMaj):
-    global state
-    state.major = newMaj
 
 def boat_state_callback(newState):
     global state
@@ -95,11 +96,11 @@ def boat_state_callback(newState):
     
 def rudder_callback(pos):
     global rudderPos
-    rudderPos = pos
+    rudderPos = pos.data
     
 def winch_callback(pos):
     global winchPos
-    winchPos = pos
+    winchPos = pos.data
     
 def waypoints_callback(newPoints):
     global points
@@ -135,32 +136,39 @@ def mouseHandler(button, state, x, y):
     waypoint_pub.publish(points)
 
 def keyboardHandler(key, mousex, mousey):
-    global rudderPos
-    if state.major is BoatState.MAJ_RC:
-        if key == GLUT_KEY_LEFT:
-            rudderPos -= 5
-        elif key == GLUT_KEY_RIGHT:
-            rudderPos += 5
-        elif key == GLUT_KEY_UP:
-            rudderPos = 90
-        elif key == GLUT_KEY_DOWN:
-            rudderPos = 90
-            
-        rudderPos = min(rudderPos, 150)
-        rudderPos = max(rudderPos, 30)
+    global joy
+    if key == GLUT_KEY_LEFT:
+        joy.axes[0] = max(joy.axes[0]-0.1, -1)
+        joy_pub.publish(joy)
+    elif key == GLUT_KEY_RIGHT:
+        joy.axes[0] = min(joy.axes[0]+0.1, 1)
+        joy_pub.publish(joy)
+    elif key == GLUT_KEY_UP or key == GLUT_KEY_DOWN:
+        joy.axes[0] = 0
+        joy_pub.publish(joy)
     
 def ASCIIHandler(key, mousex, mousey):
     global speed
+    global joy
 
     if key is chr(27):
         glutDestroyWindow(windowID)
         exit(0)
     elif key is '1':
-        update_boat_state(BoatState.MAJ_RC)
+        joy.buttons[4] = 1
+        joy.buttons[5] = 0
+        joy.buttons[8] = 0
+        joy_pub.publish(joy)
     elif key is '2':
-        update_boat_state(BoatState.MAJ_AUTONOMOUS)
+        joy.buttons[4] = 0
+        joy.buttons[5] = 1
+        joy.buttons[8] = 0
+        joy_pub.publish(joy)
     elif key is '3':
-        update_boat_state(BoatState.MAJ_DISABLED)
+        joy.buttons[4] = 0
+        joy.buttons[5] = 0
+        joy.buttons[8] = 1
+        joy_pub.publish(joy)
     elif key is 'a':
         updateWind(5)
     elif key is 'd':
@@ -170,6 +178,11 @@ def ASCIIHandler(key, mousex, mousey):
     elif key is 's':
         speed -= 0.1
         speed = max(speed, 0)
+    elif key is ' ':
+        pos.x = 0
+        pos.y = 0
+        updateGPS()
+        
         
 def redraw():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -274,7 +287,7 @@ def drawStatus():
     drawText("m: " + minor, winWidth-110, winHeight*0.56-30)
     
     drawText("Rudder: %.1f" % rudderPos, winWidth-110, winHeight*0.40)
-    drawText("Winch %.1f" % winchPos, winWidth-110, winHeight*0.40 - 15)
+    drawText("Winch %.1d" % winchPos, winWidth-110, winHeight*0.40 - 15)
     
     drawRudder(winWidth-55, winHeight*0.2)
     
@@ -378,28 +391,28 @@ def calc(running):
     
     
     # This all to be removed since it is handled by the rest of the boat
-    if(state.major == BoatState.MAJ_AUTONOMOUS):
-        if len(points.points) >= 1:
-            y = points.points[0].y
-            x = points.points[0].x
-            
-            # This is broken but whatever it's getting deleted anyways
-            h1 = heading
-            h2 = (numpy.degrees(numpy.arctan2(y-pos.y, x-pos.x))+360)%360
-            dh = h1 - h2
-            
-            if(dh > 0.1):
-                rudderPos = 120
-            elif(dh < -0.1):
-                rudderPos = 60
-            else:
-                rudderPos = 90
-            
-            if numpy.sqrt((pos.x-x)*(pos.x-x)+(pos.y-y)*(pos.y-y)) < 3:
-                points.points.remove(points.points[0])
-                waypoint_pub.publish(points)
-        else:
-            update_boat_state(BoatState.MAJ_DISABLED)
+    #if(state.major == BoatState.MAJ_AUTONOMOUS):
+    #    if len(points.points) >= 1:
+    #        y = points.points[0].y
+    #        x = points.points[0].x
+    #        
+    #        # This is broken but whatever it's getting deleted anyways
+    #        h1 = heading
+    #        h2 = (numpy.degrees(numpy.arctan2(y-pos.y, x-pos.x))+360)%360
+    #        dh = h1 - h2
+    #        
+    #        if(dh > 0.1):
+    #            rudderPos = 120
+    #        elif(dh < -0.1):
+    #            rudderPos = 60
+    #        else:
+    #            rudderPos = 90
+    #        
+    #        if numpy.sqrt((pos.x-x)*(pos.x-x)+(pos.y-y)*(pos.y-y)) < 3:
+    #            points.points.remove(points.points[0])
+    #            waypoint_pub.publish(points)
+    #    else:
+    #        update_boat_state(BoatState.MAJ_DISABLED)
 
         
     if(state.major != BoatState.MAJ_DISABLED):
