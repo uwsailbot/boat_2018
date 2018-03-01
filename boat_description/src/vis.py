@@ -50,13 +50,22 @@ def updateGPS():
     gps.status = GPS.STATUS_FIX
 
     # Vaguely uncertain of this math https://sciencing.com/convert-xy-coordinates-longitude-latitude-8449009.html
-    gps.longitude = numpy.arctan2(pos.y, pos.x)
-    gps.lattitude = numpy.arccos((pos.y/RADIUS) / numpy.sin(gps.longitude))
+    #gps.longitude = numpy.arctan2(pos.y, pos.x)
+    #print(gps.longitude)
+    #gps.latitude = numpy.arccos((pos.y/RADIUS) / numpy.sin(gps.longitude))
+    gps.latitude = numpy.degrees(pos.y/RADIUS)
+    gps.longitude = numpy.degrees((pos.x/RADIUS) / numpy.cos(numpy.radians(gps.latitude)))
     gps_pub.publish(gps)
-    
+
     orientation = quaternion_from_euler(0,0,heading)
     imu = Imu()
-    imu.orientation = orientation
+    
+    # Convertion because they are different types
+    imu.orientation.x = orientation[0]
+    imu.orientation.y = orientation[1]
+    imu.orientation.z = orientation[2]
+    imu.orientation.w = orientation[3]
+
     orientation_pub.publish(imu)
  
 def updateWind(offset):
