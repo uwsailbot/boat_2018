@@ -8,6 +8,7 @@ from boat_msgs.msg import BoatState
 from boat_msgs.msg import GPS
 from boat_msgs.msg import Point
 from boat_msgs.msg import PointArray
+from boat_msgs.srv import ConvertPoint
 from std_msgs.msg import Float32
 from std_msgs.msg import Int32
 from tf.transformations import quaternion_from_euler
@@ -38,7 +39,7 @@ heading = 90
 state = BoatState()
 rudderPos = 90
 winchPos = 0
-points = PointArray()
+local_points = PointArray()
 gps_points = PointArray()
 joy = Joy()
 joy.axes = [0]*8
@@ -51,8 +52,9 @@ waypoint_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size = 1)
 wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 1)
 gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 1)
 orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 1)
-joy_pub = rospy.Publisher('/joy', Joy, queue_size = 1)
-
+joy_pub = rospy.Publisher('joy', Joy, queue_size = 1)
+to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
+to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 
 def updateGPS():
     gps = GPS()
@@ -62,10 +64,11 @@ def updateGPS():
     #gps.longitude = numpy.arctan2(pos.y, pos.x)
     #print(gps.longitude)
     #gps.latitude = numpy.arccos((pos.y/RADIUS) / numpy.sin(gps.longitude))
- #   coords = local_to_gps(pos)
-#    gps.latitude = coords.x
- #   gps.longitude = coords.y
-#    gps_pub.publish(gps)
+
+    coords = to_gps(pos)
+    gps.latitude = coords.pt.x
+    gps.longitude = coords.pt.y
+    gps_pub.publish(gps)
 
     orientation = quaternion_from_euler(0,0,numpy.radians(heading))
     imu = Imu()
@@ -109,10 +112,18 @@ def winch_callback(pos):
     
 # Callback to restore local coord waypoints after publishing gps coord
 def waypoints_callback(newPoints):
-    global points
+    global local_points
+    global gps_points
+    
+    # Refresh GPS point list
     gps_points = newPoints
-    #Call gps convert service
-    #points= gps_service(gps_points)
+    temp_points = PointArray()
+    
+    # Convert all GPS points and store them as local points to draw
+    for point in gps_points.points:
+        local_point = to_lps(point).pt
+        temp_points.points.append(local_point)
+    local_points = temp_points
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -129,22 +140,20 @@ def resize(width, height):
     glLoadIdentity()
 
 def mouseHandler(button, state, x, y):
-    global points
+    global local_points
     global gps_points
     
     if state != GLUT_DOWN:
         return
         
     if button == GLUT_RIGHT_BUTTON:
-        points = PointArray()
+        local_points = PointArray()
         gps_points = PointArray()
     else:
         newPt = Point()
         newPt.x = x - winWidth/2
         newPt.y = -y + winHeight/2
-        print newPt
-        coords = local_to_gps(newPt)
-        print coords
+        coords = to_gps(newPt).pt
         gps_points.points.append(coords)
     waypoint_pub.publish(gps_points)
 
@@ -243,7 +252,7 @@ def drawText(text, x, y, h = 15.0):
 def drawPoints():
     glPushMatrix()
 
-    for p in points.points:
+    for p in local_points.points:
     
         x = p.x + winWidth/2.0
         y = p.y + winHeight/2.0
@@ -384,7 +393,7 @@ def calc(running):
 
     global pos
     global heading
-    global points
+    global local_points
     global lastTime
     global clock
     global rudderPos
@@ -434,13 +443,6 @@ def calc(running):
     if running:
        glutTimerFunc(1000/30, calc, 1)
 
-def local_to_gps(pos):
-    global RADIUS
-    gps = Point()
-    gps.x = numpy.degrees(float(pos.y)/RADIUS)
-    gps.y = numpy.degrees((float(pos.x)/RADIUS) / numpy.cos(numpy.radians(gps.x)))
-    return gps
-
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -451,6 +453,7 @@ def init2D(r,g,b):
 
 def initGL():
     global windowID
+    global pos
     glutInit(sys.argv)
     glutInitWindowSize(winWidth, winHeight)
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)

@@ -122,7 +122,10 @@ def listener():
 	global origin_lps
     
 	rospy.init_node('sensor_parser')
-    
+	
+	# Setup first so that simulator can send the origin point
+	srv1 = rospy.Service('lps_to_gps', ConvertPoint, lps_to_gps_srv)
+
     # setup the origin
 	origin_coords = rospy.wait_for_message('gps_raw', GPS)
 	origin_lps = toLps(get_coords(origin_coords))
@@ -131,8 +134,7 @@ def listener():
 	rospy.Subscriber('imu/data', Imu, orientation_callback)
 	rospy.Subscriber('gps_raw', GPS, gps_callback)
 	rospy.Subscriber('anemometer', Float32, anemometer_callback)
-	srv1 = rospy.Service('gps_to_lps', ConvertPoint, gps_to_lps_srv)
-	srv2 = rospy.Service('lps_to_gps', ConvertPoint, lps_to_gps_srv)
+	srv2 = rospy.Service('gps_to_lps', ConvertPoint, gps_to_lps_srv)
 	rospy.spin()
 
 
