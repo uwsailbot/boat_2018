@@ -74,7 +74,7 @@ def is_within_dist(p1, p2, dist):
 
 # Initialize the node
 def initialize():
-    rospy.init_node('route_planning')
+    rospy.init_node('path_planner')
 
     global gps_to_lps
     global lps_to_gps

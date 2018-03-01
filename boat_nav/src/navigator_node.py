@@ -99,7 +99,7 @@ def is_within_dist(p1, p2, dist):
 
 # Initialize the node
 def listener():
-    rospy.init_node('path_planning')
+    rospy.init_node('navigator')
     rospy.Subscriber('boat_state', BoatState, boat_state_callback)
     rospy.Subscriber('anemometer', Float32, anemometer_callback)
     rospy.Subscriber('target_point', Point, target_callback)

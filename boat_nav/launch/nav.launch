@@ -1,5 +1,5 @@
 <launch>
- <node pkg="boat_nav" type="route_planning_node.py" name="route_planning" />
- <node pkg="boat_nav" type="path_planning_node.py" name="path_planning" />
+ <node pkg="boat_nav" type="path_planning_node.py" name="path_planner" />
+ <node pkg="boat_nav" type="navigator_node.py" name="navigator" />
  <node pkg="boat_nav" type="sensor_parser_node.py" name="sensor_parser"/>
 </launch>
