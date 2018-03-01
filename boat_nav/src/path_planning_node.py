@@ -2,10 +2,8 @@
 import rospy
 import time
 import math
-import numpy as np
 from std_msgs.msg import Float32
 from boat_msgs.msg import Point
-from boat_msgs.msg import PointArray
 from boat_msgs.msg import BoatState
 
 # Declare global variables needed for the node
@@ -13,8 +11,7 @@ new_wind = False
 ane_reading = 0
 wind_heading = 0 # Direction the wind is pointing
 state = BoatState()
-waypoints = []
-cur_point = 0
+target = Point()
 target_heading = 0
 rate = 0
 
@@ -37,21 +34,18 @@ def anemometer_callback(new_heading):
 	new_wind = True
 
 def compass_callback(compass):
-	global ane_reading
 	global wind_heading
-
 	wind_heading = (ane_reading + compass.data) % 360
 
-def waypoints_callback(new_waypoint):
-	global waypoints
-	waypoints = new_waypoint.points
+def target_callback(new_target):
+	global target
+	target = new_target
 
 def position_callback(position):
 	global state
 	global wind_heading
 	global new_wind
-	global cur_point
-	global waypoints
+	global target
 	global target_heading
 	global rate
 	global boat_state_pub
@@ -64,21 +58,10 @@ def position_callback(position):
 	# If the boat isn't in the autonomous planning state, or there are no waypoints, exit
 	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING or len(waypoints) is 0:
 		return
-	
-	# If the boat is close enough to the waypoint...
-	while is_within_dist(position, waypoints[cur_point], buoy_tolerance):
-		cur_point += 1
-	
-		# If there are no waypoints left to navigate to, exit	
-		if cur_point >= len(waypoints):
-			state.minor = BoatState.MIN_COMPLETE			
-			boat_state_pub.publish(state)
-			rospy.loginfo(rospy.get_caller_id() + " No waypoints left. Boat State = 'Autonomous - Complete'")
-			return
 			
 	# Calculate the direct heading to the next waypoint
 	# This should never be undefined, as the atan2(0,0) case would already be caught by the proximity check above
-	best_heading = np.arctan2(waypoints[cur_point].y - position.y, waypoints[cur_point].x - position.x) * 180 / np.pi
+	best_heading = math.atan2(target.y - position.y, target.x - position.x) * 180 / np.pi
 			
 	# If the direct path isn't possible...
 	if best_heading > wind_heading-layline and best_heading < wind_heading+layline:
@@ -119,7 +102,7 @@ def listener():
     rospy.init_node('path_planning')
     rospy.Subscriber('boat_state', BoatState, boat_state_callback)
     rospy.Subscriber('anemometer', Float32, anemometer_callback)
-    rospy.Subscriber('waypoints', PointArray, waypoints_callback)
+    rospy.Subscriber('target_point', Point, target_callback)
     rospy.Subscriber('compass', Float32, compass_callback)
 
 	# If the filters work, change lps to use /odometry/filtered

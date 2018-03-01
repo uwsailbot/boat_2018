@@ -70,8 +70,8 @@ def gps_to_lps_srv(req):
     res = ConvertPointResponse()
     res.pt = toLps(req.pt)
     
-    rospy.loginfo(rospy.get_caller_id() + " Request: GPS (long: %.1f, lat: %.1f)", req.pt.x, req.pt.y)   
-    rospy.loginfo(rospy.get_caller_id() + " Response: LPS (x: %.f, y: %.f)", res.pt.x, res.pt.y)
+    #rospy.loginfo(rospy.get_caller_id() + " Request: GPS (long: %.1f, lat: %.1f)", req.pt.x, req.pt.y)   
+    #rospy.loginfo(rospy.get_caller_id() + " Response: LPS (x: %.f, y: %.f)", res.pt.x, res.pt.y)
     return res
     
 # Convert from lps to gps
@@ -79,8 +79,8 @@ def lps_to_gps_srv(req):
     res = ConvertPointResponse()
     res.pt = toGps(req.pt)
     
-    rospy.loginfo(rospy.get_caller_id() + " Request: LPS (x: %.f, y: %.f)", req.pt.x, req.pt.y)
-    rospy.loginfo(rospy.get_caller_id() + " Response: GPS (long: %.1f, lat: %.1f)", res.pt.x, res.pt.y)
+    #rospy.loginfo(rospy.get_caller_id() + " Request: LPS (x: %.f, y: %.f)", req.pt.x, req.pt.y)
+    #rospy.loginfo(rospy.get_caller_id() + " Response: GPS (long: %.1f, lat: %.1f)", res.pt.x, res.pt.y)
     return res
 	
 	

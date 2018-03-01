@@ -68,8 +68,8 @@ def updateGPS():
     #gps.latitude = numpy.arccos((pos.y/RADIUS) / numpy.sin(gps.longitude))
 
     coords = to_gps(pos)
-    gps.latitude = coords.pt.x
-    gps.longitude = coords.pt.y
+    gps.latitude = coords.pt.y
+    gps.longitude = coords.pt.x
     gps_pub.publish(gps)
 
     orientation = quaternion_from_euler(0,0,numpy.radians(heading))
