@@ -23,7 +23,7 @@
   </group>
 
   <node pkg="boat_nav" type="sensor_parser_node.py"
-    name="sensor_parser" >
+    name="sensor_parser" output="screen" >
   </node>
 
   <!-- Boat Interface nodes -->

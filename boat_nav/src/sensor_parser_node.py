@@ -8,7 +8,7 @@ from boat_msgs.msg import GPS
 from sensor_msgs.msg import NavSatFix
 from sensor_msgs.msg import NavSatStatus
 from sensor_msgs.msg import Imu
-from boat_nav.srv import ConvertPoint, ConvertPointResponse
+from boat_msgs.srv import ConvertPoint, ConvertPointResponse
 from tf.transformations import euler_from_quaternion
 import math
 
@@ -131,8 +131,8 @@ def listener():
 	rospy.Subscriber('imu/data', Imu, orientation_callback)
 	rospy.Subscriber('gps_raw', GPS, gps_callback)
 	rospy.Subscriber('anemometer', Float32, anemometer_callback)
-	rospy.Service('gps_to_lps', ConvertPoint, gps_to_lps_srv)
-	rospy.Service('lps_to_gps', ConvertPoint, lps_to_gps_srv)
+	srv1 = rospy.Service('gps_to_lps', ConvertPoint, gps_to_lps_srv)
+	srv2 = rospy.Service('lps_to_gps', ConvertPoint, lps_to_gps_srv)
 	rospy.spin()
 
 

@@ -62,10 +62,10 @@ def updateGPS():
     #gps.longitude = numpy.arctan2(pos.y, pos.x)
     #print(gps.longitude)
     #gps.latitude = numpy.arccos((pos.y/RADIUS) / numpy.sin(gps.longitude))
-    coords = local_to_gps(pos)
-    gps.latitude = coords.x
-    gps.longitude = coords.y
-    gps_pub.publish(gps)
+ #   coords = local_to_gps(pos)
+#    gps.latitude = coords.x
+ #   gps.longitude = coords.y
+#    gps_pub.publish(gps)
 
     orientation = quaternion_from_euler(0,0,numpy.radians(heading))
     imu = Imu()
@@ -110,7 +110,9 @@ def winch_callback(pos):
 # Callback to restore local coord waypoints after publishing gps coord
 def waypoints_callback(newPoints):
     global points
-    points = newPoints
+    gps_points = newPoints
+    #Call gps convert service
+    #points= gps_service(gps_points)
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -433,10 +435,10 @@ def calc(running):
        glutTimerFunc(1000/30, calc, 1)
 
 def local_to_gps(pos):
+    global RADIUS
     gps = Point()
-    gps.x = numpy.degrees(pos.y/RADIUS)
-    print gps.x
-    gps.y = numpy.degrees((pos.x/RADIUS) / numpy.cos(numpy.radians(gps.x)))
+    gps.x = numpy.degrees(float(pos.y)/RADIUS)
+    gps.y = numpy.degrees((float(pos.x)/RADIUS) / numpy.cos(numpy.radians(gps.x)))
     return gps
 
 
@@ -470,7 +472,7 @@ def listener():
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
 	rospy.Subscriber('rudder', Float32, rudder_callback)
 	rospy.Subscriber('winch', Int32, winch_callback)
-	rospy.Subscriber('waypoints', PointArray, waypoints_callback)
+	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
 
 if __name__ == '__main__':
     simJoy = not("-j" in argv or "-J" in argv)

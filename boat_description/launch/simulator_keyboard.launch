@@ -1,9 +1,0 @@
-<launch>
-  <!-- Main nodes to run simulator -->
-  <node pkg="boat_description" type="vis.py"
-    name="visualizer" >
-  </node>
-  <node pkg="boat_nav" type="sensor_parser_node.py"
-    name="sensor_parser" >
-  </node>
-</launch>
