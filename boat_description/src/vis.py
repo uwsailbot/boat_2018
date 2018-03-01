@@ -57,7 +57,7 @@ def updateGPS():
     gps.longitude = numpy.degrees((pos.x/RADIUS) / numpy.cos(numpy.radians(gps.latitude)))
     gps_pub.publish(gps)
 
-    orientation = quaternion_from_euler(0,0,heading)
+    orientation = quaternion_from_euler(0,0,numpy.radians(heading))
     imu = Imu()
     
     # Convertion because they are different types

@@ -20,7 +20,6 @@ ane_reading = 0
 gps_pub = rospy.Publisher('odometry_navsatfix', NavSatFix, queue_size=10)
 lps_pub = rospy.Publisher('lps', Point, queue_size=10)
 waypoints_pub = rospy.Publisher('waypoints', PointArray, queue_size=10)
-wind_heading_pub = rospy.Publisher('wind_heading', Float32, queue_size=10)
 compass_pub = rospy.Publisher('compass', Float32, queue_size=10)
 
 # Convert the current boat location from gps to lps
@@ -31,8 +30,8 @@ def gps_callback(gps):
 
 	gps_parsed = NavSatFix()
 	gps_parsed.header = gps.header
-	gps_parsed.status = gps.status
-	gps_parsed.service = NavSatStatus.SERVICE_GPS
+	gps_parsed.status.status = gps.status
+	gps_parsed.status.service = NavSatStatus.SERVICE_GPS
 	gps_parsed.latitude = gps.latitude
 	gps_parsed.longitude = gps.longitude
 	gps_parsed.altitude = gps.altitude
