@@ -13,6 +13,7 @@ from std_msgs.msg import Int32
 from tf.transformations import quaternion_from_euler
 import time
 import sys
+from sys import argv
 import numpy
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -27,6 +28,9 @@ clock = 0
 lastTime = -1
 boatSpeed = 4 # px/s
 RADIUS = 6378137 # Radius of earth, in meters
+
+
+simJoy = False
 
 wind_heading = 90
 pos = Point()
@@ -137,13 +141,13 @@ def mouseHandler(button, state, x, y):
 
 def keyboardHandler(key, mousex, mousey):
     global joy
-    if key == GLUT_KEY_LEFT:
+    if key == GLUT_KEY_LEFT and simJoy:
         joy.axes[0] = max(joy.axes[0]-0.1, -1)
         joy_pub.publish(joy)
-    elif key == GLUT_KEY_RIGHT:
+    elif key == GLUT_KEY_RIGHT and simJoy:
         joy.axes[0] = min(joy.axes[0]+0.1, 1)
         joy_pub.publish(joy)
-    elif key == GLUT_KEY_UP or key == GLUT_KEY_DOWN:
+    elif key == GLUT_KEY_UP or key == GLUT_KEY_DOWN and simJoy:
         joy.axes[0] = 0
         joy_pub.publish(joy)
     
@@ -154,17 +158,17 @@ def ASCIIHandler(key, mousex, mousey):
     if key is chr(27):
         glutDestroyWindow(windowID)
         exit(0)
-    elif key is '1':
+    elif key is '1' and simJoy:
         joy.buttons[4] = 1
         joy.buttons[5] = 0
         joy.buttons[8] = 0
         joy_pub.publish(joy)
-    elif key is '2':
+    elif key is '2' and simJoy:
         joy.buttons[4] = 0
         joy.buttons[5] = 1
         joy.buttons[8] = 0
         joy_pub.publish(joy)
-    elif key is '3':
+    elif key is '3' and simJoy:
         joy.buttons[4] = 0
         joy.buttons[5] = 0
         joy.buttons[8] = 1
@@ -186,7 +190,6 @@ def ASCIIHandler(key, mousex, mousey):
         
 def redraw():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
 
     glViewport(0, 0, winWidth, winHeight)
    
@@ -245,7 +248,6 @@ def drawStatus():
     glPushMatrix()
     
     # Draw the box
-    #glColor3f(168/255.0, 0.0, 145/255.0)
     glColor3f(1.0, 1.0, 1.0)
     glBegin(GL_QUADS)
     glVertex2f(winWidth,winHeight)
@@ -339,10 +341,6 @@ def drawBoat():
     glVertex2f(5,0)
     glVertex2f(0,-5)
     glEnd()
-    
-    #drawCircle(10, 0, 0)
-    #glColor3f(0,0,0)
-    #drawText("Boat", -10, -3, 10)
     
     glPopMatrix()
     
@@ -461,9 +459,11 @@ def listener():
 	rospy.Subscriber('waypoints', PointArray, waypoints_callback)
 
 if __name__ == '__main__':
-	try:
-		listener()
-	except rospy.ROSInterruptException:
-		pass
-	
-	initGL()
+    simJoy = not("-j" in argv or "-J" in argv)
+    
+    try:
+        listener()
+    except rospy.ROSInterruptException:
+        pass
+    
+    initGL()
