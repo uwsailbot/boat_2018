@@ -29,7 +29,16 @@ pid_setpoint_pub = rospy.Publisher('rudder_pid/setpoint', Float64, queue_size=10
 # If the boat state topic changes, update local boat state
 def boat_state_callback(new_state):
 	global state
+	global rudder_pos
+	global rudder_pos_pub
 	state = new_state
+
+	if state.major is BoatState.MAJ_DISABLED:
+		rudder_pos_msg = Float32()
+		rudder_pos_msg.data = 90
+		rudder_pos = rudder_pos_msg.data
+		rudder_pos_pub.publish(rudder_pos_msg)
+		
 	
 	
 # If the wind heading topic changes, update local wind heading
@@ -57,7 +66,7 @@ def anemometer_callback(anemometer):
 			if not rudder_pos == 150.0:
 				rudder_pos_msg.data = 150.0
 				rudder_pos = rudder_pos_msg.data
-				pub_rudder.publish(rudder_pos_msg)
+				rudder_pos_pub.publish(rudder_pos_msg)
 			rate.sleep()
 		else:
 			state.minor = BoatState.MIN_COMPLETE

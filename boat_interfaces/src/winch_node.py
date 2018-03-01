@@ -18,7 +18,13 @@ state = BoatState()
 
 def state_callback(new_state):
     global state
+    global winch_pos
+    global pub
     state = new_state
+
+    if state.major is BoatState.MAJ_DISABLED:
+        winch_pos = 0
+        pub.publish(winch_pos)
 
 
 def joy_callback(controller):
