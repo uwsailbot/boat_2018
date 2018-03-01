@@ -16,6 +16,7 @@ wind_heading = 0
 state = BoatState()
 pid_is_enabled = False
 tacking_direction = 0
+layline = 30
 
 # Declare the publishers for the node
 rudder_pos_pub = rospy.Publisher('rudder', Float32, queue_size=10)
@@ -47,41 +48,42 @@ def anemometer_callback(anemometer):
 	if state.major is not BoatState.MAJ_RC or state.minor is not BoatState.MIN_TACKING:
 		return
 
-	rate = rospy.Rate(10)
 	rudder_pos_msg = Float32()
 
 	# Based on direction of tack, keep the rudder turned while the boat crosses wind and passes 30 		
 	# degrees to the other side, then set the rudder back to 90
 	if tacking_direction == 1:
-		if ane_reading > 150:
+		if ane_reading < (180 + layline):
 			if not rudder_pos == 150.0:
 				rudder_pos_msg.data = 150.0
 				rudder_pos = rudder_pos_msg.data
 				pub_rudder.publish(rudder_pos_msg)
-			rate.sleep()
 		else:
 			state.minor = BoatState.MIN_COMPLETE
 			tacking_direction = 0
-			rudder_pos_msg.data = 90.0
+			rudder_pos = 90.0
+			rudder_pos_msg.data = rudder_pos
 			rudder_pos_pub.publish(rudder_pos_msg)
 			boat_state_pub.publish(state)
 
 
 	elif tacking_direction == -1:
-		if ane_reading < 210:
+		if ane_reading > (180 - layline):
 			if not rudder_pos == 30.0:
 				rudder_pos_msg.data = 30.0
 				rudder_pos = rudder_pos_msg.data
 				rudder_pos_pub.publish(rudder_pos_msg)
-			rate.sleep()
+			#print ane_reading, anemometer.data
 		else:
 			state.minor = BoatState.MIN_COMPLETE
 			tacking_direction = 0
-			rudder_pos_msg.data = 90.0
+			rudder_pos = 90.0
+			rudder_pos_msg.data = rudder_pos
 			rudder_pos_pub.publish(rudder_pos_msg)
 			boat_state_pub.publish(state)
 
-	rate.sleep()
+	#rate = rospy.Rate(10)
+	#rate.sleep()
 
 
 # If the gps topic changes, update the pid controller's input value
@@ -175,15 +177,16 @@ def joy_callback(controller):
 		state.minor = BoatState.MIN_TACKING
 
 		# If a tack is requested, figure out which side we are tacking and set the rudder accordingly
-		if ane_reading < 180:
-			rudder_pos_pub.publish(30.0)
+		if ane_reading > 180:
 			rudder_pos = 30.0
 			tacking_direction = -1
 		else:
-			rudder_pos_pub.publish(150.0)
 			rudder_pos = 150.0
 			tacking_direction = 1
 
+		rudder_pos_msg = Float32()
+		rudder_pos_msg.data = rudder_pos
+		rudder_pos_pub.publish(rudder_pos_msg)
 		boat_state_pub.publish(state)
 
 	# o is pressed, therefore cancelling a previously requested tack
@@ -193,11 +196,10 @@ def joy_callback(controller):
 		rospy.loginfo(rospy.get_caller_id() + "Tack cancelled")
 		state.minor = BoatState.MIN_COMPLETE
 		rudder_pos_msg = Float32()
-		rudder_pos_msg.data = 90.0
+		rudder_pos = 90.0
+		rudder_pos_msg.data = rudder_pos
 		rudder_pos_pub.publish(rudder_pos_msg)
 		boat_state_pub.publish(state)
-		rudder_pos = rudder_pos_msg.data
-
 	# Whenever the boat is in RC mode, except for RC - Tacking...
 	if state.minor is not BoatState.MIN_TACKING:
 	

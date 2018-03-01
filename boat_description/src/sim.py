@@ -34,6 +34,7 @@ RADIUS = 6378137 # Radius of earth, in meters
 simJoy = False
 
 wind_heading = 90
+ane_reading = 0
 pos = Point()
 heading = 90
 state = BoatState()
@@ -44,6 +45,7 @@ gps_points = PointArray()
 joy = Joy()
 joy.axes = [0]*8
 joy.buttons = [0]*11
+layline = 30
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
@@ -84,6 +86,7 @@ def updateGPS():
 def updateWind(offset):
     global wind_heading
     global heading
+    global ane_reading
 
     # Publish new anemometer message to relay requested wind data
     wind_heading = wind_heading + offset
@@ -92,14 +95,24 @@ def updateWind(offset):
     elif wind_heading < 0:
         wind_heading = wind_heading + 360
     
-    ane_reading = Float32()
-    ane_reading.data = (wind_heading - heading) % 360
-    if ane_reading.data < 0:
-        ane_reading.data + 360
-    wind_pub.publish(ane_reading)
+    ane = Float32()
+    ane_reading = (wind_heading - heading) % 360
+    if ane_reading < 0:
+        ane_reading = ane_reading + 360
+
+    ane.data = ane_reading
+    wind_pub.publish(ane)
 
 def boat_state_callback(newState):
     global state
+    global joy
+    
+    # Unpush the tacking button if tacking has completed so we don't tack forever
+    if state.minor is BoatState.MIN_TACKING and newState.minor is not BoatState.MIN_TACKING:
+        joy.buttons[2] = 1
+        joy.buttons[0] = 0
+        joy_pub.publish(joy)
+        
     state = newState
     
 def rudder_callback(pos):
@@ -190,6 +203,15 @@ def ASCIIHandler(key, mousex, mousey):
         joy.buttons[4] = 0
         joy.buttons[5] = 0
         joy.buttons[8] = 1
+        joy_pub.publish(joy)
+    elif key is 't' and simJoy:
+        joy.buttons[0] = 1
+        joy.buttons[2] = 0
+        joy.axes[0] = 0
+        joy_pub.publish(joy)
+    elif key is 'g' and simJoy:
+        joy.buttons[2] = 1
+        joy.buttons[0] = 0
         joy_pub.publish(joy)
     elif key is 'a':
         updateWind(5)
@@ -397,6 +419,8 @@ def calc(running):
     global lastTime
     global clock
     global rudderPos
+    global layline
+    global ane_reading
 
     if(lastTime == -1):
         lastTime = time.time()
@@ -434,9 +458,15 @@ def calc(running):
     if(state.major != BoatState.MAJ_DISABLED):
         heading -= (rudderPos-90)*0.1
         heading %= 360
-        pos.x += numpy.cos(numpy.radians(heading)) * boatSpeed * dt
-        pos.y += numpy.sin(numpy.radians(heading)) * boatSpeed * dt
-        
+
+        # Update anemometer reading because of new heading
+        updateWind(0)
+
+	    # Outside of laylines, speed works normally
+        if ane_reading >= (180+layline) or ane_reading <= (180 - layline):
+            pos.x += numpy.cos(numpy.radians(heading)) * boatSpeed * dt
+            pos.y += numpy.sin(numpy.radians(heading)) * boatSpeed * dt
+            
     updateGPS()
     glutPostRedisplay()
     

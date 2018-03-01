@@ -33,7 +33,7 @@
   </node>
 
   <node pkg="boat_interfaces" type="rudder_node.py"
-    name="rudder" >
+    name="rudder" output="screen">
   </node> 
 
   <node pkg="boat_interfaces" type="winch_node.py"
