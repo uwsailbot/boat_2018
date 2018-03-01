@@ -1,0 +1,44 @@
+<launch>
+  <arg name="joy" default="false" />
+  <arg name="controller" default="/dev/ttyUSB0" />
+
+  <!-- Can later add case for futaba -->
+
+  <!-- If joy is true -->
+  <group if="$(arg joy)">
+    <node pkg="boat_description" type="sim.py" args="-j"
+      name="visualizer" output="screen">
+    </node>
+    <!-- receiver_reader.py interfaces with the RC controller's receiver over serial -->
+    <node pkg="boat_interfaces" type="receiver_reader.py"
+      args="$(arg controller)" name="receiver" output="screen">
+    </node>
+  </group>
+
+  <!-- If joy is false -->
+  <group unless="$(arg joy)">
+    <node pkg="boat_description" type="sim.py"
+      name="visualizer" output="screen" >
+    </node>
+  </group>
+
+  <node pkg="boat_nav" type="sensor_parser_node.py"
+    name="sensor_parser" >
+  </node>
+
+  <!-- Boat Interface nodes -->
+
+  <node pkg="boat_interfaces" type="boat_state_controller_node.py"
+    name="boat_state_controller" >
+  </node>
+
+  <node pkg="boat_interfaces" type="rudder_node.py"
+    name="rudder" >
+  </node> 
+
+  <node pkg="boat_interfaces" type="winch_node.py"
+    name="winch" >
+  </node>
+
+
+</launch>
