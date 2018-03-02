@@ -50,19 +50,19 @@ def position_callback(position):
 	global rate
 	global boat_state_pub
 	global heading_pub
-
+	
 	buoy_tolerance = 5
-
+	
 	rate = rospy.Rate(100)
-
+	
 	# If the boat isn't in the autonomous planning state, or there are no waypoints, exit
 	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING or len(waypoints) is 0:
 		return
-			
+	
 	# Calculate the direct heading to the next waypoint
 	# This should never be undefined, as the atan2(0,0) case would already be caught by the proximity check above
 	best_heading = math.atan2(target.y - position.y, target.x - position.x) * 180 / np.pi
-			
+	
 	# If the direct path isn't possible...
 	if best_heading > wind_heading-layline and best_heading < wind_heading+layline:
 		
@@ -75,44 +75,44 @@ def position_callback(position):
 				target_heading = wind_heading + layline
 			else:
 				target_heading = wind_heading - layline
-				
+		
 		# If there isn't new wind data, DON'T update the heading
 		else:
 			best_heading = target_heading
-
-		
+	
+	
 	# If the target heading has updated, publish the newly calculated heading
 	if best_heading is not target_heading:
 		target_heading = best_heading
 		heading_pub.publish(target_heading)
 		rospy.loginfo(rospy.get_caller_id() + " New target heading: %f", target_heading)
-
+	
 	# Adjust the sleep to suit the node
 	rate.sleep()
-		
+
 
 # Determine if the dist between two points is within the specified tolerance
 def is_within_dist(p1, p2, dist):
 	a = math.pow(p1.x-p2.x, 2) + math.pow(p1.y - p2.y, 2)
 	return math.sqrt(a) < dist
-	
+
 
 # Initialize the node
 def listener():
-    rospy.init_node('navigator')
-    rospy.Subscriber('boat_state', BoatState, boat_state_callback)
-    rospy.Subscriber('anemometer', Float32, anemometer_callback)
-    rospy.Subscriber('target_point', Point, target_callback)
-    rospy.Subscriber('compass', Float32, compass_callback)
-
+	rospy.init_node('navigator')
+	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
+	rospy.Subscriber('anemometer', Float32, anemometer_callback)
+	rospy.Subscriber('target_point', Point, target_callback)
+	rospy.Subscriber('compass', Float32, compass_callback)
+	
 	# If the filters work, change lps to use /odometry/filtered
-    rospy.Subscriber('lps', Point, position_callback)
-    rospy.spin()
+	rospy.Subscriber('lps', Point, position_callback)
+	rospy.spin()
 
 
 if __name__ == '__main__':
-    try:
-        listener()
-    except rospy.ROSInterruptException:
-        pass
+	try:
+		listener()
+	except rospy.ROSInterruptException:
+		pass
 
