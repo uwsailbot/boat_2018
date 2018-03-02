@@ -266,9 +266,9 @@ def drawText(text, x, y, h = 15.0):
 	glPushMatrix()
 	
 	# Scale and translate the text as required
-	f = h/120.0
-	glScalef(f,f, 0.0)
+	scale = h/120.0
 	glTranslatef(x,y,0)
+	glScalef(scale, scale, 0.0)
 	
 	# Loop to display character by character
 	for c in text:
