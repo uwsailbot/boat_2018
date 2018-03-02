@@ -5,17 +5,18 @@
   <param name="Kp" value="1.0"/>
   <param name="Ki" value="0.0"/>
   <param name="Kd" value="0.0"/>
-  <param name="upperLimit" value="60"/>	<!-- The maximum allowable angle of the rudder servo -->
-  <param name="lowerLimit" value="-60"/>		<!-- The minimum allowable angle of the rudder servo -->
-  <param name="windupLimit" value="0" />	<!-- The limit of the integral term buildup -->
+  <param name="upperLimit" value="60"/>				<!-- The maximum allowable angle of the rudder servo -->
+  <param name="lowerLimit" value="-60"/>			<!-- The minimum allowable angle of the rudder servo -->
+  <param name="windupLimit" value="0" />			<!-- The limit of the integral term buildup -->
   <param name="max_loop_frequency" value="1000"/>	<!-- The maximum expected frequency (Hz) of input sensor updates -->
   <param name="min_loop_frequency" value="1"/>		<!-- The minimum expected frequency (Hz) of input sensor updates -->
+  <param name="angle_error" value="1"/>				<!-- Treat the minimum and maximum inputs (-180, 180) as the same point -->
   
   <!-- Set the topics used to interface with this controller -->
   <param name="topic_from_controller" value="output"/>	<!-- std_msgs/Float64 -->
   <param name="pid_enable_topic" value="enable"/>		<!-- std_msgs/Bool -->
   <param name="setpoint_topic" value="setpoint"/>		<!-- std_msgs/Float64 -->
-  <param name="topic_from_plant" value="input"/>			<!-- std_msgs/Float64 -->
+  <param name="topic_from_plant" value="input"/>		<!-- std_msgs/Float64 -->
   <!-- Note above that we can't read a specific value from the GPS message, so we have to republish gps_raw.track in a new topic -->
   
 </node>

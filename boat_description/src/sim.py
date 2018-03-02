@@ -1,0 +1,523 @@
+#!/usr/bin/env python
+
+import rospy
+import sys, select, termios, tty
+from sensor_msgs.msg import Joy
+from sensor_msgs.msg import Imu
+from boat_msgs.msg import BoatState
+from boat_msgs.msg import GPS
+from boat_msgs.msg import Point
+from boat_msgs.msg import PointArray
+from boat_msgs.srv import ConvertPoint
+from std_msgs.msg import Float32
+from std_msgs.msg import Int32
+from tf.transformations import quaternion_from_euler
+import time
+import sys
+from sys import argv
+import numpy
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+
+# OpenGL data
+win_ID = 0
+win_width = 640
+win_height = 480
+
+# Simulation data and consts
+should_sim_joy = False
+sim_is_running = True
+speed = 10
+clock = 0
+last_time = -1
+boat_speed = 4 # px/s
+RADIUS = 6378137 # Radius of earth, in meters
+layline = 30
+
+# ROS data
+wind_heading = 90
+ane_reading = 0
+pos = Point()
+heading = 90
+state = BoatState()
+rudder_pos = 90
+winch_pos = 0
+local_points = PointArray()
+gps_points = PointArray()
+joy = Joy()
+joy.axes = [0]*8
+joy.buttons = [0]*11
+
+
+# =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
+
+waypoint_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size = 1)
+wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 1)
+gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 1)
+orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 1)
+joy_pub = rospy.Publisher('joy', Joy, queue_size = 1)
+to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
+to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
+
+
+def update_gps():
+	gps = GPS()
+	gps.status = GPS.STATUS_FIX
+	
+	# Vaguely uncertain of this math https://sciencing.com/convert-xy-coordinates-longitude-latitude-8449009.html
+	#gps.longitude = numpy.arctan2(pos.y, pos.x)
+	#print(gps.longitude)
+	#gps.latitude = numpy.arccos((pos.y/RADIUS) / numpy.sin(gps.longitude))
+	
+	coords = to_gps(pos)
+	gps.latitude = coords.pt.y
+	gps.longitude = coords.pt.x
+	gps_pub.publish(gps)
+	
+	orientation = quaternion_from_euler(0,0,numpy.radians(heading))
+	imu = Imu()
+	
+	# Convertion because they are different types
+	imu.orientation.x = orientation[0]
+	imu.orientation.y = orientation[1]
+	imu.orientation.z = orientation[2]
+	imu.orientation.w = orientation[3]
+	
+	orientation_pub.publish(imu)
+
+
+def update_wind(offset):
+	global wind_heading
+	global heading
+	global ane_reading
+	
+	# Publish new anemometer message to relay requested wind data
+	wind_heading = wind_heading + offset
+	if wind_heading >= 360:
+		wind_heading = wind_heading - 360
+	elif wind_heading < 0:
+		wind_heading = wind_heading + 360
+	
+	ane = Float32()
+	ane_reading = (wind_heading - heading) % 360
+	if ane_reading < 0:
+		ane_reading = ane_reading + 360
+	
+	wind_pub.publish(Float32(ane_reading))
+
+
+def boat_state_callback(newState):
+	global state
+	global joy
+	
+	# Unpush the tacking button if tacking has completed so we don't tack forever
+	if state.minor is BoatState.MIN_TACKING and newState.minor is not BoatState.MIN_TACKING:
+		joy.buttons[2] = 1
+		joy.buttons[0] = 0
+		joy_pub.publish(joy)
+	
+	state = newState
+
+
+def rudder_callback(pos):
+	global rudder_pos
+	rudder_pos = pos.data
+
+
+def winch_callback(pos):
+	global winch_pos
+	winch_pos = pos.data
+
+
+# Callback to restore local coord waypoints after publishing gps coord
+def waypoints_callback(newPoints):
+	global local_points
+	global gps_points
+	
+	# Refresh GPS point list
+	gps_points = newPoints
+	temp_points = PointArray()
+	
+	# Convert all GPS points and store them as local points to draw
+	for point in gps_points.points:
+		local_point = to_lps(point).pt
+		temp_points.points.append(local_point)
+	local_points = temp_points
+
+# =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
+
+# Window resize callback
+def resize(width, height):
+	global win_width
+	global win_height
+	win_width = width
+	win_height = height
+	glutInitWindowSize(win_width, win_height)
+	glMatrixMode(GL_PROJECTION)
+	glLoadIdentity()
+	gluOrtho2D(0.0, win_width, 0.0, win_height)
+	glMatrixMode(GL_MODELVIEW)
+	glLoadIdentity()
+
+
+# Handler for mouse presses
+def mouse_handler(button, state, x, y):
+	global local_points
+	global gps_points
+	
+	if state != GLUT_DOWN:
+		return
+		
+	if button == GLUT_RIGHT_BUTTON:
+		local_points = PointArray()
+		gps_points = PointArray()
+	else:
+		newPt = Point()
+		newPt.x = x - win_width/2
+		newPt.y = -y + win_height/2
+		coords = to_gps(newPt).pt
+		gps_points.points.append(coords)
+	waypoint_pub.publish(gps_points)
+
+
+# Handler for all key presses that cannot be represented by an ASCII code
+def keyboard_handler(key, mousex, mousey):
+	global joy
+	if key == GLUT_KEY_LEFT and should_sim_joy:
+		joy.axes[0] = max(joy.axes[0]-0.1, -1)
+		joy_pub.publish(joy)
+	elif key == GLUT_KEY_RIGHT and should_sim_joy:
+		joy.axes[0] = min(joy.axes[0]+0.1, 1)
+		joy_pub.publish(joy)
+	elif key == GLUT_KEY_UP or key == GLUT_KEY_DOWN and should_sim_joy:
+		joy.axes[0] = 0
+		joy_pub.publish(joy)
+
+
+# Handler for all key presses that can be represented by an ASCII code
+def ASCII_handler(key, mousex, mousey):
+	global speed
+	global joy
+	global sim_is_running
+	
+	if key is chr(27):
+		sim_is_running = False
+	elif key is '1' and should_sim_joy:
+		joy.buttons[4] = 1
+		joy.buttons[5] = 0
+		joy.buttons[8] = 0
+		joy_pub.publish(joy)
+	elif key is '2' and should_sim_joy:
+		joy.buttons[4] = 0
+		joy.buttons[5] = 1
+		joy.buttons[8] = 0
+		joy_pub.publish(joy)
+	elif key is '3' and should_sim_joy:
+		joy.buttons[4] = 0
+		joy.buttons[5] = 0
+		joy.buttons[8] = 1
+		joy_pub.publish(joy)
+	elif key is 't' and should_sim_joy:
+		joy.buttons[0] = 1
+		joy.buttons[2] = 0
+		joy.axes[0] = 0
+		joy_pub.publish(joy)
+	elif key is 'g' and should_sim_joy:
+		joy.buttons[2] = 1
+		joy.buttons[0] = 0
+		joy_pub.publish(joy)
+	elif key is 'a':
+		update_wind(5)
+	elif key is 'd':
+		update_wind(-5)
+	elif key is 'w':
+		speed += 0.1
+	elif key is 's':
+		speed -= 0.1
+		speed = max(speed, 0)
+	elif key is ' ':
+		pos.x = 0
+		pos.y = 0
+		update_gps()
+
+
+# Main display rendering callback
+def redraw():
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+	
+	glViewport(0, 0, win_width, win_height)
+	
+	# Render stuff
+	draw_waypoints()
+	draw_boat()
+	draw_status()
+	
+	glutSwapBuffers()
+
+
+# =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL Rendering =*=*=*=*=*=*=*=*=*=*=*=*=
+
+# Render a circle centered at (x,y) with radius r
+def draw_circle(r, x, y, quality=300):
+	glBegin(GL_POLYGON)
+	for i in range(0, quality):
+		angle = 2 * numpy.pi * i / float(quality)
+		curx = x + numpy.cos(angle) * r
+		cury = y + numpy.sin(angle) * r
+		glVertex2f(curx,cury)
+	glEnd()
+
+# Render the specified text with bottom left corner at (x,y)
+def draw_text(text, x, y, h = 15.0):
+	glPushMatrix()
+	
+	# Scale and translate the text as required
+	scale = h/120.0
+	glTranslatef(x,y,0)
+	glScalef(scale, scale, 0.0)
+	
+	# Loop to display character by character
+	for c in text:
+		glutStrokeCharacter(GLUT_STROKE_ROMAN, ord(c))
+	
+	glPopMatrix()
+
+
+# Draw all of the waypoint as red dots
+def draw_waypoints():
+	glPushMatrix()
+	
+	glColor3f(1,0,0)
+	
+	for p in local_points.points:
+		x = p.x + win_width/2.0
+		y = p.y + win_height/2.0
+		draw_circle(5,x,y)
+	
+	glPopMatrix()
+
+
+# Draw the right-hand 'status' panel and all of its data
+def draw_status():
+	glPushMatrix()
+	
+	# Draw the box
+	glColor3f(1.0, 1.0, 1.0)
+	glBegin(GL_QUADS)
+	glVertex2f(win_width,win_height)
+	glVertex2f(win_width, 0)
+	glVertex2f(win_width-120,0)
+	glVertex2f(win_width-120,win_height)
+	glEnd()
+	
+	# Draw the wind readout
+	glColor3f(0.0, 0.0, 0.0)
+	draw_text("Wind: " + str(wind_heading), win_width-110, win_height-20)
+	draw_wind_arrow(win_width-60,win_height-50)
+	
+	# Draw the boat pos
+	glColor3f(0.0, 0.0, 0.0)
+	draw_text("X: %.1f" % pos.x, win_width-110, win_height*0.75)
+	draw_text("Y: %.1f" % pos.y, win_width-110, win_height*0.75-15)
+	draw_text("Spd: %.1f" % boat_speed, win_width-110, win_height*0.75-30)
+	draw_text("Head: %.1f" % heading, win_width-110, win_height*0.75-45)
+	
+	# Draw the boat state
+	major = ""
+	if state.major is BoatState.MAJ_RC:
+		major = "RC"
+	elif state.major is BoatState.MAJ_AUTONOMOUS:
+		major = "Auto"
+	elif state.major is BoatState.MAJ_DISABLED:
+		major = "Disabled"
+		
+	minor = ""
+	if state.minor is BoatState.MIN_COMPLETE:
+		minor = "Complete"
+	elif state.minor is BoatState.MIN_PLANNING:
+		minor = "Planning"
+	elif state.minor is BoatState.MIN_TACKING:
+		minor = "Tacking"
+	draw_text("State", win_width-85, win_height*0.56, 24)
+	draw_text("M: " + major, win_width-110, win_height*0.56-15)
+	draw_text("m: " + minor, win_width-110, win_height*0.56-30)
+	
+	# Draw the rudder and winch pos
+	draw_text("Rudder: %.1f" % rudder_pos, win_width-110, win_height*0.40)
+	draw_text("Winch: %d" % winch_pos, win_width-110, win_height*0.40 - 15)
+	
+	# Draw the rudder diagram
+	draw_rudder(win_width-55, win_height*0.2)
+	
+	# Draw the simulation speed
+	draw_text("Spd: %.f%%" % (speed*100), win_width-110, 30)
+	draw_text("Time: %.1f" % clock + "s", win_width-110, 15)
+	
+	glPopMatrix()
+
+
+# Draw the arrow for the wind direction centered on (x, y)
+def draw_wind_arrow(x,y):
+	glPushMatrix()
+	
+	glTranslatef(x,y,0)
+	glScalef(0.3,0.3,0)
+	glColor3f(0.0, 1.0, 0.0)
+	draw_circle(65,0,0)
+	
+	glRotatef(wind_heading-90,0,0,1)
+	glTranslatef(0,35,0)
+	
+	glColor3f(1.0, 0.0, 0.0)
+	glBegin(GL_QUADS)
+	glVertex2f(-10,0)
+	glVertex2f(-10,-100)
+	glVertex2f(10,-100)
+	glVertex2f(10,0)
+	glEnd()
+	
+	glBegin(GL_TRIANGLES)
+	glVertex2f(-20,0)
+	glVertex2f(0,30)
+	glVertex2f(20,0)
+	glEnd()
+	
+	glPopMatrix()
+
+
+# Draw the boat on the water
+def draw_boat():
+	glPushMatrix()
+	
+	x = pos.x + win_width/2.0
+	y = pos.y + win_height/2.0
+	
+	glTranslatef(x, y, 0)
+	glRotatef(heading-90, 0, 0, 1)
+	
+	glColor3f(1.0, 215/225.0, 145/225.0)
+	glBegin(GL_POLYGON)
+	glVertex2f(-5,0)
+	glVertex2f(0,15)
+	glVertex2f(5,0)
+	glVertex2f(0,-5)
+	glEnd()
+	
+	glPopMatrix()
+
+
+# Draw the rudder diagram centered on (x, y)
+def draw_rudder(x, y):
+	glPushMatrix()
+	
+	glTranslatef(x, y, 0)
+	
+	glColor3f(1.0, 0.5, 0.0)
+	glBegin(GL_POLYGON)
+	glVertex2f(-10,0)
+	glVertex2f(-7,40)
+	glVertex2f(0,60)
+	glVertex2f(7,40)
+	glVertex2f(10,0)
+	glEnd()
+	
+	glRotatef(rudder_pos-90, 0, 0, 1)
+	glColor3f(0.5,0.2,0.2)
+	glBegin(GL_POLYGON)
+	glVertex2f(-4,10)
+	glVertex2f(-4,-20)
+	glVertex2f(4,-20)
+	glVertex2f(4,10)
+	glEnd()
+	
+	glPopMatrix()
+
+
+# =*=*=*=*=*=*=*=*=*=*=*=*= Physics =*=*=*=*=*=*=*=*=*=*=*=*=
+def calc(_):
+	global pos
+	global heading
+	global local_points
+	global last_time
+	global clock
+	global rudder_pos
+	global layline
+	global ane_reading
+	
+	# Calculate the in-simulator time
+	if(last_time == -1):
+		last_time = time.time()
+	dt = (time.time() - last_time) * speed
+	last_time = time.time()
+	clock += dt
+	
+	#TODO: Calculate the boat's pose here
+	
+	if(state.major != BoatState.MAJ_DISABLED):
+		heading -= (rudder_pos-90)*0.1
+		heading %= 360
+		
+		# Update anemometer reading because of new heading
+		update_wind(0)
+		
+		# Outside of laylines, speed works normally
+		if ane_reading >= (180+layline) or ane_reading <= (180 - layline):
+			pos.x += numpy.cos(numpy.radians(heading)) * boat_speed * dt
+			pos.y += numpy.sin(numpy.radians(heading)) * boat_speed * dt
+	
+	update_gps()
+	glutPostRedisplay()
+	
+	if sim_is_running:
+		glutTimerFunc(1000/30, calc, 0)
+	else:
+		glutDestroyWindow(win_ID)
+		exit(0)
+
+
+# =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
+
+def init_2D(r,g,b):
+	glClearColor(r,g,b,0.0)  
+	glViewport(0, 0, win_width, win_height)
+	gluOrtho2D(0.0, win_width, 0.0, win_height)
+
+
+def init_GL():
+	global win_ID
+	global pos
+	glutInit(sys.argv)
+	glutInitWindowSize(win_width, win_height)
+	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
+	win_ID = glutCreateWindow('Simulator')
+	
+	#Setup the window with blue background
+	init_2D(66/255.0,134/255.0,244/255.0)
+	glutDisplayFunc(redraw)
+	glutReshapeFunc(resize)
+	glutMouseFunc(mouse_handler)
+	glutKeyboardFunc(ASCII_handler)
+	glutSpecialFunc(keyboard_handler)
+	glutTimerFunc(1000/30, calc, 0)
+	glutMainLoop()
+
+
+def listener():
+	# Setup subscribers
+	rospy.init_node('visualizer', anonymous=True)
+	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
+	rospy.Subscriber('rudder', Float32, rudder_callback)
+	rospy.Subscriber('winch', Int32, winch_callback)
+	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
+
+
+if __name__ == '__main__':
+	should_sim_joy = not("-j" in argv or "-J" in argv)
+	
+	try:
+		listener()
+	except rospy.ROSInterruptException:
+		pass
+	
+	init_GL()
