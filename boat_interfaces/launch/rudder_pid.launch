@@ -1,3 +1,4 @@
+<!-- PID Controller for rudder launch file -->
 <launch>
 
 <!-- This all uses the pid package - wiki.ros.org/pid -->

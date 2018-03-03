@@ -1,3 +1,4 @@
+<!-- PS4 Controller Boat Interfaces launch file -->
 <launch>
 <arg name="controller" default="/dev/ttyUSB0" />
 <arg name="arduino" default="/dev/ttyACM0" />

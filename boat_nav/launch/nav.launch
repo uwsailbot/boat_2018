@@ -1,3 +1,4 @@
+<!-- Navigation Path Planning launch file -->
 <launch>
   <node pkg="boat_nav" type="path_planner_node.py" name="path_planner" />
   <node pkg="boat_nav" type="navigator_node.py" name="navigator"/>

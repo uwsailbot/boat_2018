@@ -32,7 +32,6 @@ speed = 10
 clock = 0
 last_time = -1
 boat_speed = 4 # px/s
-RADIUS = 6378137 # Radius of earth, in meters
 layline = 30
 
 # ROS data
@@ -64,12 +63,6 @@ to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 def update_gps():
 	gps = GPS()
 	gps.status = GPS.STATUS_FIX
-	
-	# Vaguely uncertain of this math https://sciencing.com/convert-xy-coordinates-longitude-latitude-8449009.html
-	#gps.longitude = numpy.arctan2(pos.y, pos.x)
-	#print(gps.longitude)
-	#gps.latitude = numpy.arccos((pos.y/RADIUS) / numpy.sin(gps.longitude))
-	
 	coords = to_gps(pos)
 	gps.latitude = coords.pt.y
 	gps.longitude = coords.pt.x

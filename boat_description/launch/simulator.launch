@@ -1,3 +1,4 @@
+<!-- Simulator launch file -->
 <launch>
   <arg name="joy" default="false" />
   <arg name="controller" default="/dev/ttyUSB0" />
@@ -22,23 +23,10 @@
     </node>
   </group>
 
-  <node pkg="boat_nav" type="sensor_parser_node.py"
-    name="sensor_parser" >
-  </node>
+  <!-- Boat Navigation nodes -->
+  <include file="$(find boat_nav)/launch/nav.launch" />
 
   <!-- Boat Interface nodes -->
-
-  <node pkg="boat_interfaces" type="boat_state_controller_node.py"
-    name="boat_state_controller" >
-  </node>
-
-  <node pkg="boat_interfaces" type="rudder_node.py"
-    name="rudder" output="screen">
-  </node> 
-
-  <node pkg="boat_interfaces" type="winch_node.py"
-    name="winch" >
-  </node>
-
+  <include file="$(find boat_interfaces)/launch/interfaces_base.launch" />
 
 </launch>

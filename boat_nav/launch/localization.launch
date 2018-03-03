@@ -1,3 +1,4 @@
+<!-- Robot Localization Position Filter launch file -->
 <launch>
   <node pkg="robot_localization" type="navsat_transform_node" name="navsat_transform" clear_params="true">
 
