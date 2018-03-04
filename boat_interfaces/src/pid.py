@@ -11,6 +11,8 @@ kp = -1.0
 kd = 0.0
 ki = 0.0
 output_pub = rospy.Publisher('rudder_pid/output', Float64, queue_size=10)
+setpoint = 0
+pid_input = 0
 max_range = 60
 
 

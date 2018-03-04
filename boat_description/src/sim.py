@@ -35,7 +35,7 @@ boat_speed = 4 # px/s
 layline = 30
 
 # ROS data
-wind_heading = 90
+wind_heading = 270
 ane_reading = 0
 pos = Point()
 heading = 90
@@ -479,7 +479,6 @@ def calc(_):
 	last_time = time.time()
 	clock += dt
 	
-	#TODO: Calculate the boat's pose here # DONE??
 	
 	if(state.major != BoatState.MAJ_DISABLED):
 		heading -= (rudder_pos-90)*0.1
@@ -488,8 +487,13 @@ def calc(_):
 		# Update anemometer reading because of new heading
 		update_wind(0)
 		
+		
+		# Our laylines are set further out than the boat will actually hit irons at, so physics wise the laylines are actually at laylines-TOL, which
+		# is where it should hit irons
+		TOL = 5
+
 		# Outside of laylines, speed works normally
-		if ane_reading >= (180+layline) or ane_reading <= (180 - layline):
+		if ane_reading >= (180+layline-TOL) or ane_reading <= (180 - layline+TOL):
 			pos.x += numpy.cos(numpy.radians(heading)) * boat_speed * dt
 			pos.y += numpy.sin(numpy.radians(heading)) * boat_speed * dt
 	
@@ -501,6 +505,11 @@ def calc(_):
 	else:
 		glutDestroyWindow(win_ID)
 		exit(0)
+
+# Returns (x,y), given radius and angle in degrees
+def polar_to_rect(rad, ang):
+	return (rad * math.cos(math.radians(ang)), rad * math.sin(math.radians(ang)))
+
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
@@ -538,14 +547,6 @@ def listener():
 	rospy.Subscriber('winch', Int32, winch_callback)
 	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
 	rospy.Subscriber('target_heading', Float32, target_heading_callback)
-
-
-# =*=*=*=*=*=*=*=*=*=*=*=*= Helpers =*=*=*=*=*=*=*=*=*=*=*=*=
-
-# Returns (x,y), given radius and angle in degrees
-def polar_to_rect(rad, ang):
-	return (rad * math.cos(math.radians(ang)), rad * math.sin(math.radians(ang)))
-
 
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
