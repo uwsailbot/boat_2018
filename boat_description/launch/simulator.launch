@@ -29,4 +29,6 @@
   <!-- Boat Interface nodes -->
   <include file="$(find boat_interfaces)/launch/interfaces_base.launch" />
 
+  <include file="$(find boat_interfaces)/launch/rudder_pid.launch" />
+
 </launch>

@@ -31,11 +31,17 @@ pid_setpoint_pub = rospy.Publisher('rudder_pid/setpoint', Float64, queue_size=10
 def boat_state_callback(new_state):
 	global state
 	global rudder_pos
+	global pid_is_enabled
 	state = new_state
 	
-	if state.major is BoatState.MAJ_DISABLED:
+	# If disabled or auto has completed its path, then stop the boat
+	if state.major is BoatState.MAJ_DISABLED or (state.major is BoatState.MAJ_AUTONOMOUS and state.minor is BoatState.MIN_COMPLETE):
 		rudder_pos = 90
 		rudder_pos_pub.publish(Float32(rudder_pos))
+		if pid_is_enabled:
+			pid_is_enabled = False
+			pid_enable_pub.publish(Bool(False))
+			rospy.loginfo(rospy.get_caller_id() + " Disabling rudder PID")
 
 
 # If the wind heading topic changes, update local wind heading
@@ -101,7 +107,11 @@ def compass_callback(compass):
 def pid_callback(output):
 	global rudder_pos
 	
-	rudder_pos = output + 90.0
+	rudder_pos = output.data + 90.0
+	if rudder_pos < 30:
+		rudder_pos = 30
+	elif rudder_pos > 150:
+		rudder_pos = 150
 	rudder_pos_pub.publish(Float32(rudder_pos))
 	rospy.loginfo(rospy.get_caller_id() + " Rudder PID output pos: %f", rudder_pos)
 
@@ -125,22 +135,33 @@ def target_heading_callback(target_heading):
 		rospy.loginfo(rospy.get_caller_id() + " Enabling rudder PID")
 	
 	# We have a new valid setpoint, therefore output it	
-	rospy.loginfo(rospy.get_caller_id() + " New rudder setpoint: %f", target_heading)
+	rospy.loginfo(rospy.get_caller_id() + " New rudder setpoint: %f", target_heading.data)
 
 	# If the current heading and the new heading are on opposite sides of the wind, we need to tack
-	opp_wind = (wind_heading+180)%360
-	if (is_in_bounds(target_heading, wind_heading, opp_wind) and not is_in_bounds(cur_boat_heading, wind_heading, opp_wind)) or\
-		(is_in_bounds(cur_boat_heading, wind_heading, opp_wind) and not is_in_bounds(target_heading, wind_heading, opp_wind)):
-		
+#	opp_wind = (wind_heading+180)%360
+#	if (is_within_bounds(target_heading.data, wind_heading, opp_wind) and not is_within_bounds(cur_boat_heading, wind_heading, opp_wind)) or\
+#		(is_within_bounds(cur_boat_heading, wind_heading, opp_wind) and not is_within_bounds(target_heading.data, wind_heading, opp_wind)):
+
+	# Decide whether we need to tack through the wind
+	if (abs(target_heading.data - cur_boat_heading)) > 180:
+		boat_dir = -1 # Clockwise
+	else:
+		boat_dir = 1 # Counter-clockwise
+	
+	wind_coming = (wind_heading + 180)%360 # Which direction the wind is coming from
+
+	if (boat_dir is -1 and not is_within_bounds(wind_coming, cur_boat_heading, target_heading.data)) or\
+		(boat_dir is 1 and is_within_bounds(wind_coming, cur_boat_heading, target_heading.data)):
+		print wind_coming, cur_boat_heading, target_heading.data, boat_dir
 		state.minor = BoatState.MIN_TACKING
 		boat_state_pub.publish(state)
 		rospy.loginfo(rospy.get_caller_id() + " Boat State = 'Autonomous - Tacking'")
 		
-		pid_setpoint = Float64(conform_angle(target_heading))
+		pid_setpoint = Float64(conform_angle(target_heading.data))
 		pid_setpoint_pub.publish(pid_setpoint)
 		
 		# TODO: Find a good tolerance. We don't need to wait for the boat to be completely on target, but it needs to be well past the wind
-		while abs(target_heading-cur_boat_heading) < 10:
+		while abs(target_heading.data-cur_boat_heading) < 10:
 			pass
 			
 		state.minor = BoatState.MIN_PLANNING
@@ -149,7 +170,7 @@ def target_heading_callback(target_heading):
 	
 	# Otherwise, we don't need to tack, so simply update the controller's setpoint
 	else:
-		pid_setpoint = Float64(conform_angle(target_heading))
+		pid_setpoint = Float64(conform_angle(target_heading.data))
 		pid_setpoint_pub.publish(pid_setpoint)
 
 
@@ -221,7 +242,6 @@ def is_within_bounds(val, boundA, boundB):
 # Conform an input angle to range (-180, 180)
 def conform_angle(val):
 	return (val + 180) % 360 - 180
-
 
 def listener():
 	# Setup subscribers

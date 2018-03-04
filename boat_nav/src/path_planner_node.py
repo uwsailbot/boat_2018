@@ -19,7 +19,14 @@ target_pub = rospy.Publisher('target_point', Point, queue_size=1)
 
 def boat_state_callback(new_state):
 	global state
+	global waypoints
 	state = new_state
+	
+	# Move to planning state if there is a pending waypoint
+	if state.major is BoatState.MAJ_AUTONOMOUS and state.minor is BoatState.MIN_COMPLETE and len(waypoints)>0:
+		state.minor = BoatState.MIN_PLANNING
+		boat_state_pub.publish(state)
+		
 
 def waypoints_callback(new_waypoint):
 	global waypoints
@@ -28,8 +35,14 @@ def waypoints_callback(new_waypoint):
 	waypoints = new_waypoint.points
 	if(len(waypoints) > 0):
 		publish_target(waypoints[0])
+	
+		# If we are waiting in autonomous-complete, and a new waypoint is added, move to planning state
+	if state.major is BoatState.MAJ_AUTONOMOUS and state.minor is BoatState.MIN_COMPLETE and len(waypoints)>0:
+		state.minor = BoatState.MIN_PLANNING
+		boat_state_pub.publish(state)
 
 def next_point():
+	global waypoints
 	del waypoints[0]
 	waypoints_pub.publish(waypoints)
 

@@ -55,14 +55,14 @@ def position_callback(position):
 	
 	rate = rospy.Rate(100)
 	
-	# If the boat isn't in the autonomous planning state, or there are no waypoints, exit
-	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING or len(waypoints) is 0:
+	# If the boat isn't in the autonomous planning state, exit
+	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
 		return
 	
 	# Calculate the direct heading to the next waypoint
 	# This should never be undefined, as the atan2(0,0) case would already be caught by the proximity check above
-	best_heading = math.atan2(target.y - position.y, target.x - position.x) * 180 / np.pi
-	
+	best_heading = math.atan2(target.y - position.y, target.x - position.x) * 180 / math.pi
+	best_heading = (best_heading + 360) % 360 # Get rid of negative angles
 	# If the direct path isn't possible...
 	if best_heading > wind_heading-layline and best_heading < wind_heading+layline:
 		
