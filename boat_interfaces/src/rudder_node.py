@@ -108,10 +108,6 @@ def pid_callback(output):
 	global rudder_pos
 	
 	rudder_pos = output.data + 90.0
-	if rudder_pos < 30:
-		rudder_pos = 30
-	elif rudder_pos > 150:
-		rudder_pos = 150
 	rudder_pos_pub.publish(Float32(rudder_pos))
 	rospy.loginfo(rospy.get_caller_id() + " Rudder PID output pos: %f", rudder_pos)
 
@@ -145,8 +141,10 @@ def target_heading_callback(target_heading):
 	# Decide whether we need to tack through the wind
 	if (abs(target_heading.data - cur_boat_heading)) > 180:
 		boat_dir = -1 # Clockwise
+		print "clockwise"
 	else:
 		boat_dir = 1 # Counter-clockwise
+		print "cc"
 	
 	wind_coming = (wind_heading + 180)%360 # Which direction the wind is coming from
 
