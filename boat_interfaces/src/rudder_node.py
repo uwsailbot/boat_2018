@@ -78,7 +78,6 @@ def anemometer_callback(anemometer):
 			if not rudder_pos == 30.0:
 				rudder_pos_msg.data = 30.0
 				rudder_pos_pub.publish(Float32(rudder_pos))
-			#print ane_reading, anemometer.data
 		else:
 			state.minor = BoatState.MIN_COMPLETE
 			tacking_direction = 0
@@ -141,16 +140,13 @@ def target_heading_callback(target_heading):
 	# Decide whether we need to tack through the wind
 	if (abs(target_heading.data - cur_boat_heading)) > 180:
 		boat_dir = -1 # Clockwise
-		print "clockwise"
 	else:
 		boat_dir = 1 # Counter-clockwise
-		print "cc"
 	
 	wind_coming = (wind_heading + 180) % 360 # Which direction the wind is coming from
 
 	if (boat_dir is -1 and not is_within_bounds(wind_coming, cur_boat_heading, target_heading.data)) or\
 		(boat_dir is 1 and is_within_bounds(wind_coming, cur_boat_heading, target_heading.data)):
-		print wind_coming, cur_boat_heading, target_heading.data, boat_dir
 		state.minor = BoatState.MIN_TACKING
 		boat_state_pub.publish(state)
 		rospy.loginfo(rospy.get_caller_id() + " Boat State = 'Autonomous - Tacking'")

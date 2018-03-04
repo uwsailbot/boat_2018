@@ -31,7 +31,6 @@ def input_callback(pid):
 		elif e < -180:
 			e += 360
 		prop= kp * e
-		print prop, setpoint, pid_input
 		# TODO: Add integral and derivative
 		integral = 0 
 		der = 0

@@ -77,9 +77,7 @@ def position_callback(position):
 	best_heading = (best_heading + 360) % 360 # Get rid of negative angles
 	wind_coming = (wind_heading + 180) % 360 # Determine the direction the wind is coming from
 	# If the direct path isn't possible...
-	print best_heading, wind_heading
 	if best_heading > wind_coming-layline and best_heading < wind_coming+layline:
-		print "Direct path not possible"
 		# ... and there's new wind data or a new target, update the upwind path
 		if new_wind or is_new_target:
 			new_wind = False
@@ -90,8 +88,6 @@ def position_callback(position):
 				best_heading = wind_coming + layline
 			else:
 				best_heading = wind_coming - layline
-			print "UPWIND PATH"
-			print best_heading
 		
 		# If there isn't new wind data, DON'T update the heading
 		else:
