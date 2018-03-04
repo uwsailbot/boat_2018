@@ -39,6 +39,7 @@ wind_heading = 90
 ane_reading = 0
 pos = Point()
 heading = 90
+target_heading = 90
 state = BoatState()
 rudder_pos = 90
 winch_pos = 0
@@ -137,6 +138,12 @@ def waypoints_callback(newPoints):
 		local_point = to_lps(point).pt
 		temp_points.points.append(local_point)
 	local_points = temp_points
+
+
+def target_heading_callback(angle):
+	global target_heading
+	target_heading = angle.data
+
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -243,6 +250,7 @@ def redraw():
 	
 	# Render stuff
 	draw_waypoints()
+	draw_target_heading_arrow()
 	draw_boat()
 	draw_status()
 	
@@ -289,6 +297,31 @@ def draw_waypoints():
 		draw_circle(5,x,y)
 	
 	glPopMatrix()
+	
+
+# Draw boat's target heading as an arrow centered at (x, y) pointing in the target heading's dirction
+def draw_target_heading_arrow():
+	if state.major is BoatState.MAJ_AUTONOMOUS:
+		glPushMatrix()
+		
+		boat_x = pos.x + win_width/2.0
+		boat_y = pos.y + win_height/2.0
+
+		glTranslatef(boat_x, boat_y, 0)
+		glRotatef(target_heading, 0, 0, 1)
+		
+		tip_radius = 25
+		arrow_height = 10
+		arrow_base = 5
+
+		glColor3f(255, 255, 255)
+		glBegin(GL_POLYGON)
+		glVertex2f(tip_radius, 0)
+		glVertex2f(tip_radius - arrow_base, arrow_base/2)
+		glVertex2f(tip_radius - arrow_base, -arrow_base/2)
+		glEnd()
+		
+		glPopMatrix()
 
 
 # Draw the right-hand 'status' panel and all of its data
@@ -431,6 +464,7 @@ def draw_rudder(x, y):
 def calc(_):
 	global pos
 	global heading
+	global target_heading
 	global local_points
 	global last_time
 	global clock
@@ -445,7 +479,7 @@ def calc(_):
 	last_time = time.time()
 	clock += dt
 	
-	#TODO: Calculate the boat's pose here
+	#TODO: Calculate the boat's pose here # DONE??
 	
 	if(state.major != BoatState.MAJ_DISABLED):
 		heading -= (rudder_pos-90)*0.1
@@ -503,6 +537,14 @@ def listener():
 	rospy.Subscriber('rudder', Float32, rudder_callback)
 	rospy.Subscriber('winch', Int32, winch_callback)
 	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
+	rospy.Subscriber('target_heading', Float32, target_heading_callback)
+
+
+# =*=*=*=*=*=*=*=*=*=*=*=*= Helpers =*=*=*=*=*=*=*=*=*=*=*=*=
+
+# Returns (x,y), given radius and angle in degrees
+def polar_to_rect(rad, ang):
+	return (rad * math.cos(math.radians(ang)), rad * math.sin(math.radians(ang)))
 
 
 if __name__ == '__main__':
@@ -514,3 +556,5 @@ if __name__ == '__main__':
 		pass
 	
 	init_GL()
+
+
