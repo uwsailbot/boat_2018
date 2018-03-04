@@ -29,6 +29,9 @@
   <!-- Boat Interface nodes -->
   <include file="$(find boat_interfaces)/launch/interfaces_base.launch" />
 
-  <include file="$(find boat_interfaces)/launch/rudder_pid.launch" />
+  <!--<include file="$(find boat_interfaces)/launch/rudder_pid.launch" /> -->
+  <node pkg="boat_interfaces" type="pid.py"
+    name="pid" output="screen">
+  </node> 
 
 </launch>

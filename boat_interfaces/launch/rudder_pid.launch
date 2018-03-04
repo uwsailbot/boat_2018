@@ -11,8 +11,8 @@
   <param name="windupLimit" value="0" />			<!-- The limit of the integral term buildup -->
   <param name="max_loop_frequency" value="1000"/>	<!-- The maximum expected frequency (Hz) of input sensor updates -->
   <param name="min_loop_frequency" value="1"/>		<!-- The minimum expected frequency (Hz) of input sensor updates -->
-  <!--<param name="angle_error" value="1"/>	-->			<!-- Treat the minimum and maximum inputs (-180, 180) as the same point -->
- <!-- <param name="angle_wrap" value="2.0*180.0" /> -->
+  <param name="angle_error" value="true"/>			<!-- Treat the minimum and maximum inputs (-180, 180) as the same point -->
+  <param name="angle_wrap" value="2.0*180.0" /> 
   
   <!-- Set the topics used to interface with this controller -->
   <param name="topic_from_controller" value="output"/>	<!-- std_msgs/Float64 -->

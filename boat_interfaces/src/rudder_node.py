@@ -107,7 +107,7 @@ def compass_callback(compass):
 def pid_callback(output):
 	global rudder_pos
 	
-	rudder_pos = output.data + 90.0
+	rudder_pos =  90.0 + output.data 
 	rudder_pos_pub.publish(Float32(rudder_pos))
 	rospy.loginfo(rospy.get_caller_id() + " Rudder PID output pos: %f", rudder_pos)
 
@@ -146,7 +146,7 @@ def target_heading_callback(target_heading):
 		boat_dir = 1 # Counter-clockwise
 		print "cc"
 	
-	wind_coming = (wind_heading + 180)%360 # Which direction the wind is coming from
+	wind_coming = (wind_heading + 180) % 360 # Which direction the wind is coming from
 
 	if (boat_dir is -1 and not is_within_bounds(wind_coming, cur_boat_heading, target_heading.data)) or\
 		(boat_dir is 1 and is_within_bounds(wind_coming, cur_boat_heading, target_heading.data)):
