@@ -32,7 +32,7 @@ speed = 10
 clock = 0
 last_time = -1
 boat_speed = 4 # px/s
-layline = 30
+layline = rospy.get_param('/boat/layline')
 
 # ROS data
 wind_heading = 270

@@ -13,7 +13,7 @@ ki = 0.0
 output_pub = rospy.Publisher('rudder_pid/output', Float64, queue_size=10)
 setpoint = 0
 pid_input = 0
-max_range = 60
+max_range = (rospy.get_param('/boat/rudder_max') - rospy.get_param('/boat/rudder_max')) / 2.0
 
 
 # If the boat state topic changes, update local boat state
@@ -52,19 +52,9 @@ def enable_callback(pid):
 	global pid_is_enabled
 	pid_is_enabled = pid.data
 
-# Determine whether the specified value is between boundA and boundB.
-# Note that the order of boundA and boundB do not matter, either can be the upper or lower bound
-def is_within_bounds(val, boundA, boundB):
-	return (boundA < val and val < boundB) or (boundB < val and val < boundA)
-
-
-# Conform an input angle to range (-180, 180)
-def conform_angle(val):
-	return (val + 180) % 360 - 180
-
 def listener():
 	# Setup subscribers
-	rospy.init_node('pid_node', anonymous=True)
+	rospy.init_node('pid_node')
 	rospy.Subscriber('rudder_pid/input', Float64, input_callback)
 	rospy.Subscriber('rudder_pid/setpoint', Float64, setpoint_callback)
 	rospy.Subscriber('rudder_pid/enable', Bool, enable_callback)
