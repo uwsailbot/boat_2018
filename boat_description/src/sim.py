@@ -21,11 +21,23 @@ from OpenGL.GLUT import *
 
 from PIL import Image
 
+# Cheat codes
+codes = []
+cur_input = ""
+
 # OpenGL data
 win_ID = 0
 win_width = 640
 win_height = 480
-c=0
+
+# Resources
+boat_imgs = []
+rudder_imgs = []
+sail_imgs = []
+cur_boat_img = Image.Image()
+cur_rudder_img = Image.Image()
+cur_sail_img = Image.Image()
+
 # Simulation data and consts
 should_sim_joy = False
 sim_is_running = True
@@ -207,6 +219,23 @@ def ASCII_handler(key, mousex, mousey):
 	global speed
 	global joy
 	global sim_is_running
+	global cur_input
+	global cur_boat_img
+	
+	# Handle cheat codes
+	cur_input += key;
+	valid = False
+	for code in codes:
+		if code == cur_input:
+			cur_boat_img = boat_imgs[codes.index(code)]
+			#cur_rudder_img = rudder_imgs[codes.index(code)]
+			#cur_sail_img = sail_imgs[codes.index(code)]
+			valid = False
+			break
+		if code.startswith(cur_input):
+			valid = True
+	if not valid:
+		cur_input = ""
 	
 	if key is chr(27):
 		sim_is_running = False
@@ -264,8 +293,8 @@ def redraw():
 	
 	# Render stuff
 	draw_waypoints()
-	draw_target_heading_arrow()
 	draw_boat()
+	draw_target_heading_arrow()
 	draw_status()
 
 	glutSwapBuffers()
@@ -354,27 +383,28 @@ def draw_waypoints():
 
 # Draw boat's target heading as an arrow centered at (x, y) pointing in the target heading's dirction
 def draw_target_heading_arrow():
-	if state.major is BoatState.MAJ_AUTONOMOUS:
-		glPushMatrix()
-		
-		boat_x = pos.x + win_width/2.0
-		boat_y = pos.y + win_height/2.0
-
-		glTranslatef(boat_x, boat_y, 0)
-		glRotatef(target_heading, 0, 0, 1)
-		
-		tip_radius = 30
-		arrow_height = 10
-		arrow_base = 5
-
-		glColor3f(255, 255, 255)
-		glBegin(GL_POLYGON)
-		glVertex2f(tip_radius, 0)
-		glVertex2f(tip_radius - arrow_base, arrow_base/2)
-		glVertex2f(tip_radius - arrow_base, -arrow_base/2)
-		glEnd()
-		
-		glPopMatrix()
+	if state.major is not BoatState.MAJ_AUTONOMOUS:
+		return
+	glPushMatrix()
+	
+	boat_x = pos.x + win_width/2.0
+	boat_y = pos.y + win_height/2.0
+	
+	glTranslatef(boat_x, boat_y, 0)
+	glRotatef(target_heading, 0, 0, 1)
+	
+	tip_radius = 30
+	arrow_height = 10
+	arrow_base = 5
+	
+	glColor3f(255, 255, 255)
+	glBegin(GL_POLYGON)
+	glVertex2f(tip_radius, 0)
+	glVertex2f(tip_radius - arrow_base, arrow_base/2)
+	glVertex2f(tip_radius - arrow_base, -arrow_base/2)
+	glEnd()
+	
+	glPopMatrix()
 
 
 # Draw the right-hand 'status' panel and all of its data
@@ -464,20 +494,11 @@ def draw_wind_arrow(x,y):
 	
 	glPopMatrix()
 
-
-def draw_pixel_rgb_i(x, y, rgb):
-	glColor3f(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
-	glVertex2f(x,y)
-
-def draw_pixel_rgba_i(x, y, rgba):
-	glColor4f(rgba[0]/255.0, rgba[1]/255.0, rgba[2]/255.0, rgba[3]/255.0)
-	glVertex2f(x,y)
-
 # Draw the boat on the water
 def draw_boat():
 	x = pos.x + win_width/2.0
 	y = pos.y + win_height/2.0
-	draw_image(boat_image, x, y, heading-90)
+	draw_image(cur_boat_img, x, y, heading-90)
 
 # Draw the rudder diagram centered on (x, y)
 def draw_rudder(x, y):
@@ -626,8 +647,15 @@ def listener():
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
 	
-	global boat_image
-	boat_image = load_image('../meshes/pirate_boat.png', (36,48))
+	
+	# Load all the images
+	codes.append("orig")
+	boat_imgs.append(load_image('../meshes/niceboat.png', (24,48)))
+	codes.append("pirate")
+	boat_imgs.append(load_image('../meshes/pirate_boat.png', (36,48)))
+	codes.append("mars")
+	boat_imgs.append(load_image('../meshes/falcon_heavy.png', (1040/55,5842/55)))
+	cur_boat_img = boat_imgs[0]
 	
 	try:
 		listener()
@@ -635,5 +663,4 @@ if __name__ == '__main__':
 		pass
 	
 	init_GL()
-
 
