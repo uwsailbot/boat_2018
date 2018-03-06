@@ -225,7 +225,7 @@ def joy_callback(controller):
 		position_msg = Float32()
 		
 		# Set the rudder position
-		position_msg.data = (90 - ((rudder_max-rudder_min/2.0)* controller.axes[0]))
+		position_msg.data = (90 - ((rudder_max-rudder_min)/2.0* controller.axes[0]))
 		
 		# Only publish if the change in rudder angle is greater than 5
 		if abs(position_msg.data - rudder_pos_old) > 5:
