@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-import sys, select, termios, tty
+import sys, select, termios, tty, os
 from sensor_msgs.msg import Joy
 from sensor_msgs.msg import Imu
 from boat_msgs.msg import BoatState
@@ -13,18 +13,19 @@ from std_msgs.msg import Float32
 from std_msgs.msg import Int32
 from tf.transformations import quaternion_from_euler
 import time
-import sys
 from sys import argv
 import numpy
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 
+from PIL import Image
+
 # OpenGL data
 win_ID = 0
 win_width = 640
 win_height = 480
-
+c=0
 # Simulation data and consts
 should_sim_joy = False
 sim_is_running = True
@@ -252,12 +253,47 @@ def redraw():
 	draw_waypoints()
 	draw_boat()
 	draw_status()
-	
+
 	glutSwapBuffers()
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL Rendering =*=*=*=*=*=*=*=*=*=*=*=*=
 
+def draw_pixel_rgb_i(x, y, rgb):
+	glColor3f(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
+	glVertex2f(x,y)
+
+def draw_pixel_rgba_i(x, y, rgba):
+	glColor4f(rgba[0]/255.0, rgba[1]/255.0, rgba[2]/255.0, rgba[3]/255.0)
+	glVertex2f(x,y)
+
+def draw_image(image, x, y, angle):	
+	glEnable(GL_TEXTURE_2D)
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+	glEnable(GL_BLEND)
+	glPushMatrix()
+	
+	glTranslatef(x, y, 0)
+	glRotatef(angle, 0, 0, 1)
+	
+	im_width, im_height = image.size
+	im_data = image.getdata()
+	x_offset = -im_width/2
+	y_offset = -im_height/2
+	
+	glBegin(GL_POINTS)
+	if image.mode == 'RGB':
+		for i in range(0, im_width*im_height):
+			draw_pixel_rgb_i(i%im_width+x_offset, i/im_width+y_offset, im_data[i])
+	else:
+		for i in range(0, im_width*im_height):
+			draw_pixel_rgba_i(i%im_width+x_offset, i/im_width+y_offset, im_data[i])
+	glEnd()
+	
+	glPopMatrix()
+	glDisable(GL_TEXTURE_2D)
+	glDisable(GL_BLEND)
+	
 # Render a circle centered at (x,y) with radius r
 def draw_circle(r, x, y, quality=300):
 	glBegin(GL_POLYGON)
@@ -386,26 +422,19 @@ def draw_wind_arrow(x,y):
 	glPopMatrix()
 
 
+def draw_pixel_rgb_i(x, y, rgb):
+	glColor3f(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
+	glVertex2f(x,y)
+
+def draw_pixel_rgba_i(x, y, rgba):
+	glColor4f(rgba[0]/255.0, rgba[1]/255.0, rgba[2]/255.0, rgba[3]/255.0)
+	glVertex2f(x,y)
+
 # Draw the boat on the water
 def draw_boat():
-	glPushMatrix()
-	
 	x = pos.x + win_width/2.0
 	y = pos.y + win_height/2.0
-	
-	glTranslatef(x, y, 0)
-	glRotatef(heading-90, 0, 0, 1)
-	
-	glColor3f(1.0, 215/225.0, 145/225.0)
-	glBegin(GL_POLYGON)
-	glVertex2f(-5,0)
-	glVertex2f(0,15)
-	glVertex2f(5,0)
-	glVertex2f(0,-5)
-	glEnd()
-	
-	glPopMatrix()
-
+	draw_image(boat_image, x, y, heading-90)
 
 # Draw the rudder diagram centered on (x, y)
 def draw_rudder(x, y):
@@ -502,6 +531,24 @@ def init_GL():
 	glutTimerFunc(1000/30, calc, 0)
 	glutMainLoop()
 
+def rel_to_abs_filepath(filepath):
+	abs_filepath = os.path.dirname(os.path.realpath(__file__))
+	while filepath.startswith('../'):
+		filepath_arr = filepath.split('/')
+		filepath_arr.pop(0)
+		filepath = ''.join(['/'+str(s) for s in filepath_arr])[1:]
+		abs_filepath_arr = abs_filepath.split('/')
+		abs_filepath_arr = abs_filepath_arr[:-1]
+		abs_filepath =''.join(['/'+str(s) for s in abs_filepath_arr])[1:]
+	return abs_filepath + '/' + filepath
+	
+def load_image(filepath, size):
+	# loads and returns an image
+	abs_filepath = rel_to_abs_filepath(filepath)
+	im = Image.open(abs_filepath)
+	im = im.transpose(Image.FLIP_TOP_BOTTOM)
+	im = im.resize(size, Image.LANCZOS)
+	return im
 
 def listener():
 	# Setup subscribers
@@ -514,6 +561,9 @@ def listener():
 
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
+	
+	global boat_image
+	boat_image = load_image('../meshes/boat.png', (16,24))
 	
 	try:
 		listener()

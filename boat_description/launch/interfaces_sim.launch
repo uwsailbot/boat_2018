@@ -9,7 +9,4 @@
   <node pkg="boat_interfaces" type="winch_node.py"
     name="winch" >
   </node>
-  <node pkg="boat_description" type="joy.py"
-    name="joy" output="screen">
-  </node>
 </launch>
