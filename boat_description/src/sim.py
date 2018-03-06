@@ -289,8 +289,12 @@ def draw_text(text, x, y, h = 15.0):
 def draw_waypoints():
 	glPushMatrix()
 	
+	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
+		glColor3f(1,1,1)
+		first_point = local_points.points[0]
+		draw_circle(7,first_point.x + win_width/2.0, first_point.y + win_height/2.0)
+
 	glColor3f(1,0,0)
-	
 	for p in local_points.points:
 		x = p.x + win_width/2.0
 		y = p.y + win_height/2.0
