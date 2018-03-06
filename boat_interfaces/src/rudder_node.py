@@ -64,7 +64,6 @@ def anemometer_callback(anemometer):
 			if not rudder_pos == 150.0:
 				rudder_pos = 150.0
 				rudder_pos_pub.publish(Float32(rudder_pos))
-			rate.sleep()
 		else:
 			state.minor = BoatState.MIN_COMPLETE
 			tacking_direction = 0
@@ -85,8 +84,8 @@ def anemometer_callback(anemometer):
 			rudder_pos_pub.publish(Float32(rudder_pos))
 			boat_state_pub.publish(state)
 	
-	#rate = rospy.Rate(10)
-	#rate.sleep()
+	rate = rospy.Rate(10)
+	rate.sleep()
 
 
 # If the gps topic changes, update the pid controller's input value
