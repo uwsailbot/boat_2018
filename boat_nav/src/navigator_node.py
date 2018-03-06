@@ -15,9 +15,7 @@ target = Point()
 target_heading = 0
 rate = 0
 is_new_target = False
-
-# Declare the angle of the layline - This needs to be properly defined and perhaps read from a topic
-layline = 30
+layline = rospy.get_param('/boat/layline')
 
 # Declare the publishers for the node
 heading_pub = rospy.Publisher('target_heading', Float32, queue_size=10)

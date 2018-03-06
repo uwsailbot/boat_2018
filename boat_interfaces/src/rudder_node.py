@@ -16,7 +16,9 @@ wind_heading = 0
 state = BoatState()
 pid_is_enabled = False
 tacking_direction = 0
-layline = 30
+layline = rospy.get_param('/boat/layline')
+rudder_max = rospy.get_param('boat/rudder_max')
+rudder_min = rospy.get_param('boat/rudder_min')
 
 # Declare the publishers for the node
 rudder_pos_pub = rospy.Publisher('rudder', Float32, queue_size=10)
@@ -50,6 +52,8 @@ def anemometer_callback(anemometer):
 	global tacking_direction
 	global rudder_pos
 	global state
+	global rudder_max
+	global rudder_min
 	
 	ane_reading = anemometer.data
 	
@@ -61,8 +65,8 @@ def anemometer_callback(anemometer):
 	# degrees to the other side, then set the rudder back to 90
 	if tacking_direction == 1:
 		if ane_reading < (180 + layline):
-			if not rudder_pos == 150.0:
-				rudder_pos = 150.0
+			if not rudder_pos == rudder_max:
+				rudder_pos = rudder_max
 				rudder_pos_pub.publish(Float32(rudder_pos))
 		else:
 			state.minor = BoatState.MIN_COMPLETE
@@ -74,8 +78,8 @@ def anemometer_callback(anemometer):
 	
 	elif tacking_direction == -1:
 		if ane_reading > (180 - layline):
-			if not rudder_pos == 30.0:
-				rudder_pos_msg.data = 30.0
+			if not rudder_pos == rudder_min:
+				rudder_pos_msg.data = rudder_min
 				rudder_pos_pub.publish(Float32(rudder_pos))
 		else:
 			state.minor = BoatState.MIN_COMPLETE
@@ -92,11 +96,13 @@ def anemometer_callback(anemometer):
 def compass_callback(compass):
 	global cur_boat_heading
 	global wind_heading
+	global pid_input_pub
+	global ane_reading
 	
 	wind_heading = (ane_reading + compass.data) % 360
 	
 	cur_boat_heading = compass.data
-	heading_msg = Float64((cur_boat_heading+180)%360-180)
+	heading_msg = Float64(conform_angle(cur_boat_heading))
 	pid_input_pub.publish(heading_msg)
 	# Don't loginfo here, this would be somewhat redundant as this callback just parses and republishes the same information
 
@@ -172,6 +178,8 @@ def joy_callback(controller):
 	global state
 	global tacking_direction
 	global pid_is_enabled
+	global rudder_max
+	global rudder_min
 	
 	# Make sure we're in RC control mode
 	if state.major is not BoatState.MAJ_RC:
@@ -184,10 +192,10 @@ def joy_callback(controller):
 		
 		# If a tack is requested, figure out which side we are tacking and set the rudder accordingly
 		if ane_reading > 180:
-			rudder_pos = 30.0
+			rudder_pos = rudder_min
 			tacking_direction = -1
 		else:
-			rudder_pos = 150.0
+			rudder_pos = rudder_max
 			tacking_direction = 1
 		
 		rudder_pos_pub.publish(Float32(rudder_pos))
@@ -216,8 +224,8 @@ def joy_callback(controller):
 		rudder_pos_old = rudder_pos
 		position_msg = Float32()
 		
-		# Set the rudder position to be a min of 30 and max of 150
-		position_msg.data = (90 - (60 * controller.axes[0]))
+		# Set the rudder position
+		position_msg.data = (90 - ((rudder_max-rudder_min/2.0)* controller.axes[0]))
 		
 		# Only publish if the change in rudder angle is greater than 5
 		if abs(position_msg.data - rudder_pos_old) > 5:
@@ -238,7 +246,7 @@ def conform_angle(val):
 
 def listener():
 	# Setup subscribers
-	rospy.init_node('rudder_node', anonymous=True)
+	rospy.init_node('rudder_node')
 	rospy.Subscriber('joy', Joy, joy_callback)
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
 	rospy.Subscriber('anemometer', Float32, anemometer_callback)
