@@ -43,7 +43,7 @@ heading = 90
 target_heading = 90
 state = BoatState()
 rudder_pos = 90
-winch_pos = 0
+winch_pos = 2000
 local_points = PointArray()
 gps_points = PointArray()
 joy = Joy()
@@ -191,11 +191,17 @@ def keyboard_handler(key, mousex, mousey):
 	elif key == GLUT_KEY_RIGHT and should_sim_joy:
 		joy.axes[0] = min(joy.axes[0]+0.1, 1)
 		joy_pub.publish(joy)
-	elif key == GLUT_KEY_UP or key == GLUT_KEY_DOWN and should_sim_joy:
-		joy.axes[0] = 0
+	elif key == GLUT_KEY_UP and should_sim_joy:
+		joy.axes[4] = 1
 		joy_pub.publish(joy)
-
-
+		joy.axes[4] = 0
+		joy_pub.publish(joy)
+	elif key == GLUT_KEY_DOWN and should_sim_joy:
+		joy.axes[4] = -1
+		joy_pub.publish(joy)
+		joy.axes[4] = 0
+		joy_pub.publish(joy)
+	
 # Handler for all key presses that can be represented by an ASCII code
 def ASCII_handler(key, mousex, mousey):
 	global speed
@@ -224,9 +230,16 @@ def ASCII_handler(key, mousex, mousey):
 		joy.buttons[2] = 0
 		joy.axes[0] = 0
 		joy_pub.publish(joy)
+		joy.buttons[0] = 0
+		joy_pub.publish(joy)
 	elif key is 'g' and should_sim_joy:
 		joy.buttons[2] = 1
 		joy.buttons[0] = 0
+		joy_pub.publish(joy)
+		joy.buttons[2] = 0
+		joy_pub.publish(joy)
+	elif key is 'q':
+		joy.axes[0] = 0
 		joy_pub.publish(joy)
 	elif key is 'a':
 		update_wind(5)

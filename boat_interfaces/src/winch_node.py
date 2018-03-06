@@ -9,18 +9,20 @@ from boat_msgs.msg import BoatState
 import time
 
 ane_reading = 0
-winch_pos = 0
 layline = rospy.get_param('/boat/layline')  # Closest angle we can sail to the wind
 winch_min = rospy.get_param('/boat/winch_min')
 winch_max = rospy.get_param('/boat/winch_max')
 winch_pub = rospy.Publisher('winch', Int32, queue_size=10)
 state = BoatState()
+winch_pos = winch_max
 
 
 def state_callback(new_state):
 	global state
 	global winch_pos
 	global winch_pub
+	global winch_max
+
 	state = new_state
 
 	if state.major is BoatState.MAJ_DISABLED or (state.major is BoatState.MAJ_AUTONOMOUS and state.minor is BoatState.MIN_COMPLETE):
@@ -38,8 +40,9 @@ def joy_callback(controller):
 	winch_range = winch_max - winch_min
 	rate = rospy.Rate(100)
 
-	# If we are not in autonomous mode, then use the Dpad to set the sail position
+	# If we are not in autonomous mode, then use controller to set the sail
 	if state.major is BoatState.MAJ_RC:
+		# Use D-Pad
 		if controller.axes[6] < 0:
 			winch_pos = winch_min + winch_range / 2.0 # 50% in, Beam Reach
 		elif controller.axes[6] > 0:
@@ -48,8 +51,16 @@ def joy_callback(controller):
 			winch_pos = winch_min # 0% in, Run
 		elif controller.axes[7] > 0:
 			winch_pos = winch_max # 100% in, Close Hauled
+		# Use Right Joystick, up to pull in, down to let out
+		# TODO: Increase the sleep on decrease the request value depending how fast the actual winch can pull in
+		elif abs(controller.axes[4]) >= 0.1: 
+			winch_pos += 50 * controller.axes[4]
+			if winch_pos > winch_max:
+				winch_pos = winch_max
+			elif winch_pos < winch_min:
+				winch_pos = winch_min
 
-	winch_pub.publish(Int32(winch_pos))
+		winch_pub.publish(Int32(winch_pos))
 	rate.sleep()
 
 
