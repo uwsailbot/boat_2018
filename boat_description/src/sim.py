@@ -15,7 +15,7 @@ from tf.transformations import quaternion_from_euler
 import time
 import sys
 from sys import argv
-import numpy
+import math
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
@@ -69,7 +69,7 @@ def update_gps():
 	gps.longitude = coords.pt.x
 	gps_pub.publish(gps)
 	
-	orientation = quaternion_from_euler(0,0,numpy.radians(heading))
+	orientation = quaternion_from_euler(0,0,math.radians(heading))
 	imu = Imu()
 	
 	# Convertion because they are different types
@@ -263,9 +263,9 @@ def redraw():
 def draw_circle(r, x, y, quality=300):
 	glBegin(GL_POLYGON)
 	for i in range(0, quality):
-		angle = 2 * numpy.pi * i / float(quality)
-		curx = x + numpy.cos(angle) * r
-		cury = y + numpy.sin(angle) * r
+		angle = 2 * math.pi * i / float(quality)
+		curx = x + math.cos(angle) * r
+		cury = y + math.sin(angle) * r
 		glVertex2f(curx,cury)
 	glEnd()
 
@@ -471,6 +471,7 @@ def calc(_):
 	global rudder_pos
 	global layline
 	global ane_reading
+	global boat_speed
 	
 	# Calculate the in-simulator time
 	if(last_time == -1):
@@ -479,6 +480,17 @@ def calc(_):
 	last_time = time.time()
 	clock += dt
 	
+	dh = wind_heading - heading
+	while dh > 180:
+		dh -= 360
+	while dh < -180:
+		dh += 360
+	dh = max(0,(abs(dh)-25))/150
+	
+	boat_speed += 5 * (1-dh) * dt
+	boat_speed -= math.copysign(0.04*boat_speed*boat_speed, boat_speed)
+	boat_speed = min(boat_speed, 10)
+	boat_speed = max(boat_speed, -10)
 	
 	if(state.major != BoatState.MAJ_DISABLED):
 		heading -= (rudder_pos-90)*0.1
@@ -487,15 +499,14 @@ def calc(_):
 		# Update anemometer reading because of new heading
 		update_wind(0)
 		
-		
 		# Our laylines are set further out than the boat will actually hit irons at, so physics wise the laylines are actually at laylines-TOL, which
 		# is where it should hit irons
 		TOL = 5
 
 		# Outside of laylines, speed works normally
-		if ane_reading >= (180+layline-TOL) or ane_reading <= (180 - layline+TOL):
-			pos.x += numpy.cos(numpy.radians(heading)) * boat_speed * dt
-			pos.y += numpy.sin(numpy.radians(heading)) * boat_speed * dt
+		#if ane_reading >= (180+layline-TOL) or ane_reading <= (180 - layline+TOL):
+		pos.x += math.cos(math.radians(heading)) * boat_speed * dt
+		pos.y += math.sin(math.radians(heading)) * boat_speed * dt
 	
 	update_gps()
 	glutPostRedisplay()
