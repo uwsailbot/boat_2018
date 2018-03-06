@@ -603,7 +603,7 @@ if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
 	
 	global boat_image
-	boat_image = load_image('../meshes/boat.png', (16,24))
+	boat_image = load_image('../meshes/niceboat.png', (24,48))
 	
 	try:
 		listener()
