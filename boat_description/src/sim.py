@@ -280,8 +280,8 @@ def redraw():
 	
 	# Render stuff
 	draw_waypoints()
-	draw_target_heading_arrow()
 	draw_boat()
+	draw_target_heading_arrow()
 	draw_status()
 
 	glutSwapBuffers()
@@ -480,15 +480,6 @@ def draw_wind_arrow(x,y):
 	glEnd()
 	
 	glPopMatrix()
-
-
-def draw_pixel_rgb_i(x, y, rgb):
-	glColor3f(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
-	glVertex2f(x,y)
-
-def draw_pixel_rgba_i(x, y, rgba):
-	glColor4f(rgba[0]/255.0, rgba[1]/255.0, rgba[2]/255.0, rgba[3]/255.0)
-	glVertex2f(x,y)
 
 # Draw the boat on the water
 def draw_boat():
