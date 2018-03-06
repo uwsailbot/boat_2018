@@ -14,7 +14,7 @@ import math
 
 # Declare global variables needed for the node
 origin_lps = Point()
-RADIUS = 6378137.0 # Radius of earth, in meters
+RADIUS = rospy.get_param('/boat/radius')
 ane_reading = 0
 
 # Declare the publishers for the node

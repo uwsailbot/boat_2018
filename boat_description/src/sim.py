@@ -33,14 +33,14 @@ speed = 10
 clock = 0
 last_time = -1
 boat_speed = 4 # px/s
-RADIUS = 6378137 # Radius of earth, in meters
-layline = 30
+layline = rospy.get_param('/boat/layline')
 
 # ROS data
-wind_heading = 90
+wind_heading = 270
 ane_reading = 0
 pos = Point()
 heading = 90
+target_heading = 90
 state = BoatState()
 rudder_pos = 90
 winch_pos = 0
@@ -65,12 +65,6 @@ to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 def update_gps():
 	gps = GPS()
 	gps.status = GPS.STATUS_FIX
-	
-	# Vaguely uncertain of this math https://sciencing.com/convert-xy-coordinates-longitude-latitude-8449009.html
-	#gps.longitude = numpy.arctan2(pos.y, pos.x)
-	#print(gps.longitude)
-	#gps.latitude = numpy.arccos((pos.y/RADIUS) / numpy.sin(gps.longitude))
-	
 	coords = to_gps(pos)
 	gps.latitude = coords.pt.y
 	gps.longitude = coords.pt.x
@@ -145,6 +139,12 @@ def waypoints_callback(newPoints):
 		local_point = to_lps(point).pt
 		temp_points.points.append(local_point)
 	local_points = temp_points
+
+
+def target_heading_callback(angle):
+	global target_heading
+	target_heading = angle.data
+
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -251,6 +251,7 @@ def redraw():
 	
 	# Render stuff
 	draw_waypoints()
+	draw_target_heading_arrow()
 	draw_boat()
 	draw_status()
 
@@ -324,14 +325,43 @@ def draw_text(text, x, y, h = 15.0):
 def draw_waypoints():
 	glPushMatrix()
 	
+	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
+		glColor3f(1,1,1)
+		first_point = local_points.points[0]
+		draw_circle(7,first_point.x + win_width/2.0, first_point.y + win_height/2.0)
+
 	glColor3f(1,0,0)
-	
 	for p in local_points.points:
 		x = p.x + win_width/2.0
 		y = p.y + win_height/2.0
 		draw_circle(5,x,y)
 	
 	glPopMatrix()
+	
+
+# Draw boat's target heading as an arrow centered at (x, y) pointing in the target heading's dirction
+def draw_target_heading_arrow():
+	if state.major is BoatState.MAJ_AUTONOMOUS:
+		glPushMatrix()
+		
+		boat_x = pos.x + win_width/2.0
+		boat_y = pos.y + win_height/2.0
+
+		glTranslatef(boat_x, boat_y, 0)
+		glRotatef(target_heading, 0, 0, 1)
+		
+		tip_radius = 25
+		arrow_height = 10
+		arrow_base = 5
+
+		glColor3f(255, 255, 255)
+		glBegin(GL_POLYGON)
+		glVertex2f(tip_radius, 0)
+		glVertex2f(tip_radius - arrow_base, arrow_base/2)
+		glVertex2f(tip_radius - arrow_base, -arrow_base/2)
+		glEnd()
+		
+		glPopMatrix()
 
 
 # Draw the right-hand 'status' panel and all of its data
@@ -467,6 +497,7 @@ def draw_rudder(x, y):
 def calc(_):
 	global pos
 	global heading
+	global target_heading
 	global local_points
 	global last_time
 	global clock
@@ -481,7 +512,6 @@ def calc(_):
 	last_time = time.time()
 	clock += dt
 	
-	#TODO: Calculate the boat's pose here
 	
 	if(state.major != BoatState.MAJ_DISABLED):
 		heading -= (rudder_pos-90)*0.1
@@ -490,8 +520,13 @@ def calc(_):
 		# Update anemometer reading because of new heading
 		update_wind(0)
 		
+		
+		# Our laylines are set further out than the boat will actually hit irons at, so physics wise the laylines are actually at laylines-TOL, which
+		# is where it should hit irons
+		TOL = 5
+
 		# Outside of laylines, speed works normally
-		if ane_reading >= (180+layline) or ane_reading <= (180 - layline):
+		if ane_reading >= (180+layline-TOL) or ane_reading <= (180 - layline+TOL):
 			pos.x += numpy.cos(numpy.radians(heading)) * boat_speed * dt
 			pos.y += numpy.sin(numpy.radians(heading)) * boat_speed * dt
 	
@@ -503,6 +538,11 @@ def calc(_):
 	else:
 		glutDestroyWindow(win_ID)
 		exit(0)
+
+# Returns (x,y), given radius and angle in degrees
+def polar_to_rect(rad, ang):
+	return (rad * math.cos(math.radians(ang)), rad * math.sin(math.radians(ang)))
+
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
@@ -557,7 +597,7 @@ def listener():
 	rospy.Subscriber('rudder', Float32, rudder_callback)
 	rospy.Subscriber('winch', Int32, winch_callback)
 	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
-
+	rospy.Subscriber('target_heading', Float32, target_heading_callback)
 
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
@@ -571,3 +611,5 @@ if __name__ == '__main__':
 		pass
 	
 	init_GL()
+
+

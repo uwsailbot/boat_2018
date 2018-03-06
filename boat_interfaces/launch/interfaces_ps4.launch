@@ -1,7 +1,9 @@
+<!-- PS4 Controller Boat Interfaces launch file -->
 <launch>
-<arg name="controller" default="/dev/ttyUSB0" />
-<arg name="arduino" default="/dev/ttyACM0" />
-  
+  <arg name="controller" default="/dev/ttyUSB0" />
+  <arg name="arduino" default="/dev/ttyACM0" />
+  <rosparam file ="$(find boat_interfaces)/config/parameters.yaml" command="load" />
+
   <!-- rosserial_python allows topics to be published and subscribed to across the serial link to the arduino -->
   <node pkg="rosserial_python" type="serial_node.py"
     args="_port:=$(arg arduino) _baud:=57600" name="rosserial_arduino" output="screen">

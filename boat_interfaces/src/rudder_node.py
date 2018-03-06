@@ -16,7 +16,9 @@ wind_heading = 0
 state = BoatState()
 pid_is_enabled = False
 tacking_direction = 0
-layline = 30
+layline = rospy.get_param('/boat/layline')
+rudder_max = rospy.get_param('boat/rudder_max')
+rudder_min = rospy.get_param('boat/rudder_min')
 
 # Declare the publishers for the node
 rudder_pos_pub = rospy.Publisher('rudder', Float32, queue_size=10)
@@ -31,11 +33,17 @@ pid_setpoint_pub = rospy.Publisher('rudder_pid/setpoint', Float64, queue_size=10
 def boat_state_callback(new_state):
 	global state
 	global rudder_pos
+	global pid_is_enabled
 	state = new_state
 	
-	if state.major is BoatState.MAJ_DISABLED:
+	# If disabled or auto has completed its path, then stop the boat
+	if state.major is BoatState.MAJ_DISABLED or (state.major is BoatState.MAJ_AUTONOMOUS and state.minor is BoatState.MIN_COMPLETE):
 		rudder_pos = 90
 		rudder_pos_pub.publish(Float32(rudder_pos))
+		if pid_is_enabled:
+			pid_is_enabled = False
+			pid_enable_pub.publish(Bool(False))
+			rospy.loginfo(rospy.get_caller_id() + " Disabling rudder PID")
 
 
 # If the wind heading topic changes, update local wind heading
@@ -44,6 +52,8 @@ def anemometer_callback(anemometer):
 	global tacking_direction
 	global rudder_pos
 	global state
+	global rudder_max
+	global rudder_min
 	
 	ane_reading = anemometer.data
 	
@@ -55,8 +65,8 @@ def anemometer_callback(anemometer):
 	# degrees to the other side, then set the rudder back to 90
 	if tacking_direction == 1:
 		if ane_reading < (180 + layline):
-			if not rudder_pos == 150.0:
-				rudder_pos = 150.0
+			if not rudder_pos == rudder_max:
+				rudder_pos = rudder_max
 				rudder_pos_pub.publish(Float32(rudder_pos))
 			rate.sleep()
 		else:
@@ -69,10 +79,9 @@ def anemometer_callback(anemometer):
 	
 	elif tacking_direction == -1:
 		if ane_reading > (180 - layline):
-			if not rudder_pos == 30.0:
-				rudder_pos_msg.data = 30.0
+			if not rudder_pos == rudder_min:
+				rudder_pos_msg.data = rudder_min
 				rudder_pos_pub.publish(Float32(rudder_pos))
-			#print ane_reading, anemometer.data
 		else:
 			state.minor = BoatState.MIN_COMPLETE
 			tacking_direction = 0
@@ -88,11 +97,13 @@ def anemometer_callback(anemometer):
 def compass_callback(compass):
 	global cur_boat_heading
 	global wind_heading
+	global pid_input_pub
+	global ane_reading
 	
 	wind_heading = (ane_reading + compass.data) % 360
 	
 	cur_boat_heading = compass.data
-	heading_msg = Float64((cur_boat_heading+180)%360-180)
+	heading_msg = Float64(conform_angle(cur_boat_heading))
 	pid_input_pub.publish(heading_msg)
 	# Don't loginfo here, this would be somewhat redundant as this callback just parses and republishes the same information
 
@@ -101,7 +112,7 @@ def compass_callback(compass):
 def pid_callback(output):
 	global rudder_pos
 	
-	rudder_pos = output + 90.0
+	rudder_pos =  90.0 + output.data 
 	rudder_pos_pub.publish(Float32(rudder_pos))
 	rospy.loginfo(rospy.get_caller_id() + " Rudder PID output pos: %f", rudder_pos)
 
@@ -125,22 +136,32 @@ def target_heading_callback(target_heading):
 		rospy.loginfo(rospy.get_caller_id() + " Enabling rudder PID")
 	
 	# We have a new valid setpoint, therefore output it	
-	rospy.loginfo(rospy.get_caller_id() + " New rudder setpoint: %f", target_heading)
+	rospy.loginfo(rospy.get_caller_id() + " New rudder setpoint: %f", target_heading.data)
 
 	# If the current heading and the new heading are on opposite sides of the wind, we need to tack
-	opp_wind = (wind_heading+180)%360
-	if (is_in_bounds(target_heading, wind_heading, opp_wind) and not is_in_bounds(cur_boat_heading, wind_heading, opp_wind)) or\
-		(is_in_bounds(cur_boat_heading, wind_heading, opp_wind) and not is_in_bounds(target_heading, wind_heading, opp_wind)):
-		
+#	opp_wind = (wind_heading+180)%360
+#	if (is_within_bounds(target_heading.data, wind_heading, opp_wind) and not is_within_bounds(cur_boat_heading, wind_heading, opp_wind)) or\
+#		(is_within_bounds(cur_boat_heading, wind_heading, opp_wind) and not is_within_bounds(target_heading.data, wind_heading, opp_wind)):
+
+	# Decide whether we need to tack through the wind
+	if (abs(target_heading.data - cur_boat_heading)) > 180:
+		boat_dir = -1 # Clockwise
+	else:
+		boat_dir = 1 # Counter-clockwise
+	
+	wind_coming = (wind_heading + 180) % 360 # Which direction the wind is coming from
+
+	if (boat_dir is -1 and not is_within_bounds(wind_coming, cur_boat_heading, target_heading.data)) or\
+		(boat_dir is 1 and is_within_bounds(wind_coming, cur_boat_heading, target_heading.data)):
 		state.minor = BoatState.MIN_TACKING
 		boat_state_pub.publish(state)
 		rospy.loginfo(rospy.get_caller_id() + " Boat State = 'Autonomous - Tacking'")
 		
-		pid_setpoint = Float64(conform_angle(target_heading))
+		pid_setpoint = Float64(conform_angle(target_heading.data))
 		pid_setpoint_pub.publish(pid_setpoint)
 		
 		# TODO: Find a good tolerance. We don't need to wait for the boat to be completely on target, but it needs to be well past the wind
-		while abs(target_heading-cur_boat_heading) < 10:
+		while abs(target_heading.data-cur_boat_heading) < 10:
 			pass
 			
 		state.minor = BoatState.MIN_PLANNING
@@ -149,7 +170,7 @@ def target_heading_callback(target_heading):
 	
 	# Otherwise, we don't need to tack, so simply update the controller's setpoint
 	else:
-		pid_setpoint = Float64(conform_angle(target_heading))
+		pid_setpoint = Float64(conform_angle(target_heading.data))
 		pid_setpoint_pub.publish(pid_setpoint)
 
 
@@ -158,6 +179,8 @@ def joy_callback(controller):
 	global state
 	global tacking_direction
 	global pid_is_enabled
+	global rudder_max
+	global rudder_min
 	
 	# Make sure we're in RC control mode
 	if state.major is not BoatState.MAJ_RC:
@@ -170,10 +193,10 @@ def joy_callback(controller):
 		
 		# If a tack is requested, figure out which side we are tacking and set the rudder accordingly
 		if ane_reading > 180:
-			rudder_pos = 30.0
+			rudder_pos = rudder_min
 			tacking_direction = -1
 		else:
-			rudder_pos = 150.0
+			rudder_pos = rudder_max
 			tacking_direction = 1
 		
 		rudder_pos_pub.publish(Float32(rudder_pos))
@@ -202,8 +225,8 @@ def joy_callback(controller):
 		rudder_pos_old = rudder_pos
 		position_msg = Float32()
 		
-		# Set the rudder position to be a min of 30 and max of 150
-		position_msg.data = (90 - (60 * controller.axes[0]))
+		# Set the rudder position
+		position_msg.data = (90 - ((rudder_max-rudder_min/2.0)* controller.axes[0]))
 		
 		# Only publish if the change in rudder angle is greater than 5
 		if abs(position_msg.data - rudder_pos_old) > 5:
@@ -222,10 +245,9 @@ def is_within_bounds(val, boundA, boundB):
 def conform_angle(val):
 	return (val + 180) % 360 - 180
 
-
 def listener():
 	# Setup subscribers
-	rospy.init_node('rudder_node', anonymous=True)
+	rospy.init_node('rudder_node')
 	rospy.Subscriber('joy', Joy, joy_callback)
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
 	rospy.Subscriber('anemometer', Float32, anemometer_callback)

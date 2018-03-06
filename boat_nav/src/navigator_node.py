@@ -14,9 +14,8 @@ state = BoatState()
 target = Point()
 target_heading = 0
 rate = 0
-
-# Declare the angle of the layline - This needs to be properly defined and perhaps read from a topic
-layline = 30
+is_new_target = False
+layline = rospy.get_param('/boat/layline')
 
 # Declare the publishers for the node
 heading_pub = rospy.Publisher('target_heading', Float32, queue_size=10)
@@ -31,21 +30,32 @@ def anemometer_callback(new_heading):
 	global new_wind
 	
 	ane_reading = new_heading.data
-	new_wind = True
 
 def compass_callback(compass):
 	global wind_heading
-	wind_heading = (ane_reading + compass.data) % 360
+	global new_wind
+
+	new_wind_heading = (ane_reading + compass.data) % 360
+
+	# Tolerance on a wind shift to be determined
+	# Only update wind heading if a significant shift is detected, because it will then replan our upwind path
+	if abs(new_wind_heading - wind_heading) > 0.1 :
+		new_wind = True
+		wind_heading = new_wind_heading
 
 def target_callback(new_target):
 	global target
-	target = new_target
+	global is_new_target
+	if abs(target.x - new_target.x) > 0.01 or abs(target.y - new_target.y) > 0.01:
+		is_new_target = True
+		target = new_target
 
 def position_callback(position):
 	global state
 	global wind_heading
 	global new_wind
 	global target
+	global is_new_target
 	global target_heading
 	global rate
 	global boat_state_pub
@@ -55,26 +65,27 @@ def position_callback(position):
 	
 	rate = rospy.Rate(100)
 	
-	# If the boat isn't in the autonomous planning state, or there are no waypoints, exit
-	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING or len(waypoints) is 0:
+	# If the boat isn't in the autonomous planning state, exit
+	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
 		return
 	
 	# Calculate the direct heading to the next waypoint
 	# This should never be undefined, as the atan2(0,0) case would already be caught by the proximity check above
-	best_heading = math.atan2(target.y - position.y, target.x - position.x) * 180 / np.pi
-	
+	best_heading = math.atan2(target.y - position.y, target.x - position.x) * 180 / math.pi
+	best_heading = (best_heading + 360) % 360 # Get rid of negative angles
+	wind_coming = (wind_heading + 180) % 360 # Determine the direction the wind is coming from
 	# If the direct path isn't possible...
-	if best_heading > wind_heading-layline and best_heading < wind_heading+layline:
-		
-		# ... and there's new wind data, update the heading
-		if new_wind:
+	if best_heading > wind_coming-layline and best_heading < wind_coming+layline:
+		# ... and there's new wind data or a new target, update the upwind path
+		if new_wind or is_new_target:
 			new_wind = False
+			is_new_target = False
 			
 			# If the waypoint is to the right of the wind...
-			if best_heading > wind_heading:
-				target_heading = wind_heading + layline
+			if best_heading > wind_coming:
+				best_heading = wind_coming + layline
 			else:
-				target_heading = wind_heading - layline
+				best_heading = wind_coming - layline
 		
 		# If there isn't new wind data, DON'T update the heading
 		else:
