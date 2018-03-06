@@ -350,7 +350,7 @@ def draw_target_heading_arrow():
 		glTranslatef(boat_x, boat_y, 0)
 		glRotatef(target_heading, 0, 0, 1)
 		
-		tip_radius = 25
+		tip_radius = 30
 		arrow_height = 10
 		arrow_base = 5
 
@@ -587,7 +587,7 @@ def load_image(filepath, size):
 	abs_filepath = rel_to_abs_filepath(filepath)
 	im = Image.open(abs_filepath)
 	im = im.transpose(Image.FLIP_TOP_BOTTOM)
-	im = im.resize(size, Image.LANCZOS)
+	im = im.resize(size, Image.NEAREST)
 	return im
 
 def listener():
@@ -603,7 +603,7 @@ if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
 	
 	global boat_image
-	boat_image = load_image('../meshes/niceboat.png', (24,48))
+	boat_image = load_image('../meshes/pirate_boat.png', (36,48))
 	
 	try:
 		listener()

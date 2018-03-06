@@ -1,7 +1,7 @@
 boat:
-  layline: 30
-  winch_max: 2000
-  winch_min: 900
+  layline: 30.0
+  winch_max: 2000.0
+  winch_min: 900.0
   rudder_max: 150
   rudder_min: 30
   radius: 6378137.0

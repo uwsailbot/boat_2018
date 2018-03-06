@@ -5,93 +5,90 @@ from std_msgs.msg import Int32
 from std_msgs.msg import Float32
 from std_msgs.msg import Bool
 from boat_msgs.msg import BoatState
-      
+	  
 import time
 
 ane_reading = 0
-request = "Hold"
 winch_pos = 0
-max_angle = 30  # Closest angle we can sail to the wind
-pub = rospy.Publisher('winch', Int32, queue_size=10)
+layline = rospy.get_param('/boat/layline')  # Closest angle we can sail to the wind
+winch_min = rospy.get_param('/boat/winch_min')
+winch_max = rospy.get_param('/boat/winch_max')
+winch_pub = rospy.Publisher('winch', Int32, queue_size=10)
 state = BoatState()
 
 
 def state_callback(new_state):
-    global state
-    global winch_pos
-    global pub
-    state = new_state
+	global state
+	global winch_pos
+	global winch_pub
+	state = new_state
 
-    if state.major is BoatState.MAJ_DISABLED:
-        winch_pos = 0
-        pub.publish(winch_pos)
+	if state.major is BoatState.MAJ_DISABLED or (state.major is BoatState.MAJ_AUTONOMOUS and state.minor is BoatState.MIN_COMPLETE):
+		winch_pos = winch_max # Pull sails in all the way
+		winch_pub.publish(winch_pos)
 
 
 def joy_callback(controller):
-    global winch_pos
-    global request
-    global state
-    global pub
+	global winch_pos
+	global state
+	global winch_pub
+	global winch_min
+	global winch_max
+	
+	winch_range = winch_max - winch_min
+	rate = rospy.Rate(100)
 
-    rate = rospy.Rate(100)
+	# If we are not in autonomous mode, then use the Dpad to set the sail position
+	if state.major is BoatState.MAJ_RC:
+		if controller.axes[6] < 0:
+			winch_pos = winch_min + winch_range / 2.0 # 50% in, Beam Reach
+		elif controller.axes[6] > 0:
+			winch_pos = winch_min + winch_range * 3.0 / 2 # 75% in, Broad Reach
+		elif controller.axes[7] < 0:
+			winch_pos = winch_min # 0% in, Run
+		elif controller.axes[7] > 0:
+			winch_pos = winch_max # 100% in, Close Hauled
 
-    # If we are not in autonomous mode, then use the Dpad to set the sail position
-    if state.major is BoatState.MAJ_RC:
-        if controller.axes[6] < 0:
-            request = "Broad"
-            winch_pos = 1500  # 1.5 turns
-        elif controller.axes[6] > 0:
-            request = "Beam"
-            winch_pos = 1100  # Three turns
-        elif controller.axes[7] < 0:
-            request = "Run"
-            winch_pos = 1600  # Fully out
-        elif controller.axes[7] > 0:
-            request = "Close"
-            winch_pos = 0  # Five Turns
-        else:
-            request = "Hold"
-    pub.publish(winch_pos)
-    rate.sleep()
+	winch_pub.publish(Int32(winch_pos))
+	rate.sleep()
 
 
 def anemometer_callback(anemometer):
-    global winch_pos
-    global state
-    global ane_reading
-    global pub
+	global winch_pos
+	global state
+	global ane_reading
+	global winch_pub
+	global winch_max
+	global winch_min
+	global layline
 
-    ane_reading = anemometer.data
-    rate = rospy.Rate(10)
+	ane_reading = anemometer.data
+	wind_rel_boat = ane_reading - 180 # set midpoint to zero, right side < 0,left side >0
 
-    # If we are in autonomous mode, set the sail based on the wind direction given by the anemometer
-    if state.major is BoatState.MAJ_AUTONOMOUS:
-        if ane_reading < (180 + max_angle) and ane_reading > (180 - max_angle):
-            new_position = 0
-        elif ane_reading >= (180 - max_angle):
-            new_position = (600 / (180 - max_angle)) * abs(ane_reading-(max_angle + 180)) + 1000
-        else:
-            new_position = (600 / (180 - max_angle)) * abs(ane_reading-(180 - max_angle)) + 1000
+	# If we are in autonomous mode, set the sail based on the wind direction given by the anemometer
+	if state.major is BoatState.MAJ_AUTONOMOUS and state.minor is not BoatState.MIN_COMPLETE:
+		if abs(wind_rel_boat) <= layline:
+			new_position = winch_max
+			
+		else:
+			new_position = winch_max - ((winch_max - winch_min) / (180 - layline) * (abs(wind_rel_boat)-layline))
 
-        # If the change in sail position is significant, then publish a new position
-        if abs(new_position - winch_pos) > 100:
-            winch_pos = new_position
-            pub.publish(winch_pos)
-            rospy.loginfo(rospy.get_caller_id() + " Autonomy Request: %f", winch_pos)
-
-    rate.sleep()
-
+		# If the change in sail position is significant, then publish a new position
+		if abs(new_position - winch_pos) > 50:
+			winch_pos = new_position
+			winch_pub.publish(Int32(winch_pos))
+			rospy.loginfo(rospy.get_caller_id() + " Autonomy Request: %f", winch_pos)
 
 def listener():
-    # Setup subscribers
-    rospy.init_node('joy_to_winch', anonymous=True)
-    rospy.Subscriber('joy', Joy, joy_callback)
-    rospy.Subscriber('boat_state', BoatState, state_callback)
-    rospy.Subscriber('anemometer', Float32, anemometer_callback)
-    rospy.spin()
+	# Setup subscribers
+	rospy.init_node('winch',)
+	rospy.Subscriber('joy', Joy, joy_callback)
+	rospy.Subscriber('boat_state', BoatState, state_callback)
+	rospy.Subscriber('anemometer', Float32, anemometer_callback)
+	rospy.spin()
 
 if __name__ == '__main__':
-    try:
-        listener()
-    except rospy.ROSInterruptException:
-        pass
+	try:
+		listener()
+	except rospy.ROSInterruptException:
+		pass
