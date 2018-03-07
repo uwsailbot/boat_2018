@@ -18,13 +18,14 @@ import math
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
-import freetype
+import pygame
 from PIL import Image
 import numpy
 
 # Cheat codes
 codes = []
 cur_input = ""
+sound = False
 
 # OpenGL data
 win_ID = 0
@@ -63,7 +64,6 @@ joy = Joy()
 joy.axes = [0]*8
 joy.buttons = [0]*11
 
-
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
 waypoint_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size = 1)
@@ -99,16 +99,10 @@ def update_wind(offset):
 	global wind_heading
 	global heading
 	global ane_reading
-	
-	# Publish new anemometer message to relay requested wind data
-	wind_heading = wind_heading + offset
-	if wind_heading >= 360:
-		wind_heading = wind_heading - 360
-	elif wind_heading < 0:
-		wind_heading = wind_heading + 360
-	
-	ane = Float32()
-	ane_reading = (wind_heading - heading) % 360
+	global boat_speed
+
+	apparent_wind = calc_direction(calc_apparent_wind(wind_heading, boat_speed, heading))
+	ane_reading = (apparent_wind - heading) % 360
 	if ane_reading < 0:
 		ane_reading = ane_reading + 360
 	
@@ -142,10 +136,14 @@ def winch_callback(pos):
 def waypoints_callback(newPoints):
 	global local_points
 	global gps_points
+	global sound
 	
 	# Refresh GPS point list
 	gps_points = newPoints
 	temp_points = PointArray()
+
+	if (len(local_points.points)-1) is len(newPoints.points) and sound and cur_boat_img is boat_imgs[2]:
+		pygame.mixer.music.play()
 	
 	# Convert all GPS points and store them as local points to draw
 	for point in gps_points.points:
@@ -222,6 +220,7 @@ def ASCII_handler(key, mousex, mousey):
 	global sim_is_running
 	global cur_input
 	global cur_boat_img
+	global sound
 	
 	# Handle cheat codes
 	cur_input += key;
@@ -280,6 +279,8 @@ def ASCII_handler(key, mousex, mousey):
 	elif key is 's':
 		speed -= 0.1
 		speed = max(speed, 0)
+	elif key is '0':
+		sound = not sound
 	elif key is ' ':
 		pos.x = 0
 		pos.y = 0
@@ -554,6 +555,21 @@ def draw_rudder(x, y):
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Physics =*=*=*=*=*=*=*=*=*=*=*=*=
+def calc_apparent_wind(true_wind, boat_speed, boat_heading):
+	# Use constant wind speed of 8 m/s
+	x = 8*math.cos(math.radians(true_wind))
+	x += boat_speed*math.cos(math.radians(boat_heading + 180))
+	y = 8*math.sin(math.radians(true_wind))
+	y += boat_speed*math.sin(math.radians(boat_heading + 180))
+	return (x, y)
+
+def calc_direction(v):
+	angle = math.degrees(math.atan2(v[1], v[0]))
+	if angle < 0:
+		angle += 360
+	return angle
+
+
 def calc(_):
 	global pos
 	global heading
@@ -705,12 +721,9 @@ def listener():
 
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
-	
-	# face = freetype.Face(rel_to_abs_filepath('../meshes/OpenSans/OpenSans-Light.ttf'))
-    # face.set_char_size(48*86)
-	# face.load_char('S')
-	# bitmap = face.glyph.bitmap
-	# print bitmap.buffer
+
+	pygame.mixer.init()
+	pygame.mixer.music.load(rel_to_abs_filepath("../meshes/lemme-smash.mp3"))
 
 	try:
 		listener()
