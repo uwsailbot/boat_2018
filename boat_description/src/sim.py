@@ -18,12 +18,14 @@ import math
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
+import pygame
 
 from PIL import Image
 
 # Cheat codes
 codes = []
 cur_input = ""
+sound = False
 
 # OpenGL data
 win_ID = 0
@@ -61,7 +63,6 @@ gps_points = PointArray()
 joy = Joy()
 joy.axes = [0]*8
 joy.buttons = [0]*11
-
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -141,10 +142,14 @@ def winch_callback(pos):
 def waypoints_callback(newPoints):
 	global local_points
 	global gps_points
+	global sound
 	
 	# Refresh GPS point list
 	gps_points = newPoints
 	temp_points = PointArray()
+
+	if (len(local_points.points)-1) is len(newPoints.points) and sound and cur_boat_img is boat_imgs[2]:
+		pygame.mixer.music.play()
 	
 	# Convert all GPS points and store them as local points to draw
 	for point in gps_points.points:
@@ -221,6 +226,7 @@ def ASCII_handler(key, mousex, mousey):
 	global sim_is_running
 	global cur_input
 	global cur_boat_img
+	global sound
 	
 	# Handle cheat codes
 	cur_input += key;
@@ -279,6 +285,8 @@ def ASCII_handler(key, mousex, mousey):
 	elif key is 's':
 		speed -= 0.1
 		speed = max(speed, 0)
+	elif key is '0':
+		sound = not sound
 	elif key is ' ':
 		pos.x = 0
 		pos.y = 0
@@ -647,7 +655,6 @@ def listener():
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
 	
-	
 	# Load all the images
 	codes.append("orig")
 	boat_imgs.append(load_image('../meshes/niceboat.png', (24,48)))
@@ -656,7 +663,9 @@ if __name__ == '__main__':
 	codes.append("mars")
 	boat_imgs.append(load_image('../meshes/falcon_heavy.png', (1040/55,5842/55)))
 	cur_boat_img = boat_imgs[0]
-	
+	pygame.mixer.init()
+	pygame.mixer.music.load(rel_to_abs_filepath("../meshes/lemme-smash.mp3"))
+
 	try:
 		listener()
 	except rospy.ROSInterruptException:
