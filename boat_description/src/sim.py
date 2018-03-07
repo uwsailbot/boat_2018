@@ -99,16 +99,10 @@ def update_wind(offset):
 	global wind_heading
 	global heading
 	global ane_reading
-	
-	# Publish new anemometer message to relay requested wind data
-	wind_heading = wind_heading + offset
-	if wind_heading >= 360:
-		wind_heading = wind_heading - 360
-	elif wind_heading < 0:
-		wind_heading = wind_heading + 360
-	
-	ane = Float32()
-	ane_reading = (wind_heading - heading) % 360
+	global boat_speed
+
+	apparent_wind = calc_direction(calc_apparent_wind(wind_heading, boat_speed, heading))
+	ane_reading = (apparent_wind - heading) % 360
 	if ane_reading < 0:
 		ane_reading = ane_reading + 360
 	
@@ -536,6 +530,21 @@ def draw_rudder(x, y):
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Physics =*=*=*=*=*=*=*=*=*=*=*=*=
+def calc_apparent_wind(true_wind, boat_speed, boat_heading):
+	# Use constant wind speed of 8 m/s
+	x = 8*math.cos(math.radians(true_wind))
+	x += boat_speed*math.cos(math.radians(boat_heading + 180))
+	y = 8*math.sin(math.radians(true_wind))
+	y += boat_speed*math.sin(math.radians(boat_heading + 180))
+	return (x, y)
+
+def calc_direction(v):
+	angle = math.degrees(math.atan2(v[1], v[0]))
+	if angle < 0:
+		angle += 360
+	return angle
+
+
 def calc(_):
 	global pos
 	global heading
