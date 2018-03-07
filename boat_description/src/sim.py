@@ -18,8 +18,9 @@ import math
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
-
+import freetype
 from PIL import Image
+import numpy
 
 # Cheat codes
 codes = []
@@ -34,9 +35,9 @@ win_height = 480
 boat_imgs = []
 rudder_imgs = []
 sail_imgs = []
-cur_boat_img = Image.Image()
-cur_rudder_img = Image.Image()
-cur_sail_img = Image.Image()
+cur_boat_img = 0
+cur_rudder_img = 0
+cur_sail_img = 0
 
 # Simulation data and consts
 should_sim_joy = False
@@ -302,37 +303,32 @@ def redraw():
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL Rendering =*=*=*=*=*=*=*=*=*=*=*=*=
 
-def draw_pixel_rgb_i(x, y, rgb):
-	glColor3f(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
-	glVertex2f(x,y)
-
-def draw_pixel_rgba_i(x, y, rgba):
-	glColor4f(rgba[0]/255.0, rgba[1]/255.0, rgba[2]/255.0, rgba[3]/255.0)
-	glVertex2f(x,y)
-
-def draw_image(image, x, y, angle):	
+def draw_image(texture_id, position, angle, size):	
 	glEnable(GL_TEXTURE_2D)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
+	glColor3f(1.0, 1.0, 1.0)
+	glBindTexture(GL_TEXTURE_2D,texture_id)
+
 	glPushMatrix()
-	
-	glTranslatef(x, y, 0)
+	glTranslatef(position[0], position[1], 0)
 	glRotatef(angle, 0, 0, 1)
 	
-	im_width, im_height = image.size
-	im_data = image.getdata()
-	x_offset = -im_width/2
-	y_offset = -im_height/2
 	
-	glBegin(GL_POINTS)
-	if image.mode == 'RGB':
-		for i in range(0, im_width*im_height):
-			draw_pixel_rgb_i(i%im_width+x_offset, i/im_width+y_offset, im_data[i])
-	else:
-		for i in range(0, im_width*im_height):
-			draw_pixel_rgba_i(i%im_width+x_offset, i/im_width+y_offset, im_data[i])
+	extents_x = size[0]/2.0
+	extents_y = size[1]/2.0
+
+	glBegin(GL_QUADS)
+	glTexCoord2d(0,0)
+	glVertex2f(-extents_x,-extents_y)
+	glTexCoord2d(0,1)
+	glVertex2f(-extents_x,extents_y)
+	glTexCoord2d(1,1)
+	glVertex2f(extents_x,extents_y)
+	glTexCoord2d(1,0)
+	glVertex2f(extents_x,-extents_y)
 	glEnd()
-	
+
 	glPopMatrix()
 	glDisable(GL_TEXTURE_2D)
 	glDisable(GL_BLEND)
@@ -498,8 +494,38 @@ def draw_wind_arrow(x,y):
 def draw_boat():
 	x = pos.x + win_width/2.0
 	y = pos.y + win_height/2.0
-	draw_image(cur_boat_img, x, y, heading-90)
+	draw_image(cur_boat_img, (x, y), heading-90, (16,32))
+	
+def spare():
+	glEnable(GL_TEXTURE_2D)
+	glColor3f(1.0, 1.0, 1.0)
 
+	tex = glGenTextures(1)
+	glBindTexture(GL_TEXTURE_2D,tex)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	pixels = numpy.array(cur_boat_img).flatten()
+	pixels = pixels.astype(numpy.float32)
+	pixels = pixels / 256
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 100, 100, 0, GL_RGB, GL_FLOAT, pixels);
+	glPushMatrix()
+	glTranslatef(win_width/2,win_height/2,0)
+	glBegin(GL_QUADS)
+	glTexCoord2d(0,0)
+	glVertex2f(0,0)
+	glTexCoord2d(0,1)
+	glVertex2f(0,100)
+	glTexCoord2d(1,1)
+	glVertex2f(100,100)
+	glTexCoord2d(1,0)
+	glVertex2f(100,0)
+	glEnd()
+	glPopMatrix()
+	glDisable(GL_TEXTURE_2D)
+
+	
 # Draw the rudder diagram centered on (x, y)
 def draw_rudder(x, y):
 	glPushMatrix()
@@ -592,6 +618,55 @@ def polar_to_rect(rad, ang):
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
 
+def rel_to_abs_filepath(filepath):
+	abs_filepath = os.path.dirname(os.path.realpath(__file__))
+	while filepath.startswith('../'):
+		filepath_arr = filepath.split('/')
+		filepath_arr.pop(0)
+		filepath = ''.join(['/'+str(s) for s in filepath_arr])[1:]
+		abs_filepath_arr = abs_filepath.split('/')
+		abs_filepath_arr = abs_filepath_arr[:-1]
+		abs_filepath =''.join(['/'+str(s) for s in abs_filepath_arr])[1:]
+	return abs_filepath + '/' + filepath
+	
+def load_image(filepath, resolution):
+	# loads and returns an image
+	abs_filepath = rel_to_abs_filepath(filepath)
+	im = Image.open(abs_filepath)
+	im = im.transpose(Image.FLIP_TOP_BOTTOM)
+	im = im.resize(resolution, Image.NEAREST)
+
+	texture_id = glGenTextures(1)
+	glBindTexture(GL_TEXTURE_2D,texture_id)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	pixels = numpy.array(im).flatten()
+	pixels = pixels.astype(numpy.float32)
+	pixels = pixels / 256.0
+	
+	img_mode = GL_RGB
+	if im.mode == 'RGBA':
+		img_mode = GL_RGBA	
+	
+	glTexImage2D(GL_TEXTURE_2D, 0, img_mode, im.width, im.height, 0, img_mode, GL_FLOAT, pixels);
+	
+	return texture_id
+
+def load_image_resources():
+	global cur_boat_img
+
+	# Load all the images
+	codes.append("orig")
+	boat_imgs.append(load_image('../meshes/niceboat.png', (64,128)))
+	codes.append("pirate")
+	boat_imgs.append(load_image('../meshes/pirate_boat.png', (36,48)))
+	codes.append("mars")
+	boat_imgs.append(load_image('../meshes/falcon_heavy.png', (1040/55,5842/55)))
+		
+	cur_boat_img = boat_imgs[0]
+
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
 	glViewport(0, 0, win_width, win_height)
@@ -614,26 +689,10 @@ def init_GL():
 	glutKeyboardFunc(ASCII_handler)
 	glutSpecialFunc(keyboard_handler)
 	glutTimerFunc(1000/30, calc, 0)
+	
+	load_image_resources()
 	glutMainLoop()
 
-def rel_to_abs_filepath(filepath):
-	abs_filepath = os.path.dirname(os.path.realpath(__file__))
-	while filepath.startswith('../'):
-		filepath_arr = filepath.split('/')
-		filepath_arr.pop(0)
-		filepath = ''.join(['/'+str(s) for s in filepath_arr])[1:]
-		abs_filepath_arr = abs_filepath.split('/')
-		abs_filepath_arr = abs_filepath_arr[:-1]
-		abs_filepath =''.join(['/'+str(s) for s in abs_filepath_arr])[1:]
-	return abs_filepath + '/' + filepath
-	
-def load_image(filepath, size):
-	# loads and returns an image
-	abs_filepath = rel_to_abs_filepath(filepath)
-	im = Image.open(abs_filepath)
-	im = im.transpose(Image.FLIP_TOP_BOTTOM)
-	im = im.resize(size, Image.NEAREST)
-	return im
 
 def listener():
 	# Setup subscribers
@@ -647,16 +706,12 @@ def listener():
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
 	
-	
-	# Load all the images
-	codes.append("orig")
-	boat_imgs.append(load_image('../meshes/niceboat.png', (24,48)))
-	codes.append("pirate")
-	boat_imgs.append(load_image('../meshes/pirate_boat.png', (36,48)))
-	codes.append("mars")
-	boat_imgs.append(load_image('../meshes/falcon_heavy.png', (1040/55,5842/55)))
-	cur_boat_img = boat_imgs[0]
-	
+	# face = freetype.Face(rel_to_abs_filepath('../meshes/OpenSans/OpenSans-Light.ttf'))
+    # face.set_char_size(48*86)
+	# face.load_char('S')
+	# bitmap = face.glyph.bitmap
+	# print bitmap.buffer
+
 	try:
 		listener()
 	except rospy.ROSInterruptException:
