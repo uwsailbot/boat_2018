@@ -44,6 +44,7 @@ cur_sail_img = 0
 should_sim_joy = False
 sim_is_running = True
 speed = 10
+pause = False
 clock = 0
 last_time = -1
 boat_speed = 4 # px/s
@@ -111,15 +112,9 @@ def update_wind(offset):
 
 def boat_state_callback(newState):
 	global state
-	global joy
-	
-	# Unpush the tacking button if tacking has completed so we don't tack forever
-	if state.minor is BoatState.MIN_TACKING and newState.minor is not BoatState.MIN_TACKING:
-		joy.buttons[2] = 1
-		joy.buttons[0] = 0
-		joy_pub.publish(joy)
-	
 	state = newState
+	if state.major is not BoatState.MAJ_DISABLED and pause:
+		pause_sim()
 
 
 def rudder_callback(pos):
@@ -281,6 +276,8 @@ def ASCII_handler(key, mousex, mousey):
 		speed = max(speed, 0)
 	elif key is '0':
 		sound = not sound
+	elif key is 'p':
+		pause_sim()
 	elif key is ' ':
 		pos.x = 0
 		pos.y = 0
@@ -568,6 +565,18 @@ def calc_direction(v):
 		angle += 360
 	return angle
 
+def pause_sim():
+	global pause
+	global speed
+	if state.major is BoatState.MAJ_DISABLED:
+		pause = not pause
+		if pause is True:
+			speed = 0
+		else:
+			speed = 10
+	else:
+		pause = False
+		speed = 10
 
 def calc(_):
 	global pos
