@@ -310,15 +310,14 @@ def draw_image(texture_id, position, angle, size):
 	glEnable(GL_BLEND)
 	glColor3f(1.0, 1.0, 1.0)
 	glBindTexture(GL_TEXTURE_2D,texture_id)
-
+	
 	glPushMatrix()
 	glTranslatef(position[0], position[1], 0)
 	glRotatef(angle, 0, 0, 1)
 	
-	
 	extents_x = size[0]/2.0
 	extents_y = size[1]/2.0
-
+	
 	glBegin(GL_QUADS)
 	glTexCoord2d(0,0)
 	glVertex2f(-extents_x,-extents_y)
@@ -329,7 +328,7 @@ def draw_image(texture_id, position, angle, size):
 	glTexCoord2d(1,0)
 	glVertex2f(extents_x,-extents_y)
 	glEnd()
-
+	
 	glPopMatrix()
 	glDisable(GL_TEXTURE_2D)
 	glDisable(GL_BLEND)
@@ -495,7 +494,7 @@ def draw_wind_arrow(x,y):
 def draw_boat():
 	x = pos.x + win_width/2.0
 	y = pos.y + win_height/2.0
-	draw_image(cur_boat_img, (x, y), heading-90, (16,32))
+	draw_image(cur_boat_img[0], (x, y), heading-90, cur_boat_img[1])
 	
 def spare():
 	glEnable(GL_TEXTURE_2D)
@@ -675,11 +674,14 @@ def load_image_resources():
 
 	# Load all the images
 	codes.append("orig")
-	boat_imgs.append(load_image('../meshes/niceboat.png', (64,128)))
+	orig_id=load_image('../meshes/niceboat.png', (64,128))
+	boat_imgs.append((orig_id, (16,32)))
 	codes.append("pirate")
-	boat_imgs.append(load_image('../meshes/pirate_boat.png', (36,48)))
+	pirate_id=load_image('../meshes/pirate_boat.png', (39,56))
+	boat_imgs.append((pirate_id, (36,48)))
 	codes.append("mars")
-	boat_imgs.append(load_image('../meshes/falcon_heavy.png', (1040/55,5842/55)))
+	SPACE_X = load_image('../meshes/falcon_heavy.png', (1040/24,5842/24))
+	boat_imgs.append((SPACE_X, (1040/25,5842/25)))
 		
 	cur_boat_img = boat_imgs[0]
 
