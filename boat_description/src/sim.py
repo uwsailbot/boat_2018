@@ -45,6 +45,7 @@ cur_sail_img = 0
 should_sim_joy = False
 sim_is_running = True
 speed = 10
+pause = False
 clock = 0
 last_time = -1
 boat_speed = 4 # px/s
@@ -67,11 +68,11 @@ joy.buttons = [0]*11
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
-waypoint_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size = 1)
-wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 1)
-gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 1)
-orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 1)
-joy_pub = rospy.Publisher('joy', Joy, queue_size = 1)
+waypoint_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size = 10)
+wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 10)
+gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
+orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
+joy_pub = rospy.Publisher('joy', Joy, queue_size = 10)
 to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
 to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 
@@ -112,15 +113,16 @@ def update_wind(offset):
 
 def boat_state_callback(newState):
 	global state
-	global joy
-	
 	# Unpush the tacking button if tacking has completed so we don't tack forever
-	if state.minor is BoatState.MIN_TACKING and newState.minor is not BoatState.MIN_TACKING:
-		joy.buttons[2] = 1
-		joy.buttons[0] = 0
-		joy_pub.publish(joy)
-	
+	#if state.minor is BoatState.MIN_TACKING and newState.minor is not BoatState.MIN_TACKING:
+	#	joy.buttons[2] = 1
+	#	joy.buttons[0] = 0
+	#joy_pub.publish(joy)
+
 	state = newState
+	if state.major is not BoatState.MAJ_DISABLED and pause:
+		pause_sim()
+	
 
 
 def rudder_callback(pos):
@@ -282,6 +284,8 @@ def ASCII_handler(key, mousex, mousey):
 		speed = max(speed, 0)
 	elif key is '0':
 		sound = not sound
+	elif key is 'p':
+		pause_sim()
 	elif key is ' ':
 		pos.x = 0
 		pos.y = 0
@@ -560,6 +564,18 @@ def calc_direction(v):
 		angle += 360
 	return angle
 
+def pause_sim():
+	global pause
+	global speed
+	if state.major is BoatState.MAJ_DISABLED:
+		pause = not pause
+		if pause is True:
+			speed = 0
+		else:
+			speed = 10
+	else:
+		pause = False
+		speed = 10
 
 def calc(_):
 	global pos
@@ -592,21 +608,20 @@ def calc(_):
 	boat_speed = min(boat_speed, 10)
 	boat_speed = max(boat_speed, -10)
 	
-	if(state.major != BoatState.MAJ_DISABLED):
-		heading -= (rudder_pos-90)*0.1
-		heading %= 360
+	heading -= (rudder_pos-90)*0.1
+	heading %= 360
 		
-		# Update anemometer reading because of new heading
-		update_wind(0)
+	# Update anemometer reading because of new heading
+	update_wind(0)
 		
-		# Our laylines are set further out than the boat will actually hit irons at, so physics wise the laylines are actually at laylines-TOL, which
-		# is where it should hit irons
-		TOL = 5
+	# Our laylines are set further out than the boat will actually hit irons at, so physics wise the laylines are actually at laylines-TOL, which
+	# is where it should hit irons
+	TOL = 5
 
-		# Outside of laylines, speed works normally
-		#if ane_reading >= (180+layline-TOL) or ane_reading <= (180 - layline+TOL):
-		pos.x += math.cos(math.radians(heading)) * boat_speed * dt
-		pos.y += math.sin(math.radians(heading)) * boat_speed * dt
+	# Outside of laylines, speed works normally
+	#if ane_reading >= (180+layline-TOL) or ane_reading <= (180 - layline+TOL):
+	pos.x += math.cos(math.radians(heading)) * boat_speed * dt
+	pos.y += math.sin(math.radians(heading)) * boat_speed * dt
 	
 	update_gps()
 	glutPostRedisplay()
@@ -718,10 +733,16 @@ if __name__ == '__main__':
 
 	pygame.mixer.init()
 	pygame.mixer.music.load(rel_to_abs_filepath("../meshes/lemme-smash.mp3"))
+<<<<<<< HEAD
 	
 	global face	
 	face = freetype.Face(rel_to_abs_filepath('../meshes/OpenSans/OpenSans-Light.ttf'))
 	
+=======
+	state.major = BoatState.MAJ_DISABLED
+	state.minor = BoatState.MIN_COMPLETE
+
+>>>>>>> af56c009751e0161b9e16692cd7f51c171a8860e
 	try:
 		listener()
 	except rospy.ROSInterruptException:

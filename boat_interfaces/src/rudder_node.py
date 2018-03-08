@@ -56,9 +56,12 @@ def anemometer_callback(anemometer):
 	global rudder_min
 	
 	ane_reading = anemometer.data
+	#print ane_reading, tacking_direction
 	
 	# No need to check tacking directions if we are in autonomous or not tacking
 	if state.major is not BoatState.MAJ_RC or state.minor is not BoatState.MIN_TACKING:
+		#print state.major 
+		#print state.minor
 		return
 	
 	# Based on direction of tack, keep the rudder turned while the boat crosses wind and passes 30 		
@@ -87,9 +90,6 @@ def anemometer_callback(anemometer):
 			rudder_pos = 90.0
 			rudder_pos_pub.publish(Float32(rudder_pos))
 			boat_state_pub.publish(state)
-	
-	rate = rospy.Rate(10)
-	rate.sleep()
 
 
 # If the gps topic changes, update the pid controller's input value
