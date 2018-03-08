@@ -19,8 +19,8 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 import pygame
-
 from PIL import Image
+import numpy
 
 # Cheat codes
 codes = []
@@ -36,14 +36,15 @@ win_height = 480
 boat_imgs = []
 rudder_imgs = []
 sail_imgs = []
-cur_boat_img = Image.Image()
-cur_rudder_img = Image.Image()
-cur_sail_img = Image.Image()
+cur_boat_img = 0
+cur_rudder_img = 0
+cur_sail_img = 0
 
 # Simulation data and consts
 should_sim_joy = False
 sim_is_running = True
 speed = 10
+pause = False
 clock = 0
 last_time = -1
 boat_speed = 4 # px/s
@@ -68,11 +69,11 @@ joy.buttons = [0]*11
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
-waypoint_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size = 1)
-wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 1)
-gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 1)
-orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 1)
-joy_pub = rospy.Publisher('joy', Joy, queue_size = 1)
+waypoint_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size = 10)
+wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 10)
+gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
+orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
+joy_pub = rospy.Publisher('joy', Joy, queue_size = 10)
 to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
 to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 
@@ -113,15 +114,16 @@ def update_wind(offset):
 
 def boat_state_callback(newState):
 	global state
-	global joy
-	
 	# Unpush the tacking button if tacking has completed so we don't tack forever
-	if state.minor is BoatState.MIN_TACKING and newState.minor is not BoatState.MIN_TACKING:
-		joy.buttons[2] = 1
-		joy.buttons[0] = 0
-		joy_pub.publish(joy)
-	
+	#if state.minor is BoatState.MIN_TACKING and newState.minor is not BoatState.MIN_TACKING:
+	#	joy.buttons[2] = 1
+	#	joy.buttons[0] = 0
+	#joy_pub.publish(joy)
+
 	state = newState
+	if state.major is not BoatState.MAJ_DISABLED and pause:
+		pause_sim()
+	
 
 
 def rudder_callback(pos):
@@ -283,6 +285,8 @@ def ASCII_handler(key, mousex, mousey):
 		speed = max(speed, 0)
 	elif key is '0':
 		sound = not sound
+	elif key is 'p':
+		pause_sim()
 	elif key is ' ':
 		pos.x = 0
 		pos.y = 0
@@ -306,35 +310,29 @@ def redraw():
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL Rendering =*=*=*=*=*=*=*=*=*=*=*=*=
 
-def draw_pixel_rgb_i(x, y, rgb):
-	glColor3f(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
-	glVertex2f(x,y)
-
-def draw_pixel_rgba_i(x, y, rgba):
-	glColor4f(rgba[0]/255.0, rgba[1]/255.0, rgba[2]/255.0, rgba[3]/255.0)
-	glVertex2f(x,y)
-
-def draw_image(image, x, y, angle):	
+def draw_image(texture_id, position, angle, size):	
 	glEnable(GL_TEXTURE_2D)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
-	glPushMatrix()
+	glColor3f(1.0, 1.0, 1.0)
+	glBindTexture(GL_TEXTURE_2D,texture_id)
 	
-	glTranslatef(x, y, 0)
+	glPushMatrix()
+	glTranslatef(position[0], position[1], 0)
 	glRotatef(angle, 0, 0, 1)
 	
-	im_width, im_height = image.size
-	im_data = image.getdata()
-	x_offset = -im_width/2
-	y_offset = -im_height/2
+	extents_x = size[0]/2.0
+	extents_y = size[1]/2.0
 	
-	glBegin(GL_POINTS)
-	if image.mode == 'RGB':
-		for i in range(0, im_width*im_height):
-			draw_pixel_rgb_i(i%im_width+x_offset, i/im_width+y_offset, im_data[i])
-	else:
-		for i in range(0, im_width*im_height):
-			draw_pixel_rgba_i(i%im_width+x_offset, i/im_width+y_offset, im_data[i])
+	glBegin(GL_QUADS)
+	glTexCoord2d(0,0)
+	glVertex2f(-extents_x,-extents_y)
+	glTexCoord2d(0,1)
+	glVertex2f(-extents_x,extents_y)
+	glTexCoord2d(1,1)
+	glVertex2f(extents_x,extents_y)
+	glTexCoord2d(1,0)
+	glVertex2f(extents_x,-extents_y)
 	glEnd()
 	
 	glPopMatrix()
@@ -502,8 +500,38 @@ def draw_wind_arrow(x,y):
 def draw_boat():
 	x = pos.x + win_width/2.0
 	y = pos.y + win_height/2.0
-	draw_image(cur_boat_img, x, y, heading-90)
+	draw_image(cur_boat_img[0], (x, y), heading-90, cur_boat_img[1])
+	
+def spare():
+	glEnable(GL_TEXTURE_2D)
+	glColor3f(1.0, 1.0, 1.0)
 
+	tex = glGenTextures(1)
+	glBindTexture(GL_TEXTURE_2D,tex)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	pixels = numpy.array(cur_boat_img).flatten()
+	pixels = pixels.astype(numpy.float32)
+	pixels = pixels / 256
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 100, 100, 0, GL_RGB, GL_FLOAT, pixels);
+	glPushMatrix()
+	glTranslatef(win_width/2,win_height/2,0)
+	glBegin(GL_QUADS)
+	glTexCoord2d(0,0)
+	glVertex2f(0,0)
+	glTexCoord2d(0,1)
+	glVertex2f(0,100)
+	glTexCoord2d(1,1)
+	glVertex2f(100,100)
+	glTexCoord2d(1,0)
+	glVertex2f(100,0)
+	glEnd()
+	glPopMatrix()
+	glDisable(GL_TEXTURE_2D)
+
+	
 # Draw the rudder diagram centered on (x, y)
 def draw_rudder(x, y):
 	glPushMatrix()
@@ -566,6 +594,18 @@ def calc_boom_heading(boat_heading, wind_heading, winch):
 	# Note close-hauled boom is not quite parallel with boat
 	return boat_heading + tack * ((winch_max - winch) * 75/winch_range + 15)
 	
+def pause_sim():
+	global pause
+	global speed
+	if state.major is BoatState.MAJ_DISABLED:
+		pause = not pause
+		if pause is True:
+			speed = 0
+		else:
+			speed = 10
+	else:
+		pause = False
+		speed = 10
 
 def calc(_):
 	global pos
@@ -598,21 +638,26 @@ def calc(_):
 	boat_speed = min(boat_speed, 10)
 	boat_speed = max(boat_speed, -10)
 	
+<<<<<<< HEAD
 	if(state.major != BoatState.MAJ_DISABLED):
 		heading -= (rudder_pos-90)*0.1 
 		heading %= 360
+=======
+	heading -= (rudder_pos-90)*0.1
+	heading %= 360
+>>>>>>> af56c009751e0161b9e16692cd7f51c171a8860e
 		
-		# Update anemometer reading because of new heading
-		update_wind(0)
+	# Update anemometer reading because of new heading
+	update_wind(0)
 		
-		# Our laylines are set further out than the boat will actually hit irons at, so physics wise the laylines are actually at laylines-TOL, which
-		# is where it should hit irons
-		TOL = 5
+	# Our laylines are set further out than the boat will actually hit irons at, so physics wise the laylines are actually at laylines-TOL, which
+	# is where it should hit irons
+	TOL = 5
 
-		# Outside of laylines, speed works normally
-		#if ane_reading >= (180+layline-TOL) or ane_reading <= (180 - layline+TOL):
-		pos.x += math.cos(math.radians(heading)) * boat_speed * dt
-		pos.y += math.sin(math.radians(heading)) * boat_speed * dt
+	# Outside of laylines, speed works normally
+	#if ane_reading >= (180+layline-TOL) or ane_reading <= (180 - layline+TOL):
+	pos.x += math.cos(math.radians(heading)) * boat_speed * dt
+	pos.y += math.sin(math.radians(heading)) * boat_speed * dt
 	
 	update_gps()
 	glutPostRedisplay()
@@ -630,6 +675,58 @@ def polar_to_rect(rad, ang):
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
+
+def rel_to_abs_filepath(filepath):
+	abs_filepath = os.path.dirname(os.path.realpath(__file__))
+	while filepath.startswith('../'):
+		filepath_arr = filepath.split('/')
+		filepath_arr.pop(0)
+		filepath = ''.join(['/'+str(s) for s in filepath_arr])[1:]
+		abs_filepath_arr = abs_filepath.split('/')
+		abs_filepath_arr = abs_filepath_arr[:-1]
+		abs_filepath =''.join(['/'+str(s) for s in abs_filepath_arr])[1:]
+	return abs_filepath + '/' + filepath
+	
+def load_image(filepath, resolution):
+	# loads and returns an image
+	abs_filepath = rel_to_abs_filepath(filepath)
+	im = Image.open(abs_filepath)
+	im = im.transpose(Image.FLIP_TOP_BOTTOM)
+	im = im.resize(resolution, Image.NEAREST)
+
+	texture_id = glGenTextures(1)
+	glBindTexture(GL_TEXTURE_2D,texture_id)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	pixels = numpy.array(im).flatten()
+	pixels = pixels.astype(numpy.float32)
+	pixels = pixels / 256.0
+	
+	img_mode = GL_RGB
+	if im.mode == 'RGBA':
+		img_mode = GL_RGBA	
+	
+	glTexImage2D(GL_TEXTURE_2D, 0, img_mode, im.width, im.height, 0, img_mode, GL_FLOAT, pixels);
+	
+	return texture_id
+
+def load_image_resources():
+	global cur_boat_img
+
+	# Load all the images
+	codes.append("orig")
+	orig_id=load_image('../meshes/niceboat.png', (64,128))
+	boat_imgs.append((orig_id, (16,32)))
+	codes.append("pirate")
+	pirate_id=load_image('../meshes/pirate_boat.png', (39,56))
+	boat_imgs.append((pirate_id, (36,48)))
+	codes.append("mars")
+	SPACE_X = load_image('../meshes/falcon_heavy.png', (1040/24,5842/24))
+	boat_imgs.append((SPACE_X, (1040/25,5842/25)))
+		
+	cur_boat_img = boat_imgs[0]
 
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
@@ -653,26 +750,10 @@ def init_GL():
 	glutKeyboardFunc(ASCII_handler)
 	glutSpecialFunc(keyboard_handler)
 	glutTimerFunc(1000/30, calc, 0)
+	
+	load_image_resources()
 	glutMainLoop()
 
-def rel_to_abs_filepath(filepath):
-	abs_filepath = os.path.dirname(os.path.realpath(__file__))
-	while filepath.startswith('../'):
-		filepath_arr = filepath.split('/')
-		filepath_arr.pop(0)
-		filepath = ''.join(['/'+str(s) for s in filepath_arr])[1:]
-		abs_filepath_arr = abs_filepath.split('/')
-		abs_filepath_arr = abs_filepath_arr[:-1]
-		abs_filepath =''.join(['/'+str(s) for s in abs_filepath_arr])[1:]
-	return abs_filepath + '/' + filepath
-	
-def load_image(filepath, size):
-	# loads and returns an image
-	abs_filepath = rel_to_abs_filepath(filepath)
-	im = Image.open(abs_filepath)
-	im = im.transpose(Image.FLIP_TOP_BOTTOM)
-	im = im.resize(size, Image.NEAREST)
-	return im
 
 def listener():
 	# Setup subscribers
@@ -685,17 +766,11 @@ def listener():
 
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
-	
-	# Load all the images
-	codes.append("orig")
-	boat_imgs.append(load_image('../meshes/niceboat.png', (24,48)))
-	codes.append("pirate")
-	boat_imgs.append(load_image('../meshes/pirate_boat.png', (36,48)))
-	codes.append("mars")
-	boat_imgs.append(load_image('../meshes/falcon_heavy.png', (1040/55,5842/55)))
-	cur_boat_img = boat_imgs[0]
+
 	pygame.mixer.init()
 	pygame.mixer.music.load(rel_to_abs_filepath("../meshes/lemme-smash.mp3"))
+	state.major = BoatState.MAJ_DISABLED
+	state.minor = BoatState.MIN_COMPLETE
 
 	try:
 		listener()
