@@ -325,14 +325,14 @@ def draw_image(texture_id, position, angle, size, tint=(1.0,1.0,1.0)):
 	extents_y = size[1]/2.0
 	
 	glBegin(GL_QUADS)
-	glTexCoord2d(0,0)
-	glVertex2f(-extents_x,-extents_y)
 	glTexCoord2d(0,1)
 	glVertex2f(-extents_x,extents_y)
-	glTexCoord2d(1,1)
-	glVertex2f(extents_x,extents_y)
+	glTexCoord2d(0,0)
+	glVertex2f(-extents_x,-extents_y)
 	glTexCoord2d(1,0)
 	glVertex2f(extents_x,-extents_y)
+	glTexCoord2d(1,1)
+	glVertex2f(extents_x,extents_y)
 	glEnd()
 	
 	glPopMatrix()
@@ -350,37 +350,59 @@ def draw_circle(r, x, y, quality=300):
 	glEnd()
 
 # Render the specified text with bottom left corner at (x,y)
-def draw_text(text, x, y, h = 24, spacing = 2.0):
-	global face
+def draw_text(text, x, y, h = 15, spacing = 2.0, tint=(0,0,0)):
+	global font
+	font_texture_id = font[0]
+	font_map = font[1]
 
+	
+	glEnable(GL_TEXTURE_2D)
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+	glEnable(GL_BLEND)
+	r,g,b = tint
+	glColor3f(r,g,b)
+	glBindTexture(GL_TEXTURE_2D, font_texture_id)
+	
+	glPushMatrix()
+	glTranslatef(x, y, 0)
+	
+	scale = h/32.0
 	x_offset = 0
 	for c in text:
-		face.set_char_size(h*48)
-		face.load_char(c)
-		bitmap = face.glyph.bitmap
-		texture_id = glGenTextures(1)
-		glBindTexture(GL_TEXTURE_2D,texture_id)
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		if ord(c)<32 or ord(c)>127:
+			print 'invalid character to draw: ord(c)=%i' % ord(c)
+			return
 		
-		for i in range(0, len(bitmap.buffer)):
-			bitmap.buffer[i]=bitmap.buffer[i]/256.0	
-	
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmap.width, bitmap.rows, 0, GL_ALPHA, GL_FLOAT, bitmap.buffer);
-
+		char_info = font_map[ord(c)-32]
+		start_index = char_info[0]
+		char_width = char_info[1] * scale
+		char_height = char_info[2] * scale
+		tex_y_start = char_info[3]
+		tex_y_end = char_info[4]
+		tex_x_end = char_info[5]
 		# use x and y as bottom left corner
-		# use negative height to flip, since by default everything is upside down
-		draw_image(
-			texture_id,
-			(x+bitmap.width/2+x_offset,y+bitmap.rows/2),
-			0,
-			(bitmap.width,-bitmap.rows),
-			(0.0,0.0,0.0)
-			)
-		x_offset = x_offset + bitmap.width+spacing
-		glDeleteTextures(texture_id)
+		# also flip these textures, since by default everything is upside down
+		glBegin(GL_QUADS)
+		glTexCoord2d(0, tex_y_start)
+		glVertex2f(x_offset, char_height)
+
+		glTexCoord2d(0, tex_y_end)
+		glVertex2f(x_offset, 0)
+
+		glTexCoord2d(tex_x_end, tex_y_end)
+		glVertex2f(x_offset + char_width, 0)
+
+		glTexCoord2d(tex_x_end, tex_y_start)
+		glVertex2f(x_offset + char_width, char_height)
+		glEnd()
+		
+		x_offset = x_offset + char_width + (spacing * scale)
+	
+	glPopMatrix()
+	glDisable(GL_TEXTURE_2D)
+	glDisable(GL_BLEND)
+
+	
 
 
 # Draw all of the waypoint as red dots
@@ -688,9 +710,77 @@ def load_image_resources():
 	boat_imgs.append((pirate_id, (36,48)))
 	codes.append("mars")
 	SPACE_X = load_image('../meshes/falcon_heavy.png', (1040/24,5842/24))
-	boat_imgs.append((SPACE_X, (1040/25,5842/25)))
+	boat_imgs.append((SPACE_X, (1040/48,5842/48)))
 		
 	cur_boat_img = boat_imgs[0]
+
+def load_font():	
+	face = freetype.Face(rel_to_abs_filepath('../meshes/OpenSans/OpenSans-Light.ttf'))
+	face.set_char_size(2048)
+	
+	font_map = []
+	bitmaps = []
+	max_width = 0
+	total_height = 0
+	for i in range(32,128):
+		face.load_char(chr(i))
+		bitmap = face.glyph.bitmap
+		if bitmap.width>max_width:
+			max_width = bitmap.width
+		total_height += bitmap.rows
+		# can't just append the bitmap object
+		bitmaps.append((bitmap.buffer, bitmap.width, bitmap.rows))
+	
+	pixels = []	
+	index = 0
+	for i in range(32,128):
+		bitmap_buffer = bitmaps[i-32][0]
+		bitmap_width = bitmaps[i-32][1]
+		bitmap_height = bitmaps[i-32][2]
+		
+		font_map.append((
+			index,
+			bitmap_width,
+			bitmap_height,
+			index/max_width/1.0/total_height, # texture y start
+			(index/max_width+bitmap_height)/1.0/total_height, # texture y end
+			bitmap_width/1.0/max_width, # texture x end
+			))
+		
+		buffer_index = 0
+		for j in range(0,bitmap_height):
+			for k in range(0, max_width):
+				if k < bitmap_width:
+					pixels.append(bitmap_buffer[buffer_index])
+					buffer_index+=1
+				else:
+					pixels.append(0)
+				index+=1
+		
+	texture_id = glGenTextures(1)
+	glBindTexture(GL_TEXTURE_2D,texture_id)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		
+	pixels = numpy.array(pixels, dtype='float32')
+	for i in range(0, pixels.size):
+		pixels[i]/=256.0
+	
+	glTexImage2D(
+		GL_TEXTURE_2D,
+		0,
+		GL_ALPHA,
+		max_width,
+		total_height,
+		0,
+		GL_ALPHA,
+		GL_FLOAT,
+		pixels);
+	
+	global font
+	font = (texture_id, font_map)	
 
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
@@ -716,6 +806,7 @@ def init_GL():
 	glutTimerFunc(1000/30, calc, 0)
 	
 	load_image_resources()
+	load_font()
 	glutMainLoop()
 
 
@@ -733,16 +824,10 @@ if __name__ == '__main__':
 
 	pygame.mixer.init()
 	pygame.mixer.music.load(rel_to_abs_filepath("../meshes/lemme-smash.mp3"))
-<<<<<<< HEAD
-	
-	global face	
-	face = freetype.Face(rel_to_abs_filepath('../meshes/OpenSans/OpenSans-Light.ttf'))
-	
-=======
+
 	state.major = BoatState.MAJ_DISABLED
 	state.minor = BoatState.MIN_COMPLETE
 
->>>>>>> af56c009751e0161b9e16692cd7f51c171a8860e
 	try:
 		listener()
 	except rospy.ROSInterruptException:
