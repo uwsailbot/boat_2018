@@ -21,6 +21,7 @@ from OpenGL.GLUT import *
 import pygame
 from PIL import Image
 import numpy
+import freetype
 
 # Cheat codes
 codes = []
@@ -304,11 +305,12 @@ def redraw():
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL Rendering =*=*=*=*=*=*=*=*=*=*=*=*=
 
-def draw_image(texture_id, position, angle, size):	
+def draw_image(texture_id, position, angle, size, tint=(1.0,1.0,1.0)):	
 	glEnable(GL_TEXTURE_2D)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
-	glColor3f(1.0, 1.0, 1.0)
+	r,g,b = tint
+	glColor3f(r,g,b)
 	glBindTexture(GL_TEXTURE_2D,texture_id)
 	
 	glPushMatrix()
@@ -344,19 +346,37 @@ def draw_circle(r, x, y, quality=300):
 	glEnd()
 
 # Render the specified text with bottom left corner at (x,y)
-def draw_text(text, x, y, h = 15.0):
-	glPushMatrix()
-	
-	# Scale and translate the text as required
-	scale = h/120.0
-	glTranslatef(x,y,0)
-	glScalef(scale, scale, 0.0)
-	
-	# Loop to display character by character
+def draw_text(text, x, y, h = 24, spacing = 2.0):
+	global face
+
+	x_offset = 0
 	for c in text:
-		glutStrokeCharacter(GLUT_STROKE_ROMAN, ord(c))
+		face.set_char_size(h*48)
+		face.load_char(c)
+		bitmap = face.glyph.bitmap
+		texture_id = glGenTextures(1)
+		glBindTexture(GL_TEXTURE_2D,texture_id)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		
+		for i in range(0, len(bitmap.buffer)):
+			bitmap.buffer[i]=bitmap.buffer[i]/256.0	
 	
-	glPopMatrix()
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmap.width, bitmap.rows, 0, GL_ALPHA, GL_FLOAT, bitmap.buffer);
+
+		# use x and y as bottom left corner
+		# use negative height to flip, since by default everything is upside down
+		draw_image(
+			texture_id,
+			(x+bitmap.width/2+x_offset,y+bitmap.rows/2),
+			0,
+			(bitmap.width,-bitmap.rows),
+			(0.0,0.0,0.0)
+			)
+		x_offset = x_offset + bitmap.width+spacing
+		glDeleteTextures(texture_id)
 
 
 # Draw all of the waypoint as red dots
@@ -495,37 +515,9 @@ def draw_boat():
 	x = pos.x + win_width/2.0
 	y = pos.y + win_height/2.0
 	draw_image(cur_boat_img[0], (x, y), heading-90, cur_boat_img[1])
-	
-def spare():
-	glEnable(GL_TEXTURE_2D)
-	glColor3f(1.0, 1.0, 1.0)
 
-	tex = glGenTextures(1)
-	glBindTexture(GL_TEXTURE_2D,tex)
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	pixels = numpy.array(cur_boat_img).flatten()
-	pixels = pixels.astype(numpy.float32)
-	pixels = pixels / 256
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 100, 100, 0, GL_RGB, GL_FLOAT, pixels);
-	glPushMatrix()
-	glTranslatef(win_width/2,win_height/2,0)
-	glBegin(GL_QUADS)
-	glTexCoord2d(0,0)
-	glVertex2f(0,0)
-	glTexCoord2d(0,1)
-	glVertex2f(0,100)
-	glTexCoord2d(1,1)
-	glVertex2f(100,100)
-	glTexCoord2d(1,0)
-	glVertex2f(100,0)
-	glEnd()
-	glPopMatrix()
-	glDisable(GL_TEXTURE_2D)
 
-	
+
 # Draw the rudder diagram centered on (x, y)
 def draw_rudder(x, y):
 	glPushMatrix()
@@ -726,7 +718,10 @@ if __name__ == '__main__':
 
 	pygame.mixer.init()
 	pygame.mixer.music.load(rel_to_abs_filepath("../meshes/lemme-smash.mp3"))
-
+	
+	global face	
+	face = freetype.Face(rel_to_abs_filepath('../meshes/OpenSans/OpenSans-Light.ttf'))
+	
 	try:
 		listener()
 	except rospy.ROSInterruptException:
