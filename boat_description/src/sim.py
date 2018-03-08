@@ -574,7 +574,7 @@ def calc_direction(v):
 		angle += 360
 	return angle
 
-# returns 1 for port, -1 for starboard
+# returns -1 for port, 1 for starboard
 def calc_tack(boat_heading, wind_heading): 
 	diff = (wind_heading - boat_heading)
 	if diff > 180:
@@ -592,7 +592,7 @@ def calc_boom_heading(boat_heading, wind_heading, winch):
 
 	tack = calc_tack(boat_heading, wind_heading)
 	# Note close-hauled boom is not quite parallel with boat
-	return boat_heading + tack * ((winch_max - winch) * 75/winch_range + 15)
+	return boat_heading - tack * ((winch_max - winch) * 75/winch_range + 15)
 	
 def pause_sim():
 	global pause
@@ -625,37 +625,42 @@ def calc(_):
 	dt = (time.time() - last_time) * speed
 	last_time = time.time()
 	clock += dt
+
+	tack = calc_tack(heading, wind_heading)
+	boom_heading = calc_boom_heading(heading, wind_heading, winch_pos)
+	boom_vector = polar_to_rect(1, boom_heading)
+	boom_perp_vector = polar_to_rect(1, boom_heading + tack*90)
+	app_wind = calc_apparent_wind(wind_heading, boat_speed, heading)
+
+	# components of wind parallel and perpendicular to sail
+	wind_par = -proj(app_wind, boom_vector)
+	wind_perp = proj(app_wind, boom_perp_vector)
+
+	if (wind_perp < 0):
+		# Sail is backwinded/luffing
+		acc = 0
+	else:
+		# Calculate drag component (major component when on run)		
+		heading_vector = polar_to_rect(1, heading)
+		a_perp = 0.05*wind_perp**2
+		acc = a_perp * proj(boom_perp_vector, heading_vector)	
+		
+		#Calculate lift (major component when on reach)
+		if wind_par > 0:
+			a_par = 0.03*wind_par**2
+			acc += a_par * proj(boom_perp_vector, heading_vector)
+
+	# Water drag	
+	drag = 0.07*boat_speed*abs(boat_speed)
 	
-	dh = wind_heading - heading
-	while dh > 180:
-		dh -= 360
-	while dh < -180:
-		dh += 360
-	dh = max(0,(abs(dh)-25))/150
+	boat_speed += (acc - drag)*dt
 	
-	boat_speed += 5 * (1-dh) * dt
-	boat_speed -= math.copysign(0.04*boat_speed*boat_speed, boat_speed)
-	boat_speed = min(boat_speed, 10)
-	boat_speed = max(boat_speed, -10)
-	
-<<<<<<< HEAD
-	if(state.major != BoatState.MAJ_DISABLED):
-		heading -= (rudder_pos-90)*0.1 
-		heading %= 360
-=======
 	heading -= (rudder_pos-90)*0.1
 	heading %= 360
->>>>>>> af56c009751e0161b9e16692cd7f51c171a8860e
 		
 	# Update anemometer reading because of new heading
 	update_wind(0)
 		
-	# Our laylines are set further out than the boat will actually hit irons at, so physics wise the laylines are actually at laylines-TOL, which
-	# is where it should hit irons
-	TOL = 5
-
-	# Outside of laylines, speed works normally
-	#if ane_reading >= (180+layline-TOL) or ane_reading <= (180 - layline+TOL):
 	pos.x += math.cos(math.radians(heading)) * boat_speed * dt
 	pos.y += math.sin(math.radians(heading)) * boat_speed * dt
 	
@@ -667,6 +672,11 @@ def calc(_):
 	else:
 		glutDestroyWindow(win_ID)
 		exit(0)
+
+# Returns magnitude of projection of u onto v
+def proj(u,v):
+	v_mag = math.sqrt(v[0]**2 + v[1]**2)
+	return (u[0]*v[0] + u[1]*v[1])/v_mag
 
 # Returns (x,y), given radius and angle in degrees
 def polar_to_rect(rad, ang):
