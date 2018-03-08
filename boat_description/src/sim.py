@@ -352,11 +352,12 @@ def draw_circle(r, x, y, quality=300):
 	glEnd()
 
 # Render the specified text with bottom left corner at (x,y)
-def draw_text(text, x, y, h = 15, spacing = 2.0, tint=(0,0,0)):
+def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0)):
 	font_texture_id = cur_font[0]
 	font_map =  cur_font[1]
-
 	
+	scale = h/32.0
+
 	glEnable(GL_TEXTURE_2D)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
@@ -365,15 +366,29 @@ def draw_text(text, x, y, h = 15, spacing = 2.0, tint=(0,0,0)):
 	glBindTexture(GL_TEXTURE_2D, font_texture_id)
 	
 	glPushMatrix()
-	glTranslatef(x, y, 0)
 	
-	scale = h/32.0
-	x_offset = 0
+	# add up total width
+	total_width = 0
 	for c in text:
 		if ord(c)<32 or ord(c)>127:
 			print 'invalid character to draw: ord(c)=%i' % ord(c)
 			return
-		
+		total_width += (font_map[ord(c)-32][1] + spacing) * scale
+	
+	# set alignment
+	if align == 'left':
+		glTranslatef(x, y, 0)
+	elif align == 'center':
+		glTranslatef(x-(total_width/2.0), y, 0)
+	elif align == 'right':
+		glTranslatef(x-total_width, y, 0)
+	else:
+		glTranslatef(x, y, 0)
+		print '%s is not a valid alignment' % align
+	
+	
+	x_offset = 0
+	for c in text:
 		char_info = font_map[ord(c)-32]
 		start_index = char_info[0]
 		char_width = char_info[1] * scale
@@ -382,6 +397,7 @@ def draw_text(text, x, y, h = 15, spacing = 2.0, tint=(0,0,0)):
 		tex_y_start = char_info[4]
 		tex_y_end = char_info[5]
 		tex_x_end = char_info[6]
+		
 		# use x and y as bottom left corner
 		# also flip these textures, since by default everything is upside down
 		glBegin(GL_QUADS)
@@ -398,8 +414,8 @@ def draw_text(text, x, y, h = 15, spacing = 2.0, tint=(0,0,0)):
 		glVertex2f(x_offset + char_width, char_y_offset + char_height)
 		glEnd()
 		
-		x_offset = x_offset + char_width + (spacing * scale)
-	
+		x_offset += char_width + (spacing * scale)
+
 	glPopMatrix()
 	glDisable(GL_TEXTURE_2D)
 	glDisable(GL_BLEND)
@@ -469,15 +485,15 @@ def draw_status():
 	
 	# Draw the wind readout
 	glColor3f(0.0, 0.0, 0.0)
-	draw_text("Wind: " + str(wind_heading), win_width-110, win_height-20)
+	draw_text("Wind: " + str(wind_heading), win_width-60, win_height-20, 'center')
 	draw_wind_arrow(win_width-60,win_height-50)
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
-	draw_text("X: %.1f" % pos.x, win_width-110, win_height*0.75)
-	draw_text("Y: %.1f" % pos.y, win_width-110, win_height*0.75-15)
-	draw_text("Spd: %.1f" % boat_speed, win_width-110, win_height*0.75-30)
-	draw_text("Head: %.1f" % heading, win_width-110, win_height*0.75-45)
+	draw_text("X: %.1f" % pos.x, win_width-60, win_height*0.75, 'center')
+	draw_text("Y: %.1f" % pos.y, win_width-60, win_height*0.75-15, 'center')
+	draw_text("Spd: %.1f" % boat_speed, win_width-60, win_height*0.75-30, 'center')
+	draw_text("Head: %.1f" % heading, win_width-60, win_height*0.75-45, 'center')
 	
 	# Draw the boat state
 	major = ""
@@ -495,20 +511,20 @@ def draw_status():
 		minor = "Planning"
 	elif state.minor is BoatState.MIN_TACKING:
 		minor = "Tacking"
-	draw_text("State", win_width-85, win_height*0.56, 24)
-	draw_text("M: " + major, win_width-110, win_height*0.56-15)
-	draw_text("m: " + minor, win_width-110, win_height*0.56-30)
+	draw_text("State", win_width-60, win_height*0.56, 'center', 24)
+	draw_text("M: " + major, win_width-60, win_height*0.56-15, 'center')
+	draw_text("m: " + minor, win_width-60, win_height*0.56-30, 'center')
 	
 	# Draw the rudder and winch pos
-	draw_text("Rudder: %.1f" % rudder_pos, win_width-110, win_height*0.40)
-	draw_text("Winch: %d" % winch_pos, win_width-110, win_height*0.40 - 15)
+	draw_text("Rudder: %.1f" % rudder_pos, win_width-60, win_height*0.40, 'center')
+	draw_text("Winch: %d" % winch_pos, win_width-60, win_height*0.40 - 15, 'center')
 	
 	# Draw the rudder diagram
-	draw_rudder(win_width-55, win_height*0.2)
+	draw_rudder(win_width-60, win_height*0.2)
 	
 	# Draw the simulation speed
-	draw_text("Spd: %.f%%" % (speed*100), win_width-110, 30)
-	draw_text("Time: %.1f" % clock + "s", win_width-110, 15)
+	draw_text("Spd: %.f%%" % (speed*100), win_width-60, 30, 'center')
+	draw_text("Time: %.1f" % clock + "s", win_width-60, 15, 'center')
 	
 	glPopMatrix()
 
