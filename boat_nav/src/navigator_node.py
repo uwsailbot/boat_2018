@@ -74,18 +74,24 @@ def position_callback(position):
 	best_heading = math.atan2(target.y - position.y, target.x - position.x) * 180 / math.pi
 	best_heading = (best_heading + 360) % 360 # Get rid of negative angles
 	wind_coming = (wind_heading + 180) % 360 # Determine the direction the wind is coming from
+	
 	# If the direct path isn't possible...
 	if best_heading > wind_coming-layline and best_heading < wind_coming+layline:
+	
 		# ... and there's new wind data or a new target, update the upwind path
 		if new_wind or is_new_target:
 			new_wind = False
 			is_new_target = False
 			
-			# If the waypoint is to the right of the wind...
-			if best_heading > wind_coming:
-				best_heading = wind_coming + layline
+			# If the current heading is still acceptable, carry on
+			if target_heading <= wind_coming-layline+3 or target_heading >= wind_coming+layline-3 and not is_new_target:
+				best_heading = target_heading
 			else:
-				best_heading = wind_coming - layline
+				# If the waypoint is to the right of the wind...
+				if best_heading > wind_coming:
+					best_heading = wind_coming + layline
+				else:
+					best_heading = wind_coming - layline
 		
 		# If there isn't new wind data, DON'T update the heading
 		else:

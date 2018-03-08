@@ -15,7 +15,6 @@ import math
 # Declare global variables needed for the node
 origin_lps = Point()
 RADIUS = rospy.get_param('/boat/radius')
-ane_reading = 0
 
 # Declare the publishers for the node
 gps_pub = rospy.Publisher('odometry_navsatfix', NavSatFix, queue_size=10)
@@ -45,11 +44,6 @@ def gps_callback(gps):
 	# Commenting this out so that we don't spam the output
 	#rospy.loginfo(rospy.get_caller_id() + " Long: %f, Lat: %f --- X: %f, Y: %f", get_coords(gps).x, get_coords(gps).y, local.x, local.y)
 	lps_pub.publish(local)
-
-
-def anemometer_callback(anemometer):
-	global ane_reading
-	ane_reading = anemometer.data
 
 
 def orientation_callback(imu):
@@ -139,7 +133,6 @@ def listener():
 	
 	rospy.Subscriber('imu/data', Imu, orientation_callback)
 	rospy.Subscriber('gps_raw', GPS, gps_callback)
-	rospy.Subscriber('anemometer', Float32, anemometer_callback)
 	srv2 = rospy.Service('gps_to_lps', ConvertPoint, gps_to_lps_srv)
 	rospy.spin()
 

@@ -95,12 +95,12 @@ def update_gps():
 	orientation_pub.publish(imu)
 
 
-def update_wind(offset):
+def update_wind():
 	global wind_heading
 	global heading
 	global ane_reading
 	global boat_speed
-
+	
 	apparent_wind = calc_direction(calc_apparent_wind(wind_heading, boat_speed, heading))
 	ane_reading = (apparent_wind - heading) % 360
 	if ane_reading < 0:
@@ -221,6 +221,7 @@ def ASCII_handler(key, mousex, mousey):
 	global cur_input
 	global cur_boat_img
 	global sound
+	global wind_heading
 	
 	# Handle cheat codes
 	cur_input += key;
@@ -271,9 +272,9 @@ def ASCII_handler(key, mousex, mousey):
 		joy.axes[0] = 0
 		joy_pub.publish(joy)
 	elif key is 'a':
-		update_wind(5)
+		wind_heading += 5
 	elif key is 'd':
-		update_wind(-5)
+		wind_heading -= 5
 	elif key is 'w':
 		speed += 0.1
 	elif key is 's':
@@ -600,12 +601,13 @@ def calc(_):
 	boat_speed = min(boat_speed, 10)
 	boat_speed = max(boat_speed, -10)
 	
+	
 	if(state.major != BoatState.MAJ_DISABLED):
 		heading -= (rudder_pos-90)*0.1
 		heading %= 360
 		
-		# Update anemometer reading because of new heading
-		update_wind(0)
+		# Update anemometer reading because of new heading and speed
+		update_wind()
 		
 		# Our laylines are set further out than the boat will actually hit irons at, so physics wise the laylines are actually at laylines-TOL, which
 		# is where it should hit irons
