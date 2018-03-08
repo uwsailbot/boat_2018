@@ -611,14 +611,11 @@ def calc_direction(v):
 def pause_sim():
 	global pause
 	global speed
-	if state.major is BoatState.MAJ_DISABLED:
-		pause = not pause
-		if pause is True:
-			speed = 0
-		else:
-			speed = 10
+	#if state.major is BoatState.MAJ_DISABLED:
+	pause = not pause
+	if pause is True:
+		speed = 0
 	else:
-		pause = False
 		speed = 10
 
 def calc(_):
@@ -648,7 +645,7 @@ def calc(_):
 	dh = max(0,(abs(dh)-25))/150
 	
 	boat_speed += 5 * (1-dh) * dt
-	boat_speed -= math.copysign(0.04*boat_speed*boat_speed, boat_speed)
+	boat_speed -= math.copysign(0.1*boat_speed*boat_speed, boat_speed)*dt
 	boat_speed = min(boat_speed, 10)
 	boat_speed = max(boat_speed, -10)
 	
@@ -752,7 +749,7 @@ def load_font(filepath, detail):
 	# finds total width and height
 	bitmaps = []
 	max_width = 0
-	total_height = 0	
+	total_height = 0
 	for i in range(32,128):
 		face.load_char(chr(i))
 		bitmap = face.glyph.bitmap
