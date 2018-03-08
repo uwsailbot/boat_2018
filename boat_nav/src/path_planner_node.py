@@ -13,9 +13,9 @@ waypoints = []
 rate = 0
 
 # Declare the publishers for the node
-boat_state_pub = rospy.Publisher('boat_state', BoatState, queue_size=1)
-waypoints_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size=1)
-target_pub = rospy.Publisher('target_point', Point, queue_size=1)
+boat_state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
+waypoints_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size=10)
+target_pub = rospy.Publisher('target_point', Point, queue_size=10)
 
 def boat_state_callback(new_state):
 	global state
@@ -59,8 +59,8 @@ def position_callback(position):
 	rate = rospy.Rate(100)
 	
 	# If the boat isn't in the autonomous planning state, exit
-	#if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
-	#	return
+	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
+		return
 	
 	# If the list of waypoints is not empty 
 	if(len(waypoints) > 0):

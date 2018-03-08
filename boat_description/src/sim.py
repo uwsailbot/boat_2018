@@ -21,6 +21,7 @@ from OpenGL.GLUT import *
 import pygame
 from PIL import Image
 import numpy
+import freetype
 
 # Cheat codes
 codes = []
@@ -39,11 +40,14 @@ sail_imgs = []
 cur_boat_img = 0
 cur_rudder_img = 0
 cur_sail_img = 0
+open_sans_font = ()
+cur_font = ()
 
 # Simulation data and consts
 should_sim_joy = False
 sim_is_running = True
 speed = 10
+pause = False
 clock = 0
 last_time = -1
 boat_speed = 4 # px/s
@@ -66,11 +70,11 @@ joy.buttons = [0]*11
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
-waypoint_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size = 1)
-wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 1)
-gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 1)
-orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 1)
-joy_pub = rospy.Publisher('joy', Joy, queue_size = 1)
+waypoint_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size = 10)
+wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 10)
+gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
+orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
+joy_pub = rospy.Publisher('joy', Joy, queue_size = 10)
 to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
 to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 
@@ -111,15 +115,16 @@ def update_wind():
 
 def boat_state_callback(newState):
 	global state
-	global joy
-	
 	# Unpush the tacking button if tacking has completed so we don't tack forever
-	if state.minor is BoatState.MIN_TACKING and newState.minor is not BoatState.MIN_TACKING:
-		joy.buttons[2] = 1
-		joy.buttons[0] = 0
-		joy_pub.publish(joy)
-	
+	#if state.minor is BoatState.MIN_TACKING and newState.minor is not BoatState.MIN_TACKING:
+	#	joy.buttons[2] = 1
+	#	joy.buttons[0] = 0
+	#joy_pub.publish(joy)
+
 	state = newState
+	if state.major is not BoatState.MAJ_DISABLED and pause:
+		pause_sim()
+	
 
 
 def rudder_callback(pos):
@@ -282,6 +287,8 @@ def ASCII_handler(key, mousex, mousey):
 		speed = max(speed, 0)
 	elif key is '0':
 		sound = not sound
+	elif key is 'p':
+		pause_sim()
 	elif key is ' ':
 		pos.x = 0
 		pos.y = 0
@@ -305,11 +312,12 @@ def redraw():
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL Rendering =*=*=*=*=*=*=*=*=*=*=*=*=
 
-def draw_image(texture_id, position, angle, size):	
+def draw_image(texture_id, position, angle, size, tint=(1.0,1.0,1.0)):	
 	glEnable(GL_TEXTURE_2D)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
-	glColor3f(1.0, 1.0, 1.0)
+	r,g,b = tint
+	glColor3f(r,g,b)
 	glBindTexture(GL_TEXTURE_2D,texture_id)
 	
 	glPushMatrix()
@@ -320,14 +328,14 @@ def draw_image(texture_id, position, angle, size):
 	extents_y = size[1]/2.0
 	
 	glBegin(GL_QUADS)
-	glTexCoord2d(0,0)
-	glVertex2f(-extents_x,-extents_y)
 	glTexCoord2d(0,1)
 	glVertex2f(-extents_x,extents_y)
-	glTexCoord2d(1,1)
-	glVertex2f(extents_x,extents_y)
+	glTexCoord2d(0,0)
+	glVertex2f(-extents_x,-extents_y)
 	glTexCoord2d(1,0)
 	glVertex2f(extents_x,-extents_y)
+	glTexCoord2d(1,1)
+	glVertex2f(extents_x,extents_y)
 	glEnd()
 	
 	glPopMatrix()
@@ -345,19 +353,75 @@ def draw_circle(r, x, y, quality=300):
 	glEnd()
 
 # Render the specified text with bottom left corner at (x,y)
-def draw_text(text, x, y, h = 15.0):
+def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0)):
+	font_texture_id = cur_font[0]
+	font_map =  cur_font[1]
+	
+	scale = h/32.0
+
+	glEnable(GL_TEXTURE_2D)
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+	glEnable(GL_BLEND)
+	r,g,b = tint
+	glColor3f(r,g,b)
+	glBindTexture(GL_TEXTURE_2D, font_texture_id)
+	
 	glPushMatrix()
 	
-	# Scale and translate the text as required
-	scale = h/120.0
-	glTranslatef(x,y,0)
-	glScalef(scale, scale, 0.0)
-	
-	# Loop to display character by character
+	# add up total width
+	total_width = 0
 	for c in text:
-		glutStrokeCharacter(GLUT_STROKE_ROMAN, ord(c))
+		if ord(c)<32 or ord(c)>127:
+			print 'invalid character to draw: ord(c)=%i' % ord(c)
+			return
+		total_width += (font_map[ord(c)-32][1] + spacing) * scale
 	
+	# set alignment
+	if align == 'left':
+		glTranslatef(x, y, 0)
+	elif align == 'center':
+		glTranslatef(x-(total_width/2.0), y, 0)
+	elif align == 'right':
+		glTranslatef(x-total_width, y, 0)
+	else:
+		glTranslatef(x, y, 0)
+		print '%s is not a valid alignment' % align
+	
+	
+	x_offset = 0
+	for c in text:
+		char_info = font_map[ord(c)-32]
+		start_index = char_info[0]
+		char_width = char_info[1] * scale
+		char_height = char_info[2] * scale
+		char_y_offset = char_info[3] * scale
+		tex_y_start = char_info[4]
+		tex_y_end = char_info[5]
+		tex_x_end = char_info[6]
+		
+		# use x and y as bottom left corner
+		# also flip these textures, since by default everything is upside down
+		glBegin(GL_QUADS)
+		glTexCoord2d(0, tex_y_start)
+		glVertex2f(x_offset, char_y_offset + char_height)
+
+		glTexCoord2d(0, tex_y_end)
+		glVertex2f(x_offset, char_y_offset)
+
+		glTexCoord2d(tex_x_end, tex_y_end)
+		glVertex2f(x_offset + char_width, char_y_offset)
+
+		glTexCoord2d(tex_x_end, tex_y_start)
+		glVertex2f(x_offset + char_width, char_y_offset + char_height)
+		glEnd()
+		
+		x_offset += char_width + (spacing * scale)
+
 	glPopMatrix()
+	glDisable(GL_TEXTURE_2D)
+	glDisable(GL_BLEND)
+
+	
 
 
 # Draw all of the waypoint as red dots
@@ -417,17 +481,20 @@ def draw_status():
 	glVertex2f(win_width-120,win_height)
 	glEnd()
 	
+	# Set font
+	cur_font = open_sans_font	
+	
 	# Draw the wind readout
 	glColor3f(0.0, 0.0, 0.0)
-	draw_text("Wind: " + str(wind_heading), win_width-110, win_height-20)
+	draw_text("Wind: " + str(wind_heading), win_width-60, win_height-20, 'center')
 	draw_wind_arrow(win_width-60,win_height-50)
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
-	draw_text("X: %.1f" % pos.x, win_width-110, win_height*0.75)
-	draw_text("Y: %.1f" % pos.y, win_width-110, win_height*0.75-15)
-	draw_text("Spd: %.1f" % boat_speed, win_width-110, win_height*0.75-30)
-	draw_text("Head: %.1f" % heading, win_width-110, win_height*0.75-45)
+	draw_text("X: %.1f" % pos.x, win_width-60, win_height*0.75, 'center')
+	draw_text("Y: %.1f" % pos.y, win_width-60, win_height*0.75-15, 'center')
+	draw_text("Spd: %.1f" % boat_speed, win_width-60, win_height*0.75-30, 'center')
+	draw_text("Head: %.1f" % heading, win_width-60, win_height*0.75-45, 'center')
 	
 	# Draw the boat state
 	major = ""
@@ -445,20 +512,20 @@ def draw_status():
 		minor = "Planning"
 	elif state.minor is BoatState.MIN_TACKING:
 		minor = "Tacking"
-	draw_text("State", win_width-85, win_height*0.56, 24)
-	draw_text("M: " + major, win_width-110, win_height*0.56-15)
-	draw_text("m: " + minor, win_width-110, win_height*0.56-30)
+	draw_text("State", win_width-60, win_height*0.56, 'center', 24)
+	draw_text("M: " + major, win_width-60, win_height*0.56-15, 'center')
+	draw_text("m: " + minor, win_width-60, win_height*0.56-30, 'center')
 	
 	# Draw the rudder and winch pos
-	draw_text("Rudder: %.1f" % rudder_pos, win_width-110, win_height*0.40)
-	draw_text("Winch: %d" % winch_pos, win_width-110, win_height*0.40 - 15)
+	draw_text("Rudder: %.1f" % rudder_pos, win_width-60, win_height*0.40, 'center')
+	draw_text("Winch: %d" % winch_pos, win_width-60, win_height*0.40 - 15, 'center')
 	
 	# Draw the rudder diagram
-	draw_rudder(win_width-55, win_height*0.2)
+	draw_rudder(win_width-60, win_height*0.2)
 	
 	# Draw the simulation speed
-	draw_text("Spd: %.f%%" % (speed*100), win_width-110, 30)
-	draw_text("Time: %.1f" % clock + "s", win_width-110, 15)
+	draw_text("Spd: %.f%%" % (speed*100), win_width-60, 30, 'center')
+	draw_text("Time: %.1f" % clock + "s", win_width-60, 15, 'center')
 	
 	glPopMatrix()
 
@@ -496,37 +563,9 @@ def draw_boat():
 	x = pos.x + win_width/2.0
 	y = pos.y + win_height/2.0
 	draw_image(cur_boat_img[0], (x, y), heading-90, cur_boat_img[1])
-	
-def spare():
-	glEnable(GL_TEXTURE_2D)
-	glColor3f(1.0, 1.0, 1.0)
 
-	tex = glGenTextures(1)
-	glBindTexture(GL_TEXTURE_2D,tex)
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	pixels = numpy.array(cur_boat_img).flatten()
-	pixels = pixels.astype(numpy.float32)
-	pixels = pixels / 256
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 100, 100, 0, GL_RGB, GL_FLOAT, pixels);
-	glPushMatrix()
-	glTranslatef(win_width/2,win_height/2,0)
-	glBegin(GL_QUADS)
-	glTexCoord2d(0,0)
-	glVertex2f(0,0)
-	glTexCoord2d(0,1)
-	glVertex2f(0,100)
-	glTexCoord2d(1,1)
-	glVertex2f(100,100)
-	glTexCoord2d(1,0)
-	glVertex2f(100,0)
-	glEnd()
-	glPopMatrix()
-	glDisable(GL_TEXTURE_2D)
 
-	
+
 # Draw the rudder diagram centered on (x, y)
 def draw_rudder(x, y):
 	glPushMatrix()
@@ -569,6 +608,18 @@ def calc_direction(v):
 		angle += 360
 	return angle
 
+def pause_sim():
+	global pause
+	global speed
+	if state.major is BoatState.MAJ_DISABLED:
+		pause = not pause
+		if pause is True:
+			speed = 0
+		else:
+			speed = 10
+	else:
+		pause = False
+		speed = 10
 
 def calc(_):
 	global pos
@@ -609,14 +660,14 @@ def calc(_):
 		# Update anemometer reading because of new heading and speed
 		update_wind()
 		
-		# Our laylines are set further out than the boat will actually hit irons at, so physics wise the laylines are actually at laylines-TOL, which
-		# is where it should hit irons
-		TOL = 5
+	# Our laylines are set further out than the boat will actually hit irons at, so physics wise the laylines are actually at laylines-TOL, which
+	# is where it should hit irons
+	TOL = 5
 
-		# Outside of laylines, speed works normally
-		#if ane_reading >= (180+layline-TOL) or ane_reading <= (180 - layline+TOL):
-		pos.x += math.cos(math.radians(heading)) * boat_speed * dt
-		pos.y += math.sin(math.radians(heading)) * boat_speed * dt
+	# Outside of laylines, speed works normally
+	#if ane_reading >= (180+layline-TOL) or ane_reading <= (180 - layline+TOL):
+	pos.x += math.cos(math.radians(heading)) * boat_speed * dt
+	pos.y += math.sin(math.radians(heading)) * boat_speed * dt
 	
 	update_gps()
 	glutPostRedisplay()
@@ -683,15 +734,113 @@ def load_image_resources():
 	boat_imgs.append((pirate_id, (36,48)))
 	codes.append("mars")
 	SPACE_X = load_image('../meshes/falcon_heavy.png', (1040/24,5842/24))
-	boat_imgs.append((SPACE_X, (1040/25,5842/25)))
+	boat_imgs.append((SPACE_X, (1040/48,5842/48)))
 		
 	cur_boat_img = boat_imgs[0]
+
+def load_font(filepath, detail):
+	# load font with freetype
+	face = freetype.Face(rel_to_abs_filepath(filepath))
+	face.set_char_size(detail)
+	
+	# we're going to load every character into one texture, placed in order vertically 
+
+	# this is used to store data about location and size of each char in the texture
+	font_map = []
+	
+	# get bitmaps, including width, height, and top bearing for each char
+	# finds total width and height
+	bitmaps = []
+	max_width = 0
+	total_height = 0	
+	for i in range(32,128):
+		face.load_char(chr(i))
+		bitmap = face.glyph.bitmap
+		if bitmap.width>max_width:
+			max_width = bitmap.width
+		total_height += bitmap.rows
+		# can't just append the bitmap object
+		bitmaps.append((bitmap.buffer, bitmap.width, bitmap.rows, face.glyph.bitmap_top))
+	
+	# build a buffer for the texture containing all chars
+	pixels = []	
+	index = 0
+	# for each char
+	for i in range(32,128):
+		bitmap_buffer = bitmaps[i-32][0]
+		bitmap_width = bitmaps[i-32][1]
+		bitmap_height = bitmaps[i-32][2]
+		bitmap_top = bitmaps[i-32][3]
+		
+		#add char info to font_map
+		font_map.append((
+			index,
+			bitmap_width,
+			bitmap_height,
+			bitmap_top - bitmap_height, # y offset
+			index/max_width/1.0/total_height, # texture y start
+			(index/max_width+bitmap_height)/1.0/total_height, # texture y end
+			bitmap_width/1.0/max_width # texture x end
+			))
+		
+		# add buffer to total buffer 
+		buffer_index = 0
+		
+		# for each row
+		for j in range(0,bitmap_height):
+			# for each column
+			for k in range(0, max_width):
+				if k < bitmap_width:
+					# copy
+					pixels.append(bitmap_buffer[buffer_index])
+					buffer_index+=1
+				else:
+					# pading until end of row
+					pixels.append(0)
+				index+=1
+		
+		# padding between each character, to avoid bleeding into each other when interpolating
+		for k in range(0, max_width):
+			pixels.append(0)
+			index+=1
+	
+	# setup the texture
+	texture_id = glGenTextures(1)
+	glBindTexture(GL_TEXTURE_2D,texture_id)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	
+	# convert buffer to float format
+	pixels = numpy.array(pixels, dtype='float32')
+	for i in range(0, pixels.size):
+		pixels[i]/=256.0
+	
+	# make the texture
+	glTexImage2D(
+		GL_TEXTURE_2D,
+		0,
+		GL_ALPHA,
+		max_width,
+		total_height,
+		0,
+		GL_ALPHA,
+		GL_FLOAT,
+		pixels);
+	
+	return (texture_id, font_map)	
+
+def load_font_resources():
+	global cur_font
+	global open_sans_font
+	open_sans_font = load_font('../meshes/OpenSans/OpenSans-Light.ttf', 2048)
+	cur_font = open_sans_font
 
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
 	glViewport(0, 0, win_width, win_height)
 	gluOrtho2D(0.0, win_width, 0.0, win_height)
-
 
 def init_GL():
 	global win_ID
@@ -711,6 +860,7 @@ def init_GL():
 	glutTimerFunc(1000/30, calc, 0)
 	
 	load_image_resources()
+	load_font_resources()
 	glutMainLoop()
 
 
@@ -728,6 +878,9 @@ if __name__ == '__main__':
 
 	pygame.mixer.init()
 	pygame.mixer.music.load(rel_to_abs_filepath("../meshes/lemme-smash.mp3"))
+
+	state.major = BoatState.MAJ_DISABLED
+	state.minor = BoatState.MIN_COMPLETE
 
 	try:
 		listener()
