@@ -40,6 +40,8 @@ sail_imgs = []
 cur_boat_img = 0
 cur_rudder_img = 0
 cur_sail_img = 0
+open_sans_font = ()
+cur_font = ()
 
 # Simulation data and consts
 should_sim_joy = False
@@ -351,9 +353,8 @@ def draw_circle(r, x, y, quality=300):
 
 # Render the specified text with bottom left corner at (x,y)
 def draw_text(text, x, y, h = 15, spacing = 2.0, tint=(0,0,0)):
-	global font
-	font_texture_id = font[0]
-	font_map = font[1]
+	font_texture_id = cur_font[0]
+	font_map =  cur_font[1]
 
 	
 	glEnable(GL_TEXTURE_2D)
@@ -377,23 +378,24 @@ def draw_text(text, x, y, h = 15, spacing = 2.0, tint=(0,0,0)):
 		start_index = char_info[0]
 		char_width = char_info[1] * scale
 		char_height = char_info[2] * scale
-		tex_y_start = char_info[3]
-		tex_y_end = char_info[4]
-		tex_x_end = char_info[5]
+		char_y_offset = char_info[3] * scale
+		tex_y_start = char_info[4]
+		tex_y_end = char_info[5]
+		tex_x_end = char_info[6]
 		# use x and y as bottom left corner
 		# also flip these textures, since by default everything is upside down
 		glBegin(GL_QUADS)
 		glTexCoord2d(0, tex_y_start)
-		glVertex2f(x_offset, char_height)
+		glVertex2f(x_offset, char_y_offset + char_height)
 
 		glTexCoord2d(0, tex_y_end)
-		glVertex2f(x_offset, 0)
+		glVertex2f(x_offset, char_y_offset)
 
 		glTexCoord2d(tex_x_end, tex_y_end)
-		glVertex2f(x_offset + char_width, 0)
+		glVertex2f(x_offset + char_width, char_y_offset)
 
 		glTexCoord2d(tex_x_end, tex_y_start)
-		glVertex2f(x_offset + char_width, char_height)
+		glVertex2f(x_offset + char_width, char_y_offset + char_height)
 		glEnd()
 		
 		x_offset = x_offset + char_width + (spacing * scale)
@@ -461,6 +463,9 @@ def draw_status():
 	glVertex2f(win_width-120,0)
 	glVertex2f(win_width-120,win_height)
 	glEnd()
+	
+	# Set font
+	cur_font = open_sans_font	
 	
 	# Draw the wind readout
 	glColor3f(0.0, 0.0, 0.0)
@@ -714,14 +719,21 @@ def load_image_resources():
 		
 	cur_boat_img = boat_imgs[0]
 
-def load_font():	
-	face = freetype.Face(rel_to_abs_filepath('../meshes/OpenSans/OpenSans-Light.ttf'))
-	face.set_char_size(2048)
+def load_font(filepath, detail):
+	# load font with freetype
+	face = freetype.Face(rel_to_abs_filepath(filepath))
+	face.set_char_size(detail)
 	
+	# we're going to load every character into one texture, placed in order vertically 
+
+	# this is used to store data about location and size of each char in the texture
 	font_map = []
+	
+	# get bitmaps, including width, height, and top bearing for each char
+	# finds total width and height
 	bitmaps = []
 	max_width = 0
-	total_height = 0
+	total_height = 0	
 	for i in range(32,128):
 		face.load_char(chr(i))
 		bitmap = face.glyph.bitmap
@@ -729,45 +741,64 @@ def load_font():
 			max_width = bitmap.width
 		total_height += bitmap.rows
 		# can't just append the bitmap object
-		bitmaps.append((bitmap.buffer, bitmap.width, bitmap.rows))
+		bitmaps.append((bitmap.buffer, bitmap.width, bitmap.rows, face.glyph.bitmap_top))
 	
+	# build a buffer for the texture containing all chars
 	pixels = []	
 	index = 0
+	# for each char
 	for i in range(32,128):
 		bitmap_buffer = bitmaps[i-32][0]
 		bitmap_width = bitmaps[i-32][1]
 		bitmap_height = bitmaps[i-32][2]
+		bitmap_top = bitmaps[i-32][3]
 		
+		#add char info to font_map
 		font_map.append((
 			index,
 			bitmap_width,
 			bitmap_height,
+			bitmap_top - bitmap_height, # y offset
 			index/max_width/1.0/total_height, # texture y start
 			(index/max_width+bitmap_height)/1.0/total_height, # texture y end
-			bitmap_width/1.0/max_width, # texture x end
+			bitmap_width/1.0/max_width # texture x end
 			))
 		
+		# add buffer to total buffer 
 		buffer_index = 0
+		
+		# for each row
 		for j in range(0,bitmap_height):
+			# for each column
 			for k in range(0, max_width):
 				if k < bitmap_width:
+					# copy
 					pixels.append(bitmap_buffer[buffer_index])
 					buffer_index+=1
 				else:
+					# pading until end of row
 					pixels.append(0)
 				index+=1
 		
+		# padding between each character, to avoid bleeding into each other when interpolating
+		for k in range(0, max_width):
+			pixels.append(0)
+			index+=1
+	
+	# setup the texture
 	texture_id = glGenTextures(1)
 	glBindTexture(GL_TEXTURE_2D,texture_id)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		
+	
+	# convert buffer to float format
 	pixels = numpy.array(pixels, dtype='float32')
 	for i in range(0, pixels.size):
 		pixels[i]/=256.0
 	
+	# make the texture
 	glTexImage2D(
 		GL_TEXTURE_2D,
 		0,
@@ -779,14 +810,18 @@ def load_font():
 		GL_FLOAT,
 		pixels);
 	
-	global font
-	font = (texture_id, font_map)	
+	return (texture_id, font_map)	
+
+def load_font_resources():
+	global cur_font
+	global open_sans_font
+	open_sans_font = load_font('../meshes/OpenSans/OpenSans-Light.ttf', 2048)
+	cur_font = open_sans_font
 
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
 	glViewport(0, 0, win_width, win_height)
 	gluOrtho2D(0.0, win_width, 0.0, win_height)
-
 
 def init_GL():
 	global win_ID
@@ -806,7 +841,7 @@ def init_GL():
 	glutTimerFunc(1000/30, calc, 0)
 	
 	load_image_resources()
-	load_font()
+	load_font_resources()
 	glutMainLoop()
 
 
