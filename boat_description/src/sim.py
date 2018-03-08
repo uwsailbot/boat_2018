@@ -48,6 +48,8 @@ clock = 0
 last_time = -1
 boat_speed = 4 # px/s
 layline = rospy.get_param('/boat/layline')
+winch_min = rospy.get_param('/boat/winch_min')
+winch_max = rospy.get_param('/boat/winch_max')
 
 # ROS data
 wind_heading = 270
@@ -544,6 +546,26 @@ def calc_direction(v):
 		angle += 360
 	return angle
 
+# returns 1 for port, -1 for starboard
+def calc_tack(boat_heading, wind_heading): 
+	diff = (wind_heading - boat_heading)
+	if diff > 180:
+		diff -= 360
+	elif diff < -180:
+		diff += 360
+
+	return diff/abs(diff)
+
+# returns heading of vector point from end of boom to mast
+def calc_boom_heading(boat_heading, wind_heading, winch):
+	global winch_min
+	global winch_max
+	winch_range = winch_max - winch_min
+
+	tack = calc_tack(boat_heading, wind_heading)
+	# Note close-hauled boom is not quite parallel with boat
+	return boat_heading + tack * ((winch_max - winch) * 75/winch_range + 15)
+	
 
 def calc(_):
 	global pos
@@ -577,7 +599,7 @@ def calc(_):
 	boat_speed = max(boat_speed, -10)
 	
 	if(state.major != BoatState.MAJ_DISABLED):
-		heading -= (rudder_pos-90)*0.1
+		heading -= (rudder_pos-90)*0.1 
 		heading %= 360
 		
 		# Update anemometer reading because of new heading
