@@ -9,6 +9,7 @@ project(boat_interfaces)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   boat_msgs
+  actionlib
   roscpp
   rospy
   sensor_msgs
