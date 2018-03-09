@@ -1,5 +1,7 @@
 # boat_2018
 2018 UW Sailbot ROS Architecture
+[![Build Status](https://travis-ci.org/uwsailbot/boat_2018.svg?branch=master)](https://travis-ci.org/uwsailbot/boat_2018)
+
 
 To build, clone this repo as your src folder:
 
@@ -28,6 +30,7 @@ Package for planning boat path given gps waypoints, as well as controlling the o
 	$ rosdep install --from-paths src --ignore-src --rosdistro=kinetic -y
 	
 This package relies on phidgets_imu in order to compile, which won't get downloaded with the previous command.  Clone it from https://github.com/ros-drivers/phidgets_drivers.git and then run the following:
+	
 	$ cd catkin_ws
 	$ catkin_make
 
