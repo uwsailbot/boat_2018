@@ -108,9 +108,12 @@ def start():
 		# Once a proper packet has been received, parse it
 		# receiver.parse() parsing doesn't work fully right now
 		# Setup a JOY message with the parsed data and publish it
-		controller = Controller()
-		controller.header.stamp = rospy.get_rostime()
-		controller.channels = self.channels
+		joy = Joy()
+		joy.header.stamp = rospy.get_rostime()
+		joy.right_stick_x = self.channels[1]
+		joy.right_stick_y = self.channels[2]
+		joy.left_stick_x = self.channels[3]
+		joy.left_stick_y = self.channels[4]
 		pub.publish(channels)
 		rate.sleep()
 
