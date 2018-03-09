@@ -49,6 +49,8 @@ clock = 0
 last_time = -1
 boat_speed = 4 # px/s
 layline = rospy.get_param('/boat/layline')
+min_winch_pos = 900
+max_winch_pos = 2000
 
 # ROS data
 wind_heading = 270
@@ -456,8 +458,8 @@ def draw_status():
 	draw_text("Rudder: %.1f" % rudder_pos, win_width-110, win_height*0.40)
 	draw_text("Winch: %d" % winch_pos, win_width-110, win_height*0.40 - 15)
 	
-	# Draw the rudder diagram
-	draw_rudder(win_width-55, win_height*0.2)
+	# Draw the boat diagram
+	draw_status_boat(win_width-55, win_height*0.2)
 	
 	# Draw the simulation speed
 	draw_text("Spd: %.f%%" % (speed*100), win_width-110, 30)
@@ -498,7 +500,10 @@ def draw_wind_arrow(x,y):
 def draw_boat():
 	x = pos.x + win_width/2.0
 	y = pos.y + win_height/2.0
-	draw_image(cur_boat_img[0], (x, y), heading-90, cur_boat_img[1])
+	img_size = cur_boat_img[1]
+	draw_image(cur_boat_img[0], (x, y), heading-90, img_size)
+	size_factor = float(max_winch_pos - winch_pos)/(max_winch_pos - min_winch_pos)
+	draw_sail(x, y, heading-90, 2, 8, 30, 5, size_factor)
 	
 def spare():
 	glEnable(GL_TEXTURE_2D)
@@ -531,29 +536,55 @@ def spare():
 
 	
 # Draw the rudder diagram centered on (x, y)
-def draw_rudder(x, y):
+def draw_status_boat(x, y):
 	glPushMatrix()
 	
 	glTranslatef(x, y, 0)
 	
+	#draw boat
 	glColor3f(1.0, 0.5, 0.0)
 	glBegin(GL_POLYGON)
 	glVertex2f(-10,0)
-	glVertex2f(-7,40)
+	glVertex2f(-7,30)
 	glVertex2f(0,60)
-	glVertex2f(7,40)
+	glVertex2f(7,30)
 	glVertex2f(10,0)
 	glEnd()
 	
+	#draw rudder
 	glRotatef(rudder_pos-90, 0, 0, 1)
 	glColor3f(0.5,0.2,0.2)
 	glBegin(GL_POLYGON)
-	glVertex2f(-4,10)
-	glVertex2f(-4,-20)
-	glVertex2f(4,-20)
-	glVertex2f(4,10)
+	glVertex2f(-3,10)
+	glVertex2f(-3,-20)
+	glVertex2f(3,-20)
+	glVertex2f(3,10)
 	glEnd()
 	
+	glPopMatrix()
+
+	size_factor = float(max_winch_pos - winch_pos)/(max_winch_pos - min_winch_pos)
+	draw_sail(x, y+15, 0, 2, 16, 60, 10, size_factor)
+
+
+def draw_sail(x, y, angle, min_base_size, max_base1_size, max_base2_size, height, size_factor):
+	glPushMatrix()
+
+	glTranslatef(x, y, 0)
+	glRotatef(angle, 0, 0, 1)
+	
+	# extra_x, extra_y = polar_to_rect(10, angle)
+	# glTranslatef(-extra_x, extra_y, 0)
+
+	glColor3f(1.0, .2, .2)
+	
+	glBegin(GL_POLYGON)
+	glVertex2f(0.5*(max_base2_size - min_base_size)*size_factor + min_base_size, -float(height)/2) # bot right
+	glVertex2f(0.5*(max_base1_size - min_base_size)*size_factor + min_base_size, float(height)/2) # top right
+	glVertex2f(-0.5*(max_base1_size - min_base_size)*size_factor - min_base_size, float(height)/2) # top left
+	glVertex2f(-0.5*(max_base2_size - min_base_size)*size_factor - min_base_size, -float(height)/2) # bot left
+	glEnd()
+
 	glPopMatrix()
 
 
