@@ -5,7 +5,7 @@ sudo: required
 language: generic
 cache:
     directories:
-- "~/.platformio"
+      - "~/.platformio"
 env:
   global:
     - CI_SOURCE_PATH=$(pwd)
