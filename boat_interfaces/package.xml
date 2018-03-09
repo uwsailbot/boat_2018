@@ -62,7 +62,6 @@
   <build_export_depend>std_msgs</build_export_depend>
   <build_export_depend>actionlib</build_export_depend>
   <exec_depend>boat_msgs</exec_depend>
-  <exec_depend>pid</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>

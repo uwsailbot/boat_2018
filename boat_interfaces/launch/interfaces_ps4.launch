@@ -16,13 +16,5 @@
   </node>
   
   <!-- Main nodes for this package -->
-  <node pkg="boat_interfaces" type="boat_state_controller_node.py"
-    name="boat_state_controller" >
-  </node>
-  <node pkg="boat_interfaces" type="rudder_node.py"
-    name="rudder" >
-  </node> 
-  <node pkg="boat_interfaces" type="winch_node.py"
-    name="winch" >
-  </node>
+  <include file="$(find boat_interfaces)/launch/interfaces_base.launch" />
 </launch>
