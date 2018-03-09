@@ -34,6 +34,8 @@ win_width = 640
 win_height = 480
 
 # Resources
+compass_img = ()
+compass_pointer_img = ()
 boat_imgs = []
 rudder_imgs = []
 sail_imgs = []
@@ -489,7 +491,7 @@ def draw_status():
 	# Draw the wind readout
 	glColor3f(0.0, 0.0, 0.0)
 	draw_text("Wind: " + str(wind_heading), win_width-60, win_height-20, 'center')
-	draw_wind_arrow(win_width-60,win_height-50)
+	draw_wind_arrow(win_width-60,win_height-65)
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
@@ -523,7 +525,7 @@ def draw_status():
 	draw_text("Winch: %d" % winch_pos, win_width-60, win_height*0.40 - 15, 'center')
 	
 	# Draw the boat diagram
-	draw_status_boat(win_width-45, win_height*0.2)
+	draw_status_boat(win_width-60, win_height*0.2)
 	
 	# Draw the simulation speed
 	draw_text("Spd: %.f%%" % (speed*100), win_width-60, 30, 'center')
@@ -534,31 +536,8 @@ def draw_status():
 
 # Draw the arrow for the wind direction centered on (x, y)
 def draw_wind_arrow(x,y):
-	glPushMatrix()
-	
-	glTranslatef(x,y,0)
-	glScalef(0.3,0.3,0)
-	glColor3f(0.0, 1.0, 0.0)
-	draw_circle(65,0,0)
-	
-	glRotatef(wind_heading-90,0,0,1)
-	glTranslatef(0,35,0)
-	
-	glColor3f(1.0, 0.0, 0.0)
-	glBegin(GL_QUADS)
-	glVertex2f(-10,0)
-	glVertex2f(-10,-100)
-	glVertex2f(10,-100)
-	glVertex2f(10,0)
-	glEnd()
-	
-	glBegin(GL_TRIANGLES)
-	glVertex2f(-20,0)
-	glVertex2f(0,30)
-	glVertex2f(20,0)
-	glEnd()
-	
-	glPopMatrix()
+	draw_image(compass_img, (x, y), 0, (70,70))
+	draw_image(compass_pointer_img, (x, y), wind_heading-90, (7,40))
 
 # Draw the boat on the water
 def draw_boat():
@@ -571,19 +550,14 @@ def draw_boat():
 
 # Draw the rudder diagram centered on (x, y)
 def draw_status_boat(x, y):
+	#draw boat
+	img_size = cur_boat_img[1]
+	scale = 60.0/img_size[1];
+	draw_image(cur_boat_img[0], (x, y+15), 0, (img_size[0]*scale, img_size[1]*scale))
+
 	glPushMatrix()
 	
-	glTranslatef(x, y, 0)
-	
-	#draw boat
-	glColor3f(1.0, 0.5, 0.0)
-	glBegin(GL_POLYGON)
-	glVertex2f(-12,0)
-	glVertex2f(-9,30)
-	glVertex2f(0,60)
-	glVertex2f(9,30)
-	glVertex2f(12,0)
-	glEnd()
+	glTranslatef(x, y, 0)	
 	
 	#draw rudder
 	glRotatef(rudder_pos-90, 0, 0, 1)
@@ -785,8 +759,12 @@ def load_image(filepath, resolution):
 
 def load_image_resources():
 	global cur_boat_img
-
+	global compass_img
+	global compass_pointer_img
 	# Load all the images
+	compass_img = load_image('../meshes/compass.png', (256,256))
+	compass_pointer_img = load_image('../meshes/compass_pointer.png', (23,128))
+
 	codes.append("orig")
 	orig_id=load_image('../meshes/niceboat.png', (64,128))
 	boat_imgs.append((orig_id, (16,32)))
