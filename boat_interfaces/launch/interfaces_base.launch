@@ -13,4 +13,8 @@
   <node pkg="boat_interfaces" type="winch_node.py"
     name="winch" >
   </node>
+
+  <node pkg="boat_interfaces" type="tacking_action.py"
+    name="tacking_action" output="screen">
+  </node>
 </launch>
