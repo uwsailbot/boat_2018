@@ -51,7 +51,7 @@ def enable_callback(is_enabled):
 
 def listener():
 	# Setup subscribers
-	rospy.init_node('pid_node', anonymous=True)
+	rospy.init_node('pid_node')
 	rospy.Subscriber('rudder_pid/input', Float32, input_callback)
 	rospy.Subscriber('rudder_pid/setpoint', Float32, setpoint_callback)
 	rospy.Subscriber('rudder_pid/enable', Bool, enable_callback)
