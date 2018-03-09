@@ -28,8 +28,12 @@
   <build_depend>boat_nav</build_depend>
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
+  <build_export_depend>boat_interfaces</build_export_depend>
+  <build_export_depend>boat_nav</build_export_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>python-pygame</exec_depend>
+  <exec_depend>boat_interfaces</exec_depend>
+  <exec_depend>boat_nav</exec_depend>
 
 </package>

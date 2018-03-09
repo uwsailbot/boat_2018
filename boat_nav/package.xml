@@ -25,21 +25,23 @@
   <build_depend>nodelet</build_depend>
   <build_depend>robot_localization</build_depend>
 
-
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
   <build_export_depend>std_msgs</build_export_depend>
   <build_export_depend>boat_msgs</build_export_depend>
   <build_export_depend>phidgets_imu</build_export_depend>
   <build_export_depend>imu_filter_madgwick</build_export_depend>
-  
+  <build_export_depend>nodelet</build_export_depend>
+  <build_export_depend>robot_localization</build_export_depend>
 
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>boat_msgs</exec_depend>
   <exec_depend>phidgets_imu</exec_depend>
-  <exec_depend>imu_filter_madgwick</exec_depend>
+  <exec_depend>imu_filter_madgwick</exec_depend> 
+  <exec_depend>nodelet</exec_depend>
+  <exec_depend>robot_localization</exec_depend>
 
 
 </package>
