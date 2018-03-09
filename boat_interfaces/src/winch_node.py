@@ -1,12 +1,8 @@
 #!/usr/bin/env python
 import rospy
-from sensor_msgs.msg import Joy
-from std_msgs.msg import Int32
-from std_msgs.msg import Float32
-from std_msgs.msg import Bool
 from boat_msgs.msg import BoatState
-	  
-import time
+from sensor_msgs.msg import Joy
+from std_msgs.msg import Bool, Float32, Int32
 
 ane_reading = 0
 layline = rospy.get_param('/boat/layline')  # Closest angle we can sail to the wind

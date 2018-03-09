@@ -1,11 +1,7 @@
 #!/usr/bin/env python
-import rospy
 import pygame
+import rospy
 from sensor_msgs.msg import Joy
-import sys
-from struct import *
-import time
-import serial
 
 def start():
 	# Setup publisher for the /joy topic

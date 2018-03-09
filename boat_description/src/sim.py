@@ -1,27 +1,20 @@
 #!/usr/bin/env python
-
-import rospy
-import sys, select, termios, tty, os
-from sensor_msgs.msg import Joy
-from sensor_msgs.msg import Imu
-from boat_msgs.msg import BoatState
-from boat_msgs.msg import GPS
-from boat_msgs.msg import Point
-from boat_msgs.msg import PointArray
-from boat_msgs.srv import ConvertPoint
-from std_msgs.msg import Float32
-from std_msgs.msg import Int32
-from tf.transformations import quaternion_from_euler
-import time
-from sys import argv
+import freetype
 import math
+import numpy
+import pygame
+import rospy
+import time
+from boat_msgs.msg import BoatState, GPS, Point, PointArray
+from boat_msgs.srv import ConvertPoint
+from sensor_msgs.msg import Imu, Joy
+from std_msgs.msg import Float32, Int32
+from tf.transformations import quaternion_from_euler
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
-import pygame
 from PIL import Image
-import numpy
-import freetype
+from sys import argv
 
 # Cheat codes
 codes = []

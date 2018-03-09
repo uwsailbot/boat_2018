@@ -1,9 +1,9 @@
 #! /usr/bin/env python
-import rospy
 import actionlib
-import boat_msgs.msg 
-from std_msgs.msg import Float32, Bool
+import boat_msgs.msg
+import rospy
 from boat_msgs.msg import BoatState
+from std_msgs.msg import Bool, Float32
 
 class TackingAction(object):
 	# create messages that are used to publish feedback/result

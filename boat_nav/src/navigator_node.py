@@ -1,12 +1,9 @@
 #!/usr/bin/env python
-import rospy
-import time
-import math
-from std_msgs.msg import Float32
-from boat_msgs.msg import Point
-from boat_msgs.msg import BoatState
-from boat_msgs.msg import TackingAction, TackingGoal
 import actionlib
+import math
+import rospy
+from boat_msgs.msg import BoatState, Point, TackingAction, TackingGoal
+from std_msgs.msg import Float32
 
 # Declare global variables needed for the node
 new_wind = False

@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 import rospy
+from boat_msgs.msg import BoatState, GPS
 from sensor_msgs.msg import Joy
-from std_msgs.msg import Float32
-from std_msgs.msg import Bool
-from boat_msgs.msg import BoatState
-from boat_msgs.msg import GPS
+from std_msgs.msg import Bool, Float32
 
-import time
 
 # Declare global variables needed for the node
 rudder_pos = 90  # What the rudder position is (0-180)

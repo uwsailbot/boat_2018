@@ -1,10 +1,7 @@
 #!/usr/bin/env python
-import rospy
-import time
 import math
-from boat_msgs.msg import Point
-from boat_msgs.msg import PointArray
-from boat_msgs.msg import BoatState
+import rospy
+from boat_msgs.msg import BoatState, Point, PointArray
 from boat_msgs.srv import ConvertPoint
 
 # Declare global variables needed for the node

@@ -1,11 +1,10 @@
 #!/usr/bin/env python
+import actionlib
 import rospy
 import time
+from boat_msgs.msg import BoatState, TackingAction, TackingGoal
 from sensor_msgs.msg import Joy
 from std_msgs.msg import Float32
-from boat_msgs.msg import BoatState
-from boat_msgs.msg import TackingAction, TackingGoal
-import actionlib
 
 state = BoatState()
 tacking_direction = 0

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
-from std_msgs.msg import Float32, Bool
 import time
+from std_msgs.msg import Bool, Float32
 
 pid_is_enabled = False
 kp = -1.0
