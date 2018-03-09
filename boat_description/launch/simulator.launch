@@ -24,7 +24,7 @@
   </group>
 
   <!-- Boat Navigation nodes -->
-  <include file="$(find boat_nav)/launch/nav.launch.xml" />
+  <include file="$(find boat_nav)/launch/nav.launch" />
 
   <!-- Boat Interface nodes -->
   <include file="$(find boat_interfaces)/launch/interfaces_base.launch" />
