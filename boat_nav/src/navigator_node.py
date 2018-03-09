@@ -86,14 +86,14 @@ def position_callback(position):
 			is_new_target = False
 			
 			# If the current heading is still acceptable, carry on
-			if target_heading <= wind_coming-layline+3 or target_heading >= wind_coming+layline-3 and not is_new_target:
-				best_heading = target_heading
+			#if target_heading <= wind_coming-layline+3 or target_heading >= wind_coming+layline-3 and not is_new_target:
+			#	best_heading = target_heading
+			#else:
+			# If the waypoint is to the right of the wind...
+			if best_heading > wind_coming:
+				best_heading = wind_coming + layline
 			else:
-				# If the waypoint is to the right of the wind...
-				if best_heading > wind_coming:
-					best_heading = wind_coming + layline
-				else:
-					best_heading = wind_coming - layline
+				best_heading = wind_coming - layline
 		
 		# If there isn't new wind data, DON'T update the heading
 		else:
@@ -119,6 +119,8 @@ def position_callback(position):
 				tacking_direction = -1
 			else:
 				tacking_direction = 1 
+
+			heading_pub.publish(target_heading)
 
 			goal = TackingGoal(direction = tacking_direction, boat_state = state)
 			client.send_goal(goal)

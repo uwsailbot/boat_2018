@@ -45,7 +45,7 @@ speed = 10
 pause = False
 clock = 0
 last_time = -1
-boat_speed = 4 # px/s
+boat_speed = 0 # px/s
 layline = rospy.get_param('/boat/layline')
 winch_min = rospy.get_param('/boat/winch_min')
 winch_max = rospy.get_param('/boat/winch_max')
@@ -600,9 +600,9 @@ def draw_sail(x, y, angle, min_base_size, max_base1_size, max_base2_size, height
 def calc_apparent_wind(true_wind, boat_speed, boat_heading):
 	# Use constant wind speed of 8 m/s
 	x = 8*math.cos(math.radians(true_wind))
-	x += boat_speed*math.cos(math.radians(boat_heading + 180))
+	#x += boat_speed*math.cos(math.radians(boat_heading + 180))
 	y = 8*math.sin(math.radians(true_wind))
-	y += boat_speed*math.sin(math.radians(boat_heading + 180))
+	#y += boat_speed*math.sin(math.radians(boat_heading + 180))
 	return (x, y)
 
 def calc_direction(v):
