@@ -186,7 +186,7 @@ include_directories(
    launch/simulator.launch
    # myfile2
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
-# )
+ )
 
 #############
 ## Testing ##
