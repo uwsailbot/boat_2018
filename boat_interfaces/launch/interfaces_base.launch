@@ -20,6 +20,6 @@
   
   <!--<include file="$(find boat_interfaces)/launch/rudder_pid.launch" /> -->
   <node pkg="boat_interfaces" type="pid.py"
-    name="pid" output="screen" ns="rudder_pid">
+    name="controller" output="screen" ns="rudder_pid">
   </node> 
 </launch>
