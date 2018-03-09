@@ -190,7 +190,7 @@ include_directories(
    launch/interfaces_base.launch
    # myfile2
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-# )
+ )
 
 #############
 ## Testing ##
