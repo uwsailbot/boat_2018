@@ -168,8 +168,9 @@ include_directories(
    src/tacking_action.py
    src/pid.py
    src/boat_state_controller_node.py
+   src/receiver_reader.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
+ 
 
 ## Mark executables and/or libraries for installation
 # install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node
@@ -188,8 +189,14 @@ include_directories(
 ## Mark other files for installation (e.g. launch and bag files, etc.)
  install(FILES
    launch/interfaces_base.launch
+   launch/interfaces_ps4.launch
    # myfile2
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+ )
+ install(FILES
+   config/parameters.yaml
+   # myfile2
+   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
  )
 
 #############
