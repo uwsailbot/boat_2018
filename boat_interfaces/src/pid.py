@@ -7,9 +7,11 @@ pid_is_enabled = False
 kp = -1.0
 kd = 0.0
 ki = 0.0
-output_pub = rospy.Publisher('rudder_pid/output', Float32, queue_size=10)
+output_pub = rospy.Publisher('output', Float32, queue_size=10)
 setpoint = 0
 pid_input = 0
+
+# TODO: Modify this to make the PID node generalizable and usable for multiple controllers
 max_range = (rospy.get_param('/boat/rudder_max') - rospy.get_param('/boat/rudder_min')) / 2.0
 
 
@@ -52,9 +54,9 @@ def enable_callback(is_enabled):
 def listener():
 	# Setup subscribers
 	rospy.init_node('pid_node')
-	rospy.Subscriber('rudder_pid/input', Float32, input_callback)
-	rospy.Subscriber('rudder_pid/setpoint', Float32, setpoint_callback)
-	rospy.Subscriber('rudder_pid/enable', Bool, enable_callback)
+	rospy.Subscriber('input', Float32, input_callback)
+	rospy.Subscriber('setpoint', Float32, setpoint_callback)
+	rospy.Subscriber('enable', Bool, enable_callback)
 	rospy.spin()
 
 
