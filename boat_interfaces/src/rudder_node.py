@@ -2,7 +2,6 @@
 import rospy
 from sensor_msgs.msg import Joy
 from std_msgs.msg import Float32
-from std_msgs.msg import Float64
 from std_msgs.msg import Bool
 from boat_msgs.msg import BoatState
 from boat_msgs.msg import GPS
@@ -24,9 +23,9 @@ rudder_min = rospy.get_param('boat/rudder_min')
 rudder_pos_pub = rospy.Publisher('rudder', Float32, queue_size=10)
 boat_state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
 
-pid_input_pub = rospy.Publisher('rudder_pid/input', Float64, queue_size=10)
+pid_input_pub = rospy.Publisher('rudder_pid/input', Float32, queue_size=10)
 pid_enable_pub = rospy.Publisher('rudder_pid/enable', Bool, queue_size=10)
-pid_setpoint_pub = rospy.Publisher('rudder_pid/setpoint', Float64, queue_size=10)
+pid_setpoint_pub = rospy.Publisher('rudder_pid/setpoint', Float32, queue_size=10)
 
 
 # If the boat state topic changes, update local boat state
@@ -65,7 +64,7 @@ def compass_callback(compass):
 	wind_heading = (ane_reading + compass.data) % 360
 	
 	cur_boat_heading = compass.data
-	heading_msg = Float64(conform_angle(cur_boat_heading))
+	heading_msg = Float32(conform_angle(cur_boat_heading))
 	pid_input_pub.publish(heading_msg)
 	# Don't loginfo here, this would be somewhat redundant as this callback just parses and republishes the same information
 
@@ -99,7 +98,7 @@ def target_heading_callback(target_heading):
 	# We have a new valid setpoint, therefore output it	
 	rospy.loginfo(rospy.get_caller_id() + " New rudder setpoint: %f", target_heading.data)
 
-	pid_setpoint = Float64(conform_angle(target_heading.data))
+	pid_setpoint = Float32(conform_angle(target_heading.data))
 	pid_setpoint_pub.publish(pid_setpoint)
 
 
@@ -147,7 +146,7 @@ def listener():
 	rospy.Subscriber('anemometer', Float32, anemometer_callback)
 	rospy.Subscriber('target_heading', Float32, target_heading_callback)
 	rospy.Subscriber('compass', Float32, compass_callback)
-	rospy.Subscriber('rudder_pid/output', Float64, pid_callback)
+	rospy.Subscriber('rudder_pid/output', Float32, pid_callback)
 	rospy.Subscriber('rudder_pid/enable', Bool, enable_callback)
 	rospy.spin()
 

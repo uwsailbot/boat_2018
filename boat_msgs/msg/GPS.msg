@@ -13,21 +13,21 @@ int16 status
 uint16 satellites_used # Number of satellites
 
 # Latitude (degrees). Positive is north of equator; negative is south.
-float64 latitude
+float32 latitude
 
 # Longitude (degrees). Positive is east of prime meridian, negative west.
-float64 longitude
+float32 longitude
 
 # Altitude (meters). Positive is above reference (e.g., sea level).
-float64 altitude
+float32 altitude
 
 # Direction (degrees from north)
-float64 track
+float32 track
 
 # Ground speed (knots). **1 knot ~= 0.51444m/s**
-float64 speed
+float32 speed
 
 ## Dilution of precision; Xdop<=0 means the value is unknown
 
 # Horizontal dilution of precision
-float64 hdop
+float32 hdop

@@ -2,7 +2,6 @@
 import rospy
 from sensor_msgs.msg import Joy
 from std_msgs.msg import Float32
-from std_msgs.msg import Float64
 from std_msgs.msg import Bool
 import time
 
@@ -10,7 +9,7 @@ pid_is_enabled = False
 kp = -1.0
 kd = 0.0
 ki = 0.0
-output_pub = rospy.Publisher('rudder_pid/output', Float64, queue_size=10)
+output_pub = rospy.Publisher('rudder_pid/output', Float32, queue_size=10)
 setpoint = 0
 pid_input = 0
 max_range = (rospy.get_param('/boat/rudder_max') - rospy.get_param('/boat/rudder_max')) / 2.0
@@ -34,7 +33,7 @@ def input_callback(pid):
 		# TODO: Add integral and derivative
 		integral = 0 
 		der = 0
-		output = Float64()
+		output = Float32()
 		output.data = integral + prop + der
 		if output.data > 60:
 			output.data = 60
@@ -55,8 +54,8 @@ def enable_callback(pid):
 def listener():
 	# Setup subscribers
 	rospy.init_node('pid_node')
-	rospy.Subscriber('rudder_pid/input', Float64, input_callback)
-	rospy.Subscriber('rudder_pid/setpoint', Float64, setpoint_callback)
+	rospy.Subscriber('rudder_pid/input', Float32, input_callback)
+	rospy.Subscriber('rudder_pid/setpoint', Float32, setpoint_callback)
 	rospy.Subscriber('rudder_pid/enable', Bool, enable_callback)
 	rospy.spin()
 
