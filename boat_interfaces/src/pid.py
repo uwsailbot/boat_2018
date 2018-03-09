@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from sensor_msgs.msg import Joy
-from std_msgs.msg import Float32
-from std_msgs.msg import Bool
+from std_msgs.msg import Float32, Bool
 import time
 
 pid_is_enabled = False
@@ -12,7 +10,7 @@ ki = 0.0
 output_pub = rospy.Publisher('rudder_pid/output', Float32, queue_size=10)
 setpoint = 0
 pid_input = 0
-max_range = (rospy.get_param('/boat/rudder_max') - rospy.get_param('/boat/rudder_max')) / 2.0
+max_range = (rospy.get_param('/boat/rudder_max') - rospy.get_param('/boat/rudder_min')) / 2.0
 
 
 # If the boat state topic changes, update local boat state
@@ -43,17 +41,17 @@ def input_callback(pid):
 	
 
 # If the wind heading topic changes, update local wind heading
-def setpoint_callback(pid):
+def setpoint_callback(setpt):
 	global setpoint
-	setpoint = pid.data
+	setpoint = setpt.data
 
-def enable_callback(pid):
+def enable_callback(is_enabled):
 	global pid_is_enabled
-	pid_is_enabled = pid.data
+	pid_is_enabled = is_enabled.data
 
 def listener():
 	# Setup subscribers
-	rospy.init_node('pid_node')
+	rospy.init_node('pid_node', anonymous=True)
 	rospy.Subscriber('rudder_pid/input', Float32, input_callback)
 	rospy.Subscriber('rudder_pid/setpoint', Float32, setpoint_callback)
 	rospy.Subscriber('rudder_pid/enable', Bool, enable_callback)
