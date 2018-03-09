@@ -40,8 +40,8 @@
 
 ################################################################################
 
-# Use ubuntu trusty (14.04) with sudo privileges.
-dist: xenial
+# Use ubuntu trusty (14.04) with sudo privileges. Xenial is not yet supported
+dist: trusty
 sudo: required
 language:
   - generic
@@ -61,6 +61,8 @@ env:
     # Set the python path manually to include /usr/-/python2.7/dist-packages
     # as this is where apt-get installs python packages.
     - PYTHONPATH=$PYTHONPATH:/usr/lib/python2.7/dist-packages:/usr/local/lib/python2.7/dist-packages
+notifications:
+  slack: uwsailbot:5Q2oPJ7OdRTvkEu8R7OH8fCV
 
 ################################################################################
 
