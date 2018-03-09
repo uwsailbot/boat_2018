@@ -9,7 +9,6 @@ env:
     - CI_SOURCE_PATH=$(pwd)
     - DEPEND_FILE=$CI_SOURCE_PATH/dependencies.sh
     - BEFORE_SCRIPT='if [[ -f $DEPEND_FILE ]] ; then . $DEPEND_FILE ; fi'
-    - AFTER_SCRIPT='git clone https://github.com/ros-drivers/phidgets_drivers.git'
     # Set the python path manually to include /usr/-/python2.7/dist-packages
     # as this is where apt-get installs python packages.
     - PYTHONPATH=$PYTHONPATH:/usr/lib/python2.7/dist-packages:/usr/local/lib/python2.7/dist-packages
