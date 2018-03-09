@@ -543,33 +543,38 @@ def draw_wind_arrow(x,y):
 def draw_boat():
 	x = pos.x + win_width/2.0
 	y = pos.y + win_height/2.0
-	img_size = cur_boat_img[1]
-	draw_image(cur_boat_img[0], (x, y), heading-90, img_size)
+	
+	#draw rudder
+	glPushMatrix()
+	glTranslatef(x, y, 0)
+	glRotatef(heading-90, 0, 0, 1)
+	draw_image(
+		cur_rudder_img[0], # texture id
+		(0, -cur_boat_img[1][1]/2+cur_rudder_img[1][1]*0.1), # local y coord of rudder, moves to end of boat 
+		rudder_pos-90, # rudder pos
+		cur_rudder_img[1]) # rudder visual size
+	glPopMatrix()
+	
+	#draw boat
+	draw_image(cur_boat_img[0], (x, y), heading-90, cur_boat_img[1])
+	
+	#draw sail
 	size_factor = float(winch_max - winch_pos)/(winch_max - winch_min)
 	draw_sail(x, y, heading-90, 2, 8, 30, 5, size_factor)
 
 # Draw the rudder diagram centered on (x, y)
 def draw_status_boat(x, y):
-	#draw boat
-	img_size = cur_boat_img[1]
-	scale = 60.0/img_size[1];
-	draw_image(cur_boat_img[0], (x, y+15), 0, (img_size[0]*scale, img_size[1]*scale))
-
-	glPushMatrix()
+	# draw boat
+	scale = 60.0/cur_boat_img[1][1]
+	draw_image(cur_boat_img[0], (x, y+15), 0, (cur_boat_img[1][0]*scale, cur_boat_img[1][1]*scale))
 	
-	glTranslatef(x, y, 0)	
-	
-	#draw rudder
-	glRotatef(rudder_pos-90, 0, 0, 1)
-	glColor3f(0.5,0.2,0.2)
-	glBegin(GL_POLYGON)
-	glVertex2f(-3,10)
-	glVertex2f(-3,-16)
-	glVertex2f(3,-16)
-	glVertex2f(3,10)
-	glEnd()
-	
-	glPopMatrix()
+	# draw rudder
+	rudder_scale = 26.0/cur_rudder_img[1][1]
+	draw_image(
+		cur_rudder_img[0],
+		(x, y-10),
+		rudder_pos-90,
+		(cur_rudder_img[1][0]*rudder_scale, cur_rudder_img[1][1]*rudder_scale))
 
 	size_factor = float(winch_max - winch_pos)/(winch_max - winch_min)
 	draw_sail(x, y+25, 0, 2, 16, 60, 10, size_factor)
@@ -759,6 +764,7 @@ def load_image(filepath, resolution):
 
 def load_image_resources():
 	global cur_boat_img
+	global cur_rudder_img
 	global compass_img
 	global compass_pointer_img
 	# Load all the images
@@ -766,16 +772,21 @@ def load_image_resources():
 	compass_pointer_img = load_image('../meshes/compass_pointer.png', (23,128))
 
 	codes.append("orig")
-	orig_id=load_image('../meshes/niceboat.png', (64,128))
-	boat_imgs.append((orig_id, (16,32)))
+	orig=load_image('../meshes/niceboat.png', (64,128))
+	boat_imgs.append((orig, (24,48)))
+	orig_rudder = load_image('../meshes/rudder.png', (32,64))
+	rudder_imgs.append((orig_rudder, (16,32)))
+		
 	codes.append("pirate")
 	pirate_id=load_image('../meshes/pirate_boat.png', (39,56))
 	boat_imgs.append((pirate_id, (36,48)))
+	
 	codes.append("mars")
 	SPACE_X = load_image('../meshes/falcon_heavy.png', (1040/24,5842/24))
-	boat_imgs.append((SPACE_X, (1040/48,5842/48)))
-		
+	boat_imgs.append((SPACE_X, (1040/48,5842/48)))	
+	
 	cur_boat_img = boat_imgs[0]
+	cur_rudder_img = rudder_imgs[0]
 
 def load_font(filepath, detail):
 	# load font with freetype
