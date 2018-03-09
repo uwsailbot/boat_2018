@@ -189,7 +189,7 @@ include_directories(
  install(FILES
    launch/interfaces_base.launch
    # myfile2
-   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
  )
 
 #############
