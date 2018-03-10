@@ -554,8 +554,16 @@ def draw_boat():
 	draw_image(cur_boat_img[0], (x, y), heading-90, cur_boat_img[1])
 	
 	#draw sail
-	size_factor = float(winch_max - winch_pos)/(winch_max - winch_min)
-	draw_sail(x, y, heading-90, 2, 8, 30, 5, size_factor)
+	sail_angle = 90 * float(winch_max - winch_pos)/(winch_max - winch_min)
+	glPushMatrix()
+	glTranslatef(x, y, 0)
+	glRotatef(heading-90, 0, 0, 1)
+	draw_image(
+		cur_sail_img[0],
+		(1, 5),
+		sail_angle,
+		(cur_sail_img[1]))
+	glPopMatrix()
 
 # Draw the rudder diagram centered on (x, y)
 def draw_status_boat(x, y):
@@ -570,31 +578,14 @@ def draw_status_boat(x, y):
 		(x, y-10),
 		rudder_pos-90,
 		(cur_rudder_img[1][0]*rudder_scale, cur_rudder_img[1][1]*rudder_scale))
-
-	size_factor = float(winch_max - winch_pos)/(winch_max - winch_min)
-	draw_sail(x, y+25, 0, 2, 16, 60, 10, size_factor)
-
-
-def draw_sail(x, y, angle, min_base_size, max_base1_size, max_base2_size, height, size_factor):
-	glPushMatrix()
-
-	glTranslatef(x, y, 0)
-	glRotatef(angle, 0, 0, 1)
 	
-	# extra_x, extra_y = polar_to_rect(10, angle)
-	# glTranslatef(-extra_x, extra_y, 0)
-
-	glColor3f(1.0, .2, .2)
-	
-	glBegin(GL_POLYGON)
-	glVertex2f(0.5*(max_base2_size - min_base_size)*size_factor + min_base_size, -float(height)/2) # bot right
-	glVertex2f(0.5*(max_base1_size - min_base_size)*size_factor + min_base_size, float(height)/2) # top right
-	glVertex2f(-0.5*(max_base1_size - min_base_size)*size_factor - min_base_size, float(height)/2) # top left
-	glVertex2f(-0.5*(max_base2_size - min_base_size)*size_factor - min_base_size, -float(height)/2) # bot left
-	glEnd()
-
-	glPopMatrix()
-
+	sail_scale = 42.0/cur_sail_img[1][1]
+	sail_angle = 90 * float(winch_max - winch_pos)/(winch_max - winch_min)
+	draw_image(
+		cur_sail_img[0],
+		(x+1, y+20),
+		sail_angle,
+		(cur_sail_img[1][0]*sail_scale, cur_sail_img[1][1]*sail_scale))
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Physics =*=*=*=*=*=*=*=*=*=*=*=*=
 def calc_apparent_wind(true_wind, boat_speed, boat_heading):
@@ -760,6 +751,7 @@ def load_image(filepath, resolution):
 def load_image_resources():
 	global cur_boat_img
 	global cur_rudder_img
+	global cur_sail_img
 	global compass_img
 	global compass_pointer_img
 	# Load all the images
@@ -771,7 +763,9 @@ def load_image_resources():
 	boat_imgs.append((orig, (24,48)))
 	orig_rudder = load_image('../meshes/rudder.png', (32,64))
 	rudder_imgs.append((orig_rudder, (16,32)))
-		
+	orig_sail = load_image('../meshes/sail.png', (32,64))
+	sail_imgs.append((orig_sail, (24,48)))
+	
 	codes.append("pirate")
 	pirate_id=load_image('../meshes/pirate_boat.png', (39,56))
 	boat_imgs.append((pirate_id, (36,48)))
@@ -782,6 +776,7 @@ def load_image_resources():
 	
 	cur_boat_img = boat_imgs[0]
 	cur_rudder_img = rudder_imgs[0]
+	cur_sail_img = sail_imgs[0]
 
 def load_font(filepath, detail):
 	# load font with freetype
