@@ -237,7 +237,7 @@ def ASCII_handler(key, mousex, mousey):
 			cur_boat_img = boat_imgs[codes.index(code)]
 			cur_rudder_img = rudder_imgs[codes.index(code)]
 			cur_sail_img = sail_imgs[codes.index(code)]
-			print sail_imgs[codes.index(code)]
+			#print sail_imgs[codes.index(code)]
 			valid = False
 			break
 		if code.startswith(cur_input):
@@ -558,6 +558,8 @@ def draw_boat():
 	
 	#draw sail
 	sail_angle = 90 * float(winch_max - winch_pos)/(winch_max - winch_min)
+	if ane_reading <= 180:
+		sail_angle = -sail_angle
 	glPushMatrix()
 	glTranslatef(x, y, 0)
 	glRotatef(heading-90, 0, 0, 1)
