@@ -661,6 +661,7 @@ def calc(_):
 	boom_vector = polar_to_rect(1, boom_heading)
 	boom_perp_vector = polar_to_rect(1, boom_heading + tack*90)
 	app_wind = calc_apparent_wind(wind_heading, boat_speed, heading)
+	heading_vector = polar_to_rect(1, heading)
 
 	# components of wind parallel and perpendicular to sail
 	wind_par = -proj(app_wind, boom_vector)
@@ -671,7 +672,6 @@ def calc(_):
 		acc = 0
 	else:
 		# Calculate drag component (major component when on run)		
-		heading_vector = polar_to_rect(1, heading)
 		a_perp = 0.05*wind_perp**2
 		acc = a_perp * proj(boom_perp_vector, heading_vector)	
 		
@@ -680,13 +680,18 @@ def calc(_):
 			a_par = 0.03*wind_par**2
 			acc += a_par * proj(boom_perp_vector, heading_vector)
 
+	# Wind drag on boat (prominent when in irons)
+	acc += 0.005*proj(app_wind, heading_vector)
+
 	# Water drag	
 	drag = 0.07*boat_speed*abs(boat_speed)
+	rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
+	drag += rudder_drag
 	
 	boat_speed += (acc - drag)*dt
 	
 	if(state.major != BoatState.MAJ_DISABLED):
-		heading -= (rudder_pos-90)*0.1
+		heading -= (rudder_pos-90)*0.015*boat_speed
 		heading %= 360
 		
 		# Update anemometer reading because of new heading and speed
