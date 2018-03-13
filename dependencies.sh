@@ -3,7 +3,4 @@
 # file must be added here,  to download from apt
 sudo apt-get install python-pip
 pip install freetype-py
-pip install -U platformio
-platformio update
-sudo apt-get install ros-kinetic-rosserial-arduino
-sudo apt-get install ros-kinetic-rosserial
+
