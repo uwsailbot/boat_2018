@@ -5,6 +5,12 @@ import sys
 from struct import *
 import time
 import serial
+import signal
+
+def signal_handler(siganl, frame):
+	sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
 
 #Requires a serial port to read from
 if len(sys.argv) == 1:
@@ -26,21 +32,21 @@ class parse_receiver:
 		# Sort input data into 8 channels
 		self.channel = [0]*16
 		self.channel[0]  = ((data[1]|data[2]<< 8) & 0x07FF)
-        self.channel[1]  = ((data[2]>>3|data[3]<<5) & 0x07FF)
-        self.channel[2]  = ((data[3]>>6|data[4]<<2|data[5]<<10) & 0x07FF)
-        self.channel[3]  = ((data[5]>>1|data[6]<<7) & 0x07FF)
-        self.channel[4]  = ((data[6]>>4|data[7]<<4) & 0x07FF)
-        self.channel[5]  = ((data[7]>>7|data[8]<<1|data[9]<<9) & 0x07FF)
-        self.channel[6]  = ((data[9]>>2|data[10]<<6) & 0x07FF)
-        self.channel[7]  = ((data[10]>>5|data[11]<<3) & 0x07FF) 
-        self.channel[8]  = ((data[12]|data[13]<< 8) & 0x07FF)
-        self.channel[9]  = ((data[13]>>3|data[14]<<5) & 0x07FF)
-        self.channel[10] = ((data[14]>>6|data[15]<<2|data[16]<<10) & 0x07FF)
-        self.channel[11] = ((data[16]>>1|data[17]<<7) & 0x07FF)
-        self.channel[12] = ((data[17]>>4|data[18]<<4) & 0x07FF)
-        self.channel[13] = ((data[18]>>7|data[19]<<1|data[20]<<9) & 0x07FF)
-        self.channel[14] = ((data[20]>>2|data[21]<<6) & 0x07FF)
-        self.channel[15] = ((data[21]>>5|data[22]<<3) & 0x07FF)
+		self.channel[1]  = ((data[2]>>3|data[3]<<5) & 0x07FF)
+		self.channel[2]  = ((data[3]>>6|data[4]<<2|data[5]<<10) & 0x07FF)
+		self.channel[3]  = ((data[5]>>1|data[6]<<7) & 0x07FF)
+		self.channel[4]  = ((data[6]>>4|data[7]<<4) & 0x07FF)
+		self.channel[5]  = ((data[7]>>7|data[8]<<1|data[9]<<9) & 0x07FF)
+		self.channel[6]  = ((data[9]>>2|data[10]<<6) & 0x07FF)
+		self.channel[7]  = ((data[10]>>5|data[11]<<3) & 0x07FF) 
+		self.channel[8]  = ((data[12]|data[13]<< 8) & 0x07FF)
+		self.channel[9]  = ((data[13]>>3|data[14]<<5) & 0x07FF)
+		self.channel[10] = ((data[14]>>6|data[15]<<2|data[16]<<10) & 0x07FF)
+		self.channel[11] = ((data[16]>>1|data[17]<<7) & 0x07FF)
+		self.channel[12] = ((data[17]>>4|data[18]<<4) & 0x07FF)
+		self.channel[13] = ((data[18]>>7|data[19]<<1|data[20]<<9) & 0x07FF)
+		self.channel[14] = ((data[20]>>2|data[21]<<6) & 0x07FF)
+		self.channel[15] = ((data[21]>>5|data[22]<<3) & 0x07FF)
 		
 		# each channel has 11 bits
 		
@@ -99,15 +105,16 @@ def start():
 		# Loop to check to make sure we have received a string of proper length with the right formatting
 		#changed parameters below for SBUS
 		
-		received_data.append(ser.read(1))
-		received_data.pop(0)
 
-		if received_data[0] == 0x0F and received_data[24] in endBytes:  
-			receiver = parse_receiver(received_data)
+		while not (received_data[0] == 0x0F and received_data[24] in endBytes): 
+			received_data.append(ser.read(1))
+			received_data.pop(0) 
 
 		# Once a proper packet has been received, parse it
 		# receiver.parse() parsing doesn't work fully right now
 		# Setup a JOY message with the parsed data and publish it
+
+		receiver = parse_receiver(received_data)
 		joy = Joy()
 		joy.header.stamp = rospy.get_rostime()
 		joy.right_stick_x = self.channels[1]
