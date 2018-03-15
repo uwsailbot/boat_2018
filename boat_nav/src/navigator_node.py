@@ -2,25 +2,33 @@
 import actionlib
 import math
 import rospy
-from boat_msgs.msg import BoatState, Point, TackingAction, TackingGoal
+from boat_msgs.msg import BoatState, GPS, MaxVMGAction, MaxVMGGoal, Point, TackingAction, TackingGoal
 from std_msgs.msg import Float32
 
 # Declare global variables needed for the node
 new_wind = False
+is_new_target = False
+
 ane_reading = 0
-wind_heading = 0 # Direction the wind is pointing
+apparent_wind_heading = 0 # Direction the wind is pointing
 state = BoatState()
 target = Point()
 target_heading = 0
 cur_boat_heading = 0
-rate = 0
-is_new_target = False
+last_speed = 0
+boat_speed = 0
+
+max_vmg = 0
+found_max_vmg = False
+wind_side = 0
+
 layline = rospy.get_param('/boat/layline')
 
 # Declare the publishers for the node
 heading_pub = rospy.Publisher('target_heading', Float32, queue_size=10)
 boat_state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
-client = actionlib.SimpleActionClient('tacking_action', TackingAction)
+max_vmg_client = actionlib.SimpleActionClient('max_vmg_action', MaxVMGAction)
+tacking_client = actionlib.SimpleActionClient('tacking_action', TackingAction)
 
 def boat_state_callback(new_state):
 	global state
@@ -30,8 +38,15 @@ def anemometer_callback(new_heading):
 	global ane_reading
 	ane_reading = new_heading.data
 
+
+def gps_callback(gps):
+	global last_speed
+	global boat_speed
+	last_speed = boat_speed
+	boat_speed = gps.speed * 0.514444
+
 def compass_callback(compass):
-	global wind_heading
+	global apparent_wind_heading
 	global new_wind
 	global cur_boat_heading
 	
@@ -40,9 +55,9 @@ def compass_callback(compass):
 
 	# Tolerance on a wind shift to be determined
 	# Only update wind heading if a significant shift is detected, because it will then replan our upwind path
-	if abs(new_wind_heading - wind_heading) > 0.1 :
+	if abs(new_wind_heading - apparent_wind_heading) > 0.1 :
 		new_wind = True
-		wind_heading = new_wind_heading
+		apparent_wind_heading = new_wind_heading
 
 def target_callback(new_target):
 	global target
@@ -51,31 +66,65 @@ def target_callback(new_target):
 		is_new_target = True
 		target = new_target
 
-def position_callback(position):
+def vmg(direct_heading):
+	return math.cos(cur_boat_heading - direct_heading) * boat_speed
+
+def awa_algotithm(cur_pos):
+	global found_max_vmg
+	global max_vmg
+	global target_heading
+	global new_wind
+	global is_new_target
+	global wind_side
+	
+	
+	# Calculate the direct heading to the next waypoint
+	direct_heading = math.atan2(target.y - cur_pos.y, target.x - cur_pos.x) * 180 / math.pi
+	direct_heading = (direct_heading + 360) % 360 # Get rid of negative angles
+	wind_coming = (apparent_wind_heading + 180) % 360 # Determine the direction the wind is coming from
+	
+	
+	if new_wind or is_new_target:
+		new_wind = False
+		is_new_target = False
+		found_max_vmg = False
+		max_vmg = 0
+		
+		#target_heading = cur_boat_heading
+		
+		# If the waypoint is to the right of the wind...
+		if direct_heading > cur_boat_heading:
+			wind_side = 1
+		else:
+			wind_side = -1
+		
+		goal = MaxVMGGoal(wind_side, target)
+		max_vmg_client.send_goal(goal)
+		
+		# Adjust time delay until the tack is considered failed, and we return to planning
+		if not max_vmg_client.wait_for_result(rospy.Duration(10)):
+			max_vmg_client.cancel_goal()
+			# TODO: Add other conditions upon tack failure
+	
+	
+	rate = rospy.Rate(100)
+	rate.sleep()
+	
+
+def taras_algorithm(cur_pos):
 	global state
-	global wind_heading
+	global apparent_wind_heading
 	global new_wind
 	global target
 	global is_new_target
 	global target_heading
-	global rate
-	global boat_state_pub
-	global heading_pub
-	global client
-
 	buoy_tolerance = 5
-	
-	rate = rospy.Rate(100)
-	
-	# If the boat isn't in the autonomous planning state, exit
-	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
-		return
 	
 	# Calculate the direct heading to the next waypoint
 	# This should never be undefined, as the atan2(0,0) case would already be caught by the proximity check above
-	best_heading = math.atan2(target.y - position.y, target.x - position.x) * 180 / math.pi
+	best_heading = math.atan2(target.y - cur_pos.y, target.x - cur_pos.x) * 180 / math.pi
 	best_heading = (best_heading + 360) % 360 # Get rid of negative angles
-	wind_coming = (wind_heading + 180) % 360 # Determine the direction the wind is coming from
+	wind_coming = (apparent_wind_heading + 180) % 360 # Determine the direction the wind is coming from
 	
 	# If the direct path isn't possible...
 	if best_heading > wind_coming-layline and best_heading < wind_coming+layline:
@@ -110,7 +159,7 @@ def position_callback(position):
 		else:
 			boat_dir = -1 
 		
-		wind_coming = (wind_heading + 180) % 360 # Which direction the wind is coming from
+		wind_coming = (apparent_wind_heading + 180) % 360 # Which direction the wind is coming from
 	
 		if (boat_dir is 1 and not is_within_bounds(wind_coming, cur_boat_heading, target_heading)) or\
 			(boat_dir is -1 and is_within_bounds(wind_coming, cur_boat_heading, target_heading)):
@@ -119,15 +168,15 @@ def position_callback(position):
 				tacking_direction = -1
 			else:
 				tacking_direction = 1 
-
+			
 			heading_pub.publish(target_heading)
-
+			
 			goal = TackingGoal(direction = tacking_direction, boat_state = state)
-			client.send_goal(goal)
-
+			tacking_client.send_goal(goal)
+			
 			# Adjust time delay until the tack is considered failed, and we return to planning
-			if not client.wait_for_result(rospy.Duration(10)):
-				client.cancel_goal()
+			if not tacking_client.wait_for_result(rospy.Duration(10)):
+				tacking_client.cancel_goal()
 				# TODO: Add other conditions upon tack failure
 			
 			rospy.loginfo(rospy.get_caller_id() + " Boat State = 'Autonomous - Planning'")
@@ -135,7 +184,17 @@ def position_callback(position):
 			# Publish new heading for the rudder 
 			heading_pub.publish(target_heading)
 			rospy.loginfo(rospy.get_caller_id() + " New target heading: %f", target_heading)
-		
+
+
+def position_callback(position):
+	rate = rospy.Rate(100)
+	
+	# If the boat isn't in the autonomous planning state, exit
+	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
+		return
+	
+	awa_algotithm(position)
+	
 	# Adjust the sleep to suit the node
 	rate.sleep()
 
@@ -156,13 +215,15 @@ def is_within_bounds(val, boundA, boundB):
 def listener():
 	rospy.init_node('navigator')
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
+	rospy.Subscriber('gps_raw', GPS, gps_callback)
 	rospy.Subscriber('anemometer', Float32, anemometer_callback)
 	rospy.Subscriber('target_point', Point, target_callback)
 	rospy.Subscriber('compass', Float32, compass_callback)
 	
 	# If the filters work, change lps to use /odometry/filtered
 	rospy.Subscriber('lps', Point, position_callback)
-	client.wait_for_server()
+	max_vmg_client.wait_for_server()
+	tacking_client.wait_for_server()
 	rospy.spin()
 
 
