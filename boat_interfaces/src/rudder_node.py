@@ -72,7 +72,7 @@ def pid_callback(output):
 	
 	rudder_pos =  90.0 + output.data 
 	rudder_pos_pub.publish(Float32(rudder_pos))
-	rospy.loginfo(rospy.get_caller_id() + " Rudder PID output pos: %f", rudder_pos)
+	#rospy.loginfo(rospy.get_caller_id() + " Rudder PID output pos: %f", rudder_pos)
 
 
 # If the target boat heading topic changes, update rudder PID setpoint
@@ -93,7 +93,7 @@ def target_heading_callback(target_heading):
 		rospy.loginfo(rospy.get_caller_id() + " Enabling rudder PID")
 	
 	# We have a new valid setpoint, therefore output it	
-	rospy.loginfo(rospy.get_caller_id() + " New rudder setpoint: %f", target_heading.data)
+	#rospy.loginfo(rospy.get_caller_id() + " New rudder setpoint: %f", target_heading.data)
 
 	pid_setpoint = Float32(conform_angle(target_heading.data))
 	pid_setpoint_pub.publish(pid_setpoint)

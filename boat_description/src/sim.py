@@ -83,7 +83,7 @@ def update_gps():
 	gps.latitude = coords.pt.y
 	gps.longitude = coords.pt.x
 	gps.track = (450-heading)%360
-	gps.speed = boat_speed
+	gps.speed = boat_speed * 1.94384 # m/s to KNOTS
 	gps_pub.publish(gps)
 	
 	orientation = quaternion_from_euler(0,0,math.radians(heading))
