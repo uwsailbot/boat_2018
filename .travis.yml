@@ -3,20 +3,12 @@
 dist: trusty
 sudo: required
 language: generic
-cache:
-    directories:
-      - "~/.platformio"
+
 env:
   global:
     - CI_SOURCE_PATH=$(pwd)
-    - PLATFORMIO_CI_SRC=boat_interfaces/arduino/PS4_Controller/PS4_Controller.ino
-    - PLATFORMIO_CI_SRC=boat_interfaces/arduino/boat_control/boat_control.ino
-    - PLATFORMIO_CI_SRC=boat_interfaces/arduino/boat_control/anemometer_lookup_table.ino
-    - PLATFORMIO_CI_SRC=boat_interfaces/arduino/boat_control/anemometer_filter.ino     
     - DEPEND_FILE=$CI_SOURCE_PATH/dependencies.sh
-    - POST_FILE =$CI_SOURCE_PATH/post.sh
     - BEFORE_SCRIPT='if [[ -f $DEPEND_FILE ]] ; then . $DEPEND_FILE ; fi'
-    - AFTER_SCRIPT='if [[ -f $POST_FILE ]] ; then . $POST_FILE ; fi'
     # Set the python path manually to include /usr/-/python2.7/dist-packages
     # as this is where apt-get installs python packages.
     - PYTHONPATH=$PYTHONPATH:/usr/lib/python2.7/dist-packages:/usr/local/lib/python2.7/dist-packages

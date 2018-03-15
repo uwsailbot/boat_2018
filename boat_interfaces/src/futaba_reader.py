@@ -5,6 +5,12 @@ import sys
 from struct import *
 import time
 import serial
+import signal
+
+def signal_handler(siganl, frame):
+	sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
 
 #Requires a serial port to read from
 if len(sys.argv) == 1:
@@ -99,15 +105,16 @@ def start():
 		# Loop to check to make sure we have received a string of proper length with the right formatting
 		#changed parameters below for SBUS
 		
-		received_data.append(ser.read(1))
-		received_data.pop(0)
 
-		if received_data[0] == 0x0F and received_data[24] in endBytes:  
-			receiver = parse_receiver(received_data)
+		while not (received_data[0] == 0x0F and received_data[24] in endBytes): 
+			received_data.append(ser.read(1))
+			received_data.pop(0) 
 
 		# Once a proper packet has been received, parse it
 		# receiver.parse() parsing doesn't work fully right now
 		# Setup a JOY message with the parsed data and publish it
+
+		receiver = parse_receiver(received_data)
 		joy = Joy()
 		joy.header.stamp = rospy.get_rostime()
 		joy.right_stick_x = self.channels[1]
