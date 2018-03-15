@@ -43,7 +43,7 @@ def gps_callback(gps):
 	global last_speed
 	global boat_speed
 	last_speed = boat_speed
-	boat_speed = gps.speed * 0.514444
+	boat_speed = gps.speed * 0.514444 # Knots to m/s
 
 def compass_callback(compass):
 	global apparent_wind_heading
@@ -69,7 +69,7 @@ def target_callback(new_target):
 def vmg(direct_heading):
 	return math.cos(cur_boat_heading - direct_heading) * boat_speed
 
-def awa_algotithm(cur_pos):
+def awa_algorithm(cur_pos):
 	global found_max_vmg
 	global max_vmg
 	global target_heading
@@ -82,7 +82,8 @@ def awa_algotithm(cur_pos):
 	direct_heading = math.atan2(target.y - cur_pos.y, target.x - cur_pos.x) * 180 / math.pi
 	direct_heading = (direct_heading + 360) % 360 # Get rid of negative angles
 	wind_coming = (apparent_wind_heading + 180) % 360 # Determine the direction the wind is coming from
-	
+	p = 100 # Beating parameter, width of course in m
+	n = 1 + p/dist_to_target() # Tacking weight
 	
 	if new_wind or is_new_target:
 		new_wind = False
@@ -90,26 +91,90 @@ def awa_algotithm(cur_pos):
 		found_max_vmg = False
 		max_vmg = 0
 		
-		#target_heading = cur_boat_heading
+		cur_vmg = cur_vmg(direct_heading, wind_coming) # Calculate vmg on target path 
+		max_vmg, vmg_heading = theoretic_max_vmg(direct_heading, wind_coming) # Calculate max vmg 
 		
-		# If the waypoint is to the right of the wind...
-		if direct_heading > cur_boat_heading:
-			wind_side = 1
-		else:
-			wind_side = -1
-		
-		goal = MaxVMGGoal(wind_side, target)
-		max_vmg_client.send_goal(goal)
-		
-		# Adjust time delay until the tack is considered failed, and we return to planning
-		if not max_vmg_client.wait_for_result(rospy.Duration(10)):
-			max_vmg_client.cancel_goal()
-			# TODO: Add other conditions upon tack failure
+		if max_vmg > cur_vmg:
+			# If the our headings are more that 180 degrees apart, reverse travel direction
+			if (abs(vmg_heading - target_heading)) > 180:
+				boat_dir = 1 
+			else:
+				boat_dir = -1 
+
+			# Is tack required to get to vmg_heading
+			if (boat_dir is 1 and not is_within_bounds(wind_coming, vmg_heading, target_heading)) or\
+				(boat_dir is -1 and is_within_bounds(wind_coming, vmg_heading, target_heading)):
+				# If this loop is entered, then getting to vmg_heading requires a tack
+				# Now we need to calculate if the tack is worth it
+				if max_vmg > cur_vmg * n:
+					# Worth the tack, therefore determine the tacking direction and exectute the action
+					target_heading = vmg_heading
+					if is_within_bounds(target_heading, 90, 270):
+						tacking_direction = -1
+					else:
+						tacking_direction = 1 
+			
+					heading_pub.publish(target_heading)
+			
+					goal = TackingGoal(direction = tacking_direction, boat_state = state)
+					tacking_client.send_goal(goal)
+			
+					# Adjust time delay until the tack is considered failed, and we return to planning
+					if not tacking_client.wait_for_result(rospy.Duration(10)):
+						tacking_client.cancel_goal()
+						# TODO: Add other conditions upon tack failure
+				
+					rospy.loginfo(rospy.get_caller_id() + " Boat State = 'Autonomous - Planning'")
+			# Tack is not required to get to vmg_heading, therefore set it
+			else: 
+				target_heading = vmg_heading
+				heading_pub.publish(target_heading)
+
+#		else:
+#			# If the waypoint is to the right of the wind...
+#			if direct_heading > cur_boat_heading:
+#				wind_side = 1
+#			else:
+#				wind_side = -1
+#			
+# UNCOMMENT IF WE WANT TO FIND REAL VMG
+#			goal = MaxVMGGoal(wind_side, target)
+#			max_vmg_client.send_goal(goal)
+#		
+#			# Adjust time delay until the tack is considered failed, and we return to planning
+#			if not max_vmg_client.wait_for_result(rospy.Duration(10)):
+#				max_vmg_client.cancel_goal()
+#				# TODO: Add other conditions upon tack failure
 	
 	
 	rate = rospy.Rate(100)
 	rate.sleep()
 	
+# TODO: Make a service and make more general for object avoidance
+def theoretic_max_vmg(direct_heading, wind_coming):
+	
+	if direct_heading > wind_coming-layline and direct_heading < wind_coming+layline:
+		theoretic_boat_speed = 0
+		if direct_heading >= wind_coming:
+			vmg_heading = wind_coming + layline 
+			theoretic_boat_speed = 2.5 * 0.54444
+		else :
+			vmg_heading = wind_coming - layline
+			theoretic_boat_speed = 2.5 * 0.54444
+	else:
+		theoretic_boat_speed = 2.5 * 0.54444 # 2.5 Knots to m/s (measured boat speed)
+		vmg_heading = direct_heading
+
+	max_vmg = theoretic_boat_speed * math.cosd(vmg_heading - direct_heading)
+	return max_vmg, vmg_heading
+
+def cur_vmg(direct_heading, wind_coming):
+	if target_heading > wind_coming-layline and target_heading < wind_coming+layline:
+		theoretic_boat_speed = 0
+	else:
+		theoretic_boat_speed = 2.5 * 0.54444 # 2.5 Knots to m/s (measured boat speed)
+	
+	max_vmg = theoretic_boat_speed * math.cosd(target_heading - direct_heading)
 
 def taras_algorithm(cur_pos):
 	global state
@@ -193,11 +258,12 @@ def position_callback(position):
 	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
 		return
 	
-	awa_algotithm(position)
+	awa_algorithm(position)
 	
 	# Adjust the sleep to suit the node
 	rate.sleep()
-
+def dist_to_target():
+	return math.sqrt(math.pow((target.y - cur_pos.y), 2) +  math.pow((target.x - cur_pos.x), 2))
 
 # Determine if the dist between two points is within the specified tolerance
 def is_within_dist(p1, p2, dist):
