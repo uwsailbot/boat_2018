@@ -5,22 +5,38 @@ import rospy
 from boat_msgs.msg import BoatState, GPS, MaxVMGAction, MaxVMGGoal, Point, TackingAction, TackingGoal
 from std_msgs.msg import Float32
 
-# Declare global variables needed for the node
+## Trigger for when the wind shifts significantly
 new_wind = False
+
+## Trigger for when we are navigating towards a brand new target
 is_new_target = False
 
+## The relative apparent wind heading, in degrees CCW from East
 ane_reading = 0
-apparent_wind_heading = 0 # Direction the wind is pointing
+
+## The true apparent wind heading, in degrees CCW from East
+apparent_wind_heading = 0
+
+## The current `boat_msgs.msg.BoatState`
 state = BoatState()
+
+## The `boat_msgs.msg.Point` describing the location to navigate to
 target = Point()
+
+## The angle to the target point, in degrees CCW from East
 target_heading = 0
+
+## The current boat heading, in degrees CCW from East
 cur_boat_heading = 0
-last_speed = 0
+
+## The boat's speed, in m/s
 boat_speed = 0
 
+## The maximum VMG found, in m/s
 max_vmg = 0
+
+## Whether or not the max VMG has been found
 found_max_vmg = False
-wind_side = 0
 
 layline = rospy.get_param('/boat/layline')
 
@@ -58,9 +74,7 @@ def anemometer_callback(new_heading):
 #	@param gps The `boat_msgs.msg.GPS` message containing the current boat speed
 #	
 def gps_callback(gps):
-	global last_speed
 	global boat_speed
-	last_speed = boat_speed
 	boat_speed = gps.speed * 0.514444 # Knots to m/s
 
 
@@ -206,7 +220,6 @@ def awa_algorithm(cur_pos):
 	global target_heading
 	global new_wind
 	global is_new_target
-	global wind_side
 	
 	
 	# Calculate the direct heading to the next waypoint
@@ -231,7 +244,7 @@ def awa_algorithm(cur_pos):
 				boat_dir = 1 
 			else:
 				boat_dir = -1 
-
+			
 			# Is tack required to get to vmg_heading
 			if (boat_dir is 1 and not is_within_bounds(wind_coming, vmg_heading, target_heading)) or\
 				(boat_dir is -1 and is_within_bounds(wind_coming, vmg_heading, target_heading)):
@@ -245,17 +258,17 @@ def awa_algorithm(cur_pos):
 						tacking_direction = -1
 					else:
 						tacking_direction = 1 
-			
+					
 					heading_pub.publish(target_heading)
-			
+					
 					goal = TackingGoal(direction = tacking_direction, boat_state = state)
 					tacking_client.send_goal(goal)
-			
+					
 					# Adjust time delay until the tack is considered failed, and we return to planning
 					if not tacking_client.wait_for_result(rospy.Duration(10)):
 						tacking_client.cancel_goal()
 						# TODO: Add other conditions upon tack failure
-				
+					
 					rospy.loginfo(rospy.get_caller_id() + " Boat State = 'Autonomous - Planning'")
 			# Tack is not required to get to vmg_heading, therefore set it
 			else: 
@@ -322,7 +335,7 @@ def taras_algorithm(cur_pos):
 	# If the target heading has updated, decide if we need to tack, then publish the new heading
 	if best_heading is not target_heading:
 		target_heading = best_heading
-
+		
 		# If the our headings are more that 180 degrees apart, reverse travel direction
 		if (abs(target_heading - cur_boat_heading)) > 180:
 			boat_dir = 1 
@@ -330,7 +343,7 @@ def taras_algorithm(cur_pos):
 			boat_dir = -1 
 		
 		wind_coming = (apparent_wind_heading + 180) % 360 # Which direction the wind is coming from
-	
+		
 		if (boat_dir is 1 and not is_within_bounds(wind_coming, cur_boat_heading, target_heading)) or\
 			(boat_dir is -1 and is_within_bounds(wind_coming, cur_boat_heading, target_heading)):
 			# Determine which direction to tack based on the side that our goal is on
@@ -358,7 +371,11 @@ def taras_algorithm(cur_pos):
 	rospy.Rate(100).sleep()
 
 
-# Initialize the node
+##	Initialize the node
+#	
+#	Sets up all of the subscribers, initializes the node, and blocks until
+#	the max_vmg_client and tacking_client action servers are ready
+#	
 def init():
 	rospy.init_node('navigator')
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
