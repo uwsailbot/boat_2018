@@ -3,11 +3,11 @@
   <!-- Boat Interface nodes -->
   <rosparam file ="$(find boat_interfaces)/config/parameters.yaml" command="load" />
   <node pkg="boat_interfaces" type="boat_state_controller_node.py"
-    name="boat_state_controller" output="screen">
+    name="boat_state_controller">
   </node>
 
   <node pkg="boat_interfaces" type="rudder_node.py"
-    name="rudder" output="screen">
+    name="rudder">
   </node> 
 
   <node pkg="boat_interfaces" type="winch_node.py"
@@ -18,8 +18,7 @@
     name="tacking_action" output="screen">
   </node>
   
-  <!--<include file="$(find boat_interfaces)/launch/rudder_pid.launch" /> -->
   <node pkg="boat_interfaces" type="pid.py"
-    name="controller" output="screen" ns="rudder_pid">
+    name="controller" ns="rudder_pid">
   </node> 
 </launch>

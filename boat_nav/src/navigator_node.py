@@ -38,6 +38,10 @@ max_vmg = 0
 ## Whether or not the max VMG has been found
 found_max_vmg = False
 
+## Direct heading to next mark
+direct_heading = 0
+
+## The angle within which the boat cannot go (Irons)
 layline = rospy.get_param('/boat/layline')
 
 # Declare the publishers for the node
@@ -86,6 +90,7 @@ def compass_callback(compass):
 	global apparent_wind_heading
 	global new_wind
 	global cur_boat_heading
+	global target_heading
 	
 	cur_boat_heading = compass.data
 	new_wind_heading = (ane_reading + compass.data) % 360
@@ -95,6 +100,11 @@ def compass_callback(compass):
 	if abs(new_wind_heading - apparent_wind_heading) > 0.1 :
 		new_wind = True
 		apparent_wind_heading = new_wind_heading
+	
+	# If we are in RC, update our target heading to be the same direction as we are pointing, so the path planner 
+	# will work when we switch to auto
+	if state.major is not BoatState.MAJ_AUTONOMOUS:
+		target_heading = cur_boat_heading
 
 
 ##	Callback for setting the target point when the `/target_point` topic is updated.
@@ -143,7 +153,7 @@ def vmg(direct_heading):
 #	@param wind_coming The heading of the apparent wind, in degrees CCW from East
 #	@return The theoretical max velocity made good
 #	
-def theoretic_max_vmg(direct_heading, wind_coming):
+def theoretic_max_vmg(wind_coming):
 	
 	# TODO: Make a service and make more general for object avoidance
 	
@@ -169,20 +179,37 @@ def theoretic_max_vmg(direct_heading, wind_coming):
 #	@param wind_coming The heading of the apparent wind, in degrees CCW from East
 #	@return The velocity made good
 #	
-def calc_vmg(direct_heading, wind_coming):
+def calc_vmg(wind_coming):
+	global target_heading
+
 	if target_heading > wind_coming-layline and target_heading < wind_coming+layline:
-		theoretic_boat_speed = 0
+		rospy.loginfo(rospy.get_caller_id() +" Target lies within no go zone.")
+		#rospy.loginfo(rospy.get_caller_id() +" No go zone: %f -> %f", wind_coming-layline, wind_coming+layline)
+		
+		# If in no go zone, adjust the target heading to be out of it
+		if target_heading >= wind_coming:
+			target_heading = wind_coming + layline
+			heading_pub.publish(target_heading)
+		else:
+			target_heading = wind_coming - layline
+			heading_pub.publish(target_heading)
+				
+		theoretic_boat_speed = 2.5 * 0.54444
+		rospy.loginfo(rospy.get_caller_id() +" Adjusted target heading: %f", target_heading)		
 	else:
 		theoretic_boat_speed = 2.5 * 0.54444 # 2.5 Knots to m/s (measured boat speed)
 	
+	#rospy.loginfo(rospy.get_caller_id() +" Calculating Max vmg on current target heading.")
+	#rospy.loginfo(rospy.get_caller_id() +" Target heading: %f Direct heading: %f Wind coming: %f Boat Speed: %f", target_heading, direct_heading, wind_coming, theoretic_boat_speed)
 	return theoretic_boat_speed * math.cos(math.radians(target_heading - direct_heading))
 
 
 ##	Calculate the distance from the boat to the current target
 #	
+#	@param Boat's current position
 #	@return The distance, in meters
 #	
-def dist_to_target():
+def dist_to_target(cur_pos):
 	return math.sqrt(math.pow((target.y - cur_pos.y), 2) +  math.pow((target.x - cur_pos.x), 2))
 
 
@@ -220,39 +247,46 @@ def awa_algorithm(cur_pos):
 	global target_heading
 	global new_wind
 	global is_new_target
-	
+	global direct_heading
 	
 	# Calculate the direct heading to the next waypoint
+	old_direct_heading = direct_heading
 	direct_heading = math.atan2(target.y - cur_pos.y, target.x - cur_pos.x) * 180 / math.pi
 	direct_heading = (direct_heading + 360) % 360 # Get rid of negative angles
 	wind_coming = (apparent_wind_heading + 180) % 360 # Determine the direction the wind is coming from
-	p = 100 # Beating parameter, width of course in m
-	n = 1 + p/dist_to_target() # Tacking weight
+
+	# TODO: Don't think this parameter actually restricts it to exactly the width, it is more used for shape of rectangle rn
+	p = 200.0 # Beating parameter, width of course in m
+
+	# TODO: Make n a function of boat speed to negate the effects of apparent wind
+	app_wind_offset = 0.5 # Make tacking less favourable because we are measuring its favour relative to apparent not true wind
+	n = 1 + dist_to_target(cur_pos)*p/100.0 # Tacking weight, can add app_wind_offset here to make even less desirable
 	
-	if new_wind or is_new_target:
+	# Tolerance the headings and the wind possibly
+	if new_wind or is_new_target or direct_heading is not old_direct_heading:
 		new_wind = False
 		is_new_target = False
 		found_max_vmg = False
 		max_vmg = 0
 		
-		cur_vmg = calc_vmg(direct_heading, wind_coming) # Calculate vmg on target path 
-		max_vmg, vmg_heading = theoretic_max_vmg(direct_heading, wind_coming) # Calculate max vmg 
+		cur_vmg = calc_vmg(wind_coming) # Calculate vmg on target path 
+		max_vmg, vmg_heading = theoretic_max_vmg(wind_coming) # Calculate max vmg 
+		rospy.loginfo(rospy.get_caller_id() +" Cur VMG: %f Max VMG: %f with Heading: %f Direct Heading: %f", cur_vmg, max_vmg, vmg_heading, direct_heading)
 		
 		if max_vmg > cur_vmg:
 			# If the our headings are more that 180 degrees apart, reverse travel direction
 			if (abs(vmg_heading - target_heading)) > 180:
 				boat_dir = 1 
 			else:
-				boat_dir = -1 
+				boat_dir = -1
 			
 			# Is tack required to get to vmg_heading
 			if (boat_dir is 1 and not is_within_bounds(wind_coming, vmg_heading, target_heading)) or\
 				(boat_dir is -1 and is_within_bounds(wind_coming, vmg_heading, target_heading)):
-				
 				# If this loop is entered, then getting to vmg_heading requires a tack
 				# Now we need to calculate if the tack is worth it
 				if max_vmg > cur_vmg * n:
-					# Worth the tack, therefore determine the tacking direction and exectute the action
+					# Worth the tack, therefore determine the tacking direction and execute the action
 					target_heading = vmg_heading
 					if is_within_bounds(target_heading, 90, 270):
 						tacking_direction = -1
