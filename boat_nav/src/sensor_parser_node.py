@@ -18,8 +18,11 @@ compass_pub = rospy.Publisher('compass', Float32, queue_size=10)
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
-# Convert the current boat location from gps to lps
-# Convert GPS to NavSatFix msg for filtering
+## When new GPS data is received, convert and republish it
+#
+# Performs two conversions:
+# - Convert the current boat location from gps to lps, and
+# - Convert GPS to NavSatFix msg for filtering
 def gps_callback(gps):
 	global gps_pub
 	global lps_pub
