@@ -18,19 +18,34 @@ class TackingAction(object):
 		self.rudder_max = rospy.get_param('boat/rudder_max')
 		self.rudder_min = rospy.get_param('boat/rudder_min')
 		self.rudder_pos = 90.0
+		self.app_wind_shift = 0
+		self.target_heading = 0
+		self.init_anemometer = 0
+		self.init_heading = 0
+		self.cur_boat_heading = 0
+		self.ane_reading = 0
+		self.tacking = False
 		self.state = BoatState()
-		self._sub = rospy.Subscriber('anemometer', Float32, self.anemometer_callback)
+		self.sub_ane = rospy.Subscriber('anemometer', Float32, self.anemometer_callback)
+		self.sub_tar = rospy.Subscriber('target_heading', Float32, self.target_callback)
+		self.sub_heading = rospy.Subscriber('compass', Float32, self.compass_callback)
 		self.rudder_pos_pub = rospy.Publisher('rudder', Float32, queue_size=10)
 		self.state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
 		self.pid_enable_pub = rospy.Publisher('rudder_pid/enable', Bool, queue_size=10)
+		self.target_pub = rospy.Publisher('target_heading', Float32, queue_size=10)
 		self.rate = rospy.Rate(100)
 
 	def anemometer_callback(self, anemometer):
 		self.ane_reading = anemometer.data
-	  
+
+	def target_callback(self, target):
+		self.target_heading = target.data
+
+ 	def compass_callback(self, heading):
+		self.cur_boat_heading = heading.data
+	
 	def tacking_callback(self, goal):
 		# helper variables
-		
 		success = False
 		preempted = False
 		
@@ -41,14 +56,18 @@ class TackingAction(object):
 		self.state = goal.boat_state
 		self.state.minor = BoatState.MIN_TACKING
 		self.state_pub.publish(self.state)
-		
+				
 		# Make sure PID is disabled
 		self.pid_enable_pub.publish(Bool(False))
+		
+		self.init_target = self.target_heading
 		
 		while not success and not preempted:
 			# start executing the action
 			if goal.direction == 1:
 				if self.ane_reading < (180 + self.layline):
+					if self.cur_boat_heading < self.init_target:
+						self.target_pub.publish(Float32(self.cur_boat_heading))
 					if not self.rudder_pos == self.rudder_max:
 						self.rudder_pos = self.rudder_max
 						self.rudder_pos_pub.publish(Float32(self.rudder_pos))
@@ -64,6 +83,8 @@ class TackingAction(object):
 			
 			elif goal.direction == -1:
 				if self.ane_reading > (180 - self.layline):
+					if self.cur_boat_heading > self.init_target:
+						self.target_pub.publish(Float32(self.cur_boat_heading))
 					if not self.rudder_pos == self.rudder_min:
 						self.rudder_pos = self.rudder_min
 						self.rudder_pos_pub.publish(Float32(self.rudder_pos))
