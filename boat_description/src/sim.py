@@ -38,6 +38,11 @@ cur_sail_img = ()
 open_sans_font = ()
 cur_font = ()
 
+# Modes
+sim_mode = 0
+sim_mode_str =['default', 'replay everything', 'replay sensor data']
+
+
 # Simulation data and consts
 should_sim_joy = False
 sim_is_running = True
@@ -228,6 +233,7 @@ def ASCII_handler(key, mousex, mousey):
 	global cur_sail_img
 	global sound
 	global wind_heading
+	global sim_mode
 	
 	# Handle cheat codes
 	cur_input += key;
@@ -295,7 +301,12 @@ def ASCII_handler(key, mousex, mousey):
 		pos.x = 0
 		pos.y = 0
 		update_gps()
-
+	elif key is 'm':
+		if sim_mode is 2:
+			sim_mode = 0
+		else:
+			sim_mode += 1
+		print 'Changed sim mode, is now \'%s\'' % sim_mode_str[sim_mode] 
 
 # Main display rendering callback
 def redraw():
@@ -628,7 +639,7 @@ def calc_boom_heading(boat_heading, wind_heading, winch):
 	tack = calc_tack(boat_heading, wind_heading)
 	# Note close-hauled boom is not quite parallel with boat
 	return boat_heading - tack * ((winch_max - winch) * 75/winch_range + 15)
-	
+
 def pause_sim():
 	global pause
 	global speed
@@ -657,52 +668,55 @@ def calc(_):
 	dt = (time.time() - last_time) * speed
 	last_time = time.time()
 	clock += dt
-
-	tack = calc_tack(heading, wind_heading)
-	boom_heading = calc_boom_heading(heading, wind_heading, winch_pos)
-	boom_vector = polar_to_rect(1, boom_heading)
-	boom_perp_vector = polar_to_rect(1, boom_heading + tack*90)
-	app_wind = calc_apparent_wind(wind_heading, boat_speed, heading)
-	heading_vector = polar_to_rect(1, heading)
-
-	# components of wind parallel and perpendicular to sail
-	wind_par = -proj(app_wind, boom_vector)
-	wind_perp = proj(app_wind, boom_perp_vector)
-
-	if (wind_perp < 0):
-		# Sail is backwinded/luffing
-		acc = 0
-	else:
-		# Calculate drag component (major component when on run)		
-		a_perp = 0.05*wind_perp**2
-		acc = a_perp * proj(boom_perp_vector, heading_vector)	
-		
-		#Calculate lift (major component when on reach)
-		if wind_par > 0:
-			a_par = 0.03*wind_par**2
-			acc += a_par * proj(boom_perp_vector, heading_vector)
-
-	# Wind drag on boat (prominent when in irons)
-	acc += 0.005*proj(app_wind, heading_vector)
-
-	# Water drag	
-	drag = 0.07*boat_speed*abs(boat_speed)
-	rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
-	drag += rudder_drag
 	
-	boat_speed += (acc - drag)*dt
-	
-	if(state.major != BoatState.MAJ_DISABLED):
-		heading -= (rudder_pos-90)*0.015*boat_speed
-		heading %= 360
+	if(sim_mode == 0):
+		# Calculate other things
+		tack = calc_tack(heading, wind_heading)
+		boom_heading = calc_boom_heading(heading, wind_heading, winch_pos)
+		boom_vector = polar_to_rect(1, boom_heading)
+		boom_perp_vector = polar_to_rect(1, boom_heading + tack*90)
+		app_wind = calc_apparent_wind(wind_heading, boat_speed, heading)
+		heading_vector = polar_to_rect(1, heading)
+
+		# components of wind parallel and perpendicular to sail
+		wind_par = -proj(app_wind, boom_vector)
+		wind_perp = proj(app_wind, boom_perp_vector)
+
+		if (wind_perp < 0):
+			# Sail is backwinded/luffing
+			acc = 0
+		else:
+			# Calculate drag component (major component when on run)		
+			a_perp = 0.05*wind_perp**2
+			acc = a_perp * proj(boom_perp_vector, heading_vector)	
 		
-		# Update anemometer reading because of new heading and speed
-		update_wind()
-		
-	pos.x += math.cos(math.radians(heading)) * boat_speed * dt
-	pos.y += math.sin(math.radians(heading)) * boat_speed * dt
+			#Calculate lift (major component when on reach)
+			if wind_par > 0:
+				a_par = 0.03*wind_par**2
+				acc += a_par * proj(boom_perp_vector, heading_vector)
+
+		# Wind drag on boat (prominent when in irons)
+		acc += 0.005*proj(app_wind, heading_vector)
+
+		# Water drag	
+		drag = 0.07*boat_speed*abs(boat_speed)
+		rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
+		drag += rudder_drag
 	
-	update_gps()
+		boat_speed += (acc - drag)*dt
+	
+		if(state.major != BoatState.MAJ_DISABLED):
+			heading -= (rudder_pos-90)*0.015*boat_speed
+			heading %= 360
+		
+			# Update anemometer reading because of new heading and speed
+			update_wind()
+		
+		pos.x += math.cos(math.radians(heading)) * boat_speed * dt
+		pos.y += math.sin(math.radians(heading)) * boat_speed * dt
+	
+		update_gps()
+	
 	glutPostRedisplay()
 	
 	if sim_is_running:
