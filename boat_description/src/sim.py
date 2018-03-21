@@ -17,7 +17,6 @@ from PIL import Image
 from sys import argv
 
 # Cheat codes
-codes = []
 cur_input = ""
 sound = False
 
@@ -41,8 +40,7 @@ class Slider:
 		self.color=(0,0,0)
 		callback(float(cur_val))
 	
-	def draw(self, x=None, y=None, w=None, h=None):
-		
+	def resize(self, x=None, y=None, w=None, h=None):
 		if x is None:
 			x = self.x
 		if y is None:
@@ -52,45 +50,52 @@ class Slider:
 		if h is None:
 			h = self.h
 		
+		self.x = x
+		self.y = y
+		self.w = w
+		self.h = h
+	
+	def draw(self):
+		
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 		glEnable(GL_BLEND)
 		glPushMatrix()
-		glTranslatef(x, y, 0)
+		glTranslatef(self.x, self.y, 0)
 		
 		(r,g,b) = self.color
 		
 		glColor4f(r,g,b,0.4)
 		glBegin(GL_QUADS)
-		glVertex2f(0,h)
+		glVertex2f(0,self.h)
 		glVertex2f(0,0)
-		glVertex2f(w,0)
-		glVertex2f(w,h)
+		glVertex2f(self.w,0)
+		glVertex2f(self.w,self.h)
 		glEnd()
 		
-		handle_x = w * self.cur_val / (self.max_val - self.min_val)
+		handle_x = self.w * self.cur_val / (self.max_val - self.min_val)
 		glColor4f(r,g,b,0.2)
 		glBegin(GL_QUADS)
-		glVertex2f(handle_x-3,h)
+		glVertex2f(handle_x-3,self.h)
 		glVertex2f(handle_x-3,0)
 		glVertex2f(handle_x+3,0)
-		glVertex2f(handle_x+3,h)
+		glVertex2f(handle_x+3,self.h)
 		glEnd()
 		
 		glPopMatrix()
 		
 		draw_text(
 			str(self.cur_val),
-			x+0.5*w,
-			y+5,
+			self.x+0.5*self.w,
+			self.y+5,
 			'center',
-			h-5,
+			self.h-5,
 			2.0,
 			(r,g,b))
 		
 		glDisable(GL_BLEND)
 	
 	def set_color(self, r, g, b):
-		self.color=(r,g,b)		
+		self.color=(r,g,b)
 		
 	def change_val(self, new_val):
 		self.cur_val = new_val
@@ -108,14 +113,14 @@ class Slider:
 		self.change_val(self.max_val * local_x / self.w)
 
 cur_slider = ()
-sliders = []
+sliders = {}
 
 # Resources
 compass_img = ()
 compass_pointer_img = ()
-boat_imgs = []
-rudder_imgs = []
-sail_imgs = []
+boat_imgs = {}
+rudder_imgs = {}
+sail_imgs = {}
 cur_boat_img = ()
 cur_rudder_img = ()
 cur_sail_img = ()
@@ -278,10 +283,10 @@ def mouse_handler(button, state, x, y):
 		local_points = PointArray()
 		gps_points = PointArray()
 	else:
-		for slider in sliders:
-			if slider.contains(x,y):
-				slider.handle_mouse(x,y)
-				cur_slider = slider
+		for key in sliders:
+			if sliders[key].contains(x,y):
+				cur_slider = sliders[key]
+				cur_slider.handle_mouse(x,y)
 		if cur_slider is ():
 			newPt = Point()
 			newPt.x = x - win_width/2
@@ -335,12 +340,11 @@ def ASCII_handler(key, mousex, mousey):
 	# Handle cheat codes
 	cur_input += key;
 	valid = False
-	for code in codes:
+	for code in boat_imgs:
 		if code == cur_input:
-			cur_boat_img = boat_imgs[codes.index(code)]
-			cur_rudder_img = rudder_imgs[codes.index(code)]
-			cur_sail_img = sail_imgs[codes.index(code)]
-			#print sail_imgs[codes.index(code)]
+			cur_boat_img = boat_imgs[code]
+			cur_rudder_img = rudder_imgs[code]
+			cur_sail_img = sail_imgs[code]
 			valid = False
 			break
 		if code.startswith(cur_input):
@@ -601,7 +605,8 @@ def draw_status():
 	
 	# Draw wind speed text
 	draw_text("Wind speed ", win_width-60, win_height-125, 'center')
-	sliders[0].draw(win_width-100, win_height-160)
+	sliders["Wind speed"].resize(win_width-100, win_height-160)
+	sliders["Wind speed"].draw()
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
@@ -734,9 +739,9 @@ def draw_speed_graph(x, y, size):
 
 def calc_apparent_wind(true_wind, boat_speed, boat_heading):
 	# Use constant wind speed of 8 m/s
-	x = 8*math.cos(math.radians(true_wind))
+	x = wind_speed*math.cos(math.radians(true_wind))
 	x += boat_speed*math.cos(math.radians(boat_heading + 180))
-	y = 8*math.sin(math.radians(true_wind))
+	y = wind_speed*math.sin(math.radians(true_wind))
 	y += boat_speed*math.sin(math.radians(boat_heading + 180))
 	return (x, y)
 
@@ -922,33 +927,30 @@ def load_image_resources():
 	compass_img = load_image('../meshes/compass.png', (256,256))
 	compass_pointer_img = load_image('../meshes/compass_pointer.png', (23,128))
 	
-	codes.append("orig")
 	orig=load_image('../meshes/niceboat.png', (64,128))
-	boat_imgs.append((orig, (24,48)))
+	boat_imgs["orig"] = orig, (24,48)
 	orig_rudder = load_image('../meshes/rudder.png', (32,64))
-	rudder_imgs.append((orig_rudder, (16,32)))
+	rudder_imgs["orig"] = orig_rudder, (16,32)
 	orig_sail = load_image('../meshes/sail.png', (32,64))
-	sail_imgs.append((orig_sail, (24,48)))
+	sail_imgs["orig"] = orig_sail, (24,48)
 	
-	codes.append("pirate")
 	pirate_id=load_image('../meshes/pirate_boat.png', (39,56))
-	boat_imgs.append((pirate_id, (36,48)))
+	boat_imgs["pirate"] = pirate_id, (36,48)
 	# use orig rudder and sail	
-	rudder_imgs.append((orig_rudder, (16,32)))
-	sail_imgs.append((orig_sail, (24,48)))
+	rudder_imgs["pirate"] = orig_rudder, (16,32)
+	sail_imgs["pirate"] = orig_sail, (24,48)
 	
-	codes.append("mars")
-	SPACE_X = load_image('../meshes/falcon_heavy.png', (1040/24,5842/24))
-	boat_imgs.append((SPACE_X, (1040/48,5842/48)))	
-	# use orig rudder	
-	rudder_imgs.append((orig_rudder, (16,32)))
+	SPACE_X = load_image('../meshes/falcon_heavy.png', (1040,5842))
+	boat_imgs["mars"] = SPACE_X, (1040/48,5842/48)
+	# use orig rudder
+	rudder_imgs["mars"] = orig_rudder, (16,32)
 	roadster = load_image('../meshes/roadster.png', (128,256))
-	sail_imgs.append((roadster, (32,64)))
+	sail_imgs["mars"] = roadster, (32,64)
 	
 	# Load stanard/orig boat by default
-	cur_boat_img = boat_imgs[0]
-	cur_rudder_img = rudder_imgs[0]
-	cur_sail_img = sail_imgs[1]
+	cur_boat_img = boat_imgs["orig"]
+	cur_rudder_img = rudder_imgs["orig"]
+	cur_sail_img = sail_imgs["orig"]
 
 
 def load_font(filepath, detail):
@@ -1056,7 +1058,7 @@ def init_sliders():
 	global sliders
 	wind_speed_slider = Slider(win_width-100,win_height-160,80,25, wind_speed_slider_callback, 0, 15, 5)
 	wind_speed_slider.set_color(0,0,0)
-	sliders.append(wind_speed_slider)
+	sliders["Wind speed"] = wind_speed_slider
 
 
 def wind_speed_slider_callback(value):
