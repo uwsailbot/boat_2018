@@ -27,7 +27,6 @@ win_width = 720
 win_height = 480
 
 # UI objects and UI controls stuff
-left_mouse_down = False
 class Slider:
 	
 	def __init__(self,x,y,w,h,callback,min_val,max_val,cur_val):
@@ -45,9 +44,9 @@ class Slider:
 	def draw_self(self):
 		glPushMatrix()
 		glTranslatef(self.x, self.y, 0)
-	
+		
 		(r,g,b) = self.color
-
+		
 		glColor4f(r,g,b,0.4)
 		glBegin(GL_QUADS)
 		glVertex2f(0,self.h)
@@ -55,7 +54,7 @@ class Slider:
 		glVertex2f(self.w,0)
 		glVertex2f(self.w,self.h)
 		glEnd()
-
+		
 		handle_x = self.w * self.cur_val / (self.max_val - self.min_val)
 		glColor4f(r,g,b,0.2)
 		glBegin(GL_QUADS)
@@ -64,7 +63,7 @@ class Slider:
 		glVertex2f(handle_x+3,0)
 		glVertex2f(handle_x+3,self.h)
 		glEnd()
-
+		
 		glPopMatrix()
 		
 		draw_text(
@@ -83,14 +82,18 @@ class Slider:
 		self.cur_val = new_val
 		self.callback(new_val)
 	
-	def	handle_mouse_down(self, x, y):
+	def contains(self, x, y):
 		local_x = x-self.x
 		local_y = win_height-y-self.y
-		if local_x > 0 and local_x < self.w and local_y > 0 and local_y < self.h:
-			self.change_val(self.max_val * local_x / self.w)
-			return True
-		return False
+		return local_x > 0 and local_x < self.w and local_y > 0 and local_y < self.h
+	
+	def	handle_mouse(self, x, y):
+		local_x = x-self.x
+		local_x = min(local_x, self.w)
+		local_x = max(local_x, 0)
+		self.change_val(self.max_val * local_x / self.w)
 
+cur_slider = ()
 sliders = []
 
 # Resources
@@ -249,23 +252,21 @@ def mouse_handler(button, state, x, y):
 	global local_points
 	global gps_points
 	global sliders
-	global left_mouse_down
+	global cur_slider
 	
-	if button == GLUT_LEFT_BUTTON:
-		left_mouse_down = state == GLUT_DOWN
-
 	if state != GLUT_DOWN:
+		cur_slider = ()
 		return
 	
 	if button == GLUT_RIGHT_BUTTON:
 		local_points = PointArray()
 		gps_points = PointArray()
 	else:
-		sliders_changed = False
 		for slider in sliders:
-			if slider.handle_mouse_down(x,y):
-				sliders_changed = True
-		if not sliders_changed:
+			if slider.contains(x,y):
+				slider.handle_mouse(x,y)
+				cur_slider = slider
+		if cur_slider is ():
 			newPt = Point()
 			newPt.x = x - win_width/2
 			newPt.y = -y + win_height/2
@@ -277,8 +278,8 @@ def mouse_handler(button, state, x, y):
 def motion_handler(x,y):
 	global sliders
 	global left_mouse_down
-	for slider in sliders:
-		slider.handle_mouse_down(x,y)
+	if cur_slider is not ():
+		cur_slider.handle_mouse(x,y)
 
 # Handler for all key presses that cannot be represented by an ASCII code
 def keyboard_handler(key, mousex, mousey):
