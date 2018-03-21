@@ -562,13 +562,18 @@ def draw_target_heading_arrow():
 def draw_status():
 	glPushMatrix()
 	
+	pos_offset = win_height*0.6
+	state_offset = win_height*0.4
+	boat_offset = win_height*0.2
+	
+	
 	# Draw the box
 	glColor3f(1.0, 1.0, 1.0)
 	glBegin(GL_QUADS)
 	glVertex2f(win_width,win_height)
 	glVertex2f(win_width, 0)
-	glVertex2f(win_width-200,0)
-	glVertex2f(win_width-200,win_height)
+	glVertex2f(win_width-120,0)
+	glVertex2f(win_width-120,win_height)
 	glEnd()
 	
 	# Set font
@@ -580,14 +585,14 @@ def draw_status():
 	draw_wind_arrow(win_width-60,win_height-65)
 	
 	# Draw wind speed text
-	draw_text("Wind speed ", win_width-150, win_height-20, 'center')	
+	draw_text("Wind speed ", win_width-60, win_height-125, 'center')	
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
-	draw_text("X: %.1f" % pos.x, win_width-60, win_height*0.75, 'center')
-	draw_text("Y: %.1f" % pos.y, win_width-60, win_height*0.75-15, 'center')
-	draw_text("Spd: %.1f" % boat_speed, win_width-60, win_height*0.75-30, 'center')
-	draw_text("Head: %.1f" % heading, win_width-60, win_height*0.75-45, 'center')
+	draw_text("X: %.1f" % pos.x, win_width-60, pos_offset, 'center')
+	draw_text("Y: %.1f" % pos.y, win_width-60, pos_offset-15, 'center')
+	draw_text("Spd: %.1f" % boat_speed, win_width-60, pos_offset-30, 'center')
+	draw_text("Head: %.1f" % heading, win_width-60, pos_offset-45, 'center')
 	
 	# Draw the boat state
 	major = ""
@@ -605,16 +610,16 @@ def draw_status():
 		minor = "Planning"
 	elif state.minor is BoatState.MIN_TACKING:
 		minor = "Tacking"
-	draw_text("State", win_width-60, win_height*0.56, 'center', 24)
-	draw_text("M: " + major, win_width-60, win_height*0.56-15, 'center')
-	draw_text("m: " + minor, win_width-60, win_height*0.56-30, 'center')
-	
-	# Draw the rudder and winch pos
-	draw_text("Rudder: %.1f" % rudder_pos, win_width-60, win_height*0.40, 'center')
-	draw_text("Winch: %d" % winch_pos, win_width-60, win_height*0.40 - 15, 'center')
+	draw_text("State", win_width-60, state_offset, 'center', 24)
+	draw_text("M: " + major, win_width-60, state_offset-20, 'center')
+	draw_text("m: " + minor, win_width-60, state_offset-35, 'center')
 	
 	# Draw the boat diagram
-	draw_status_boat(win_width-60, win_height*0.2)
+	draw_status_boat(win_width-60, boat_offset)
+
+	# Draw the rudder and winch pos
+	draw_text("Winch: %d" % winch_pos, win_width-60, boat_offset-30, 'center')
+	draw_text("Rudder: %.1f" % rudder_pos, win_width-60, boat_offset-45, 'center')
 	
 	# Draw the simulation speed
 	draw_text("Spd: %.f%%" % (speed*100), win_width-60, 30, 'center')
@@ -992,7 +997,7 @@ def load_font_resources():
 
 def init_sliders():
 	global sliders
-	wind_speed_slider = Slider(win_width-190,win_height-50,80,25, wind_speed_slider_callback, 0, 15, 5)
+	wind_speed_slider = Slider(win_width-100,win_height-160,80,25, wind_speed_slider_callback, 0, 15, 5)
 	wind_speed_slider.set_color(0,0,0)
 	sliders.append(wind_speed_slider)
 
