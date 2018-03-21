@@ -134,6 +134,7 @@ layline = rospy.get_param('/boat/layline')
 winch_min = rospy.get_param('/boat/winch_min')
 winch_max = rospy.get_param('/boat/winch_max')
 wind_speed = 0
+speed_graph = {0 : 0}
 
 # ROS data
 wind_heading = 270
@@ -640,6 +641,8 @@ def draw_status():
 	draw_text("Spd: %.f%%" % (speed*100), win_width-60, 30, 'center')
 	draw_text("Time: %.1f" % clock + "s", win_width-60, 15, 'center')
 	
+	draw_speed_graph(75, 75, 100)
+	
 	glPopMatrix()
 
 
@@ -704,6 +707,27 @@ def draw_status_boat(x, y):
 		(x+1, y+20),
 		sail_angle,
 		(cur_sail_img[1][0]*sail_scale, cur_sail_img[1][1]*sail_scale))
+
+
+def draw_speed_graph(x, y, size):
+	glPushMatrix()
+	glTranslatef(x,y,0)
+	
+	glColor3f(1.0, 1.0, 1.0)
+	glBegin(GL_LINES)
+	glVertex2f(-size/2, 0)
+	glVertex2f(size/2, 0)
+	glVertex2f(0, -size/2)
+	glVertex2f(0, size/2)
+	glEnd()
+	
+	glColor3f(0.2, 0.2, 0.2)
+	for head, speed in speed_graph.items():
+		radius = speed/20 * size
+		ang = math.radians(head-90)
+		draw_circle(2, math.cos(ang)*radius, math.sin(ang)*radius)
+	
+	glPopMatrix()
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Physics =*=*=*=*=*=*=*=*=*=*=*=*=
@@ -812,13 +836,18 @@ def calc(_):
 	
 	boat_speed += (acc - drag)*dt
 	
+	#old_wind_head = ane_reading
+	
 	if(state.major != BoatState.MAJ_DISABLED):
 		heading -= (rudder_pos-90)*0.05*boat_speed
 		heading %= 360
 		
 		# Update anemometer reading because of new heading and speed
 		update_wind()
-		
+	
+	
+	speed_graph[int(ane_reading)%360] = boat_speed
+	
 	pos.x += math.cos(math.radians(heading)) * boat_speed * dt
 	pos.y += math.sin(math.radians(heading)) * boat_speed * dt
 	
