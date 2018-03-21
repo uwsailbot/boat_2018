@@ -23,8 +23,75 @@ sound = False
 
 # OpenGL data
 win_ID = 0
-win_width = 640
+win_width = 720
 win_height = 480
+
+# UI objects and UI controls stuff
+left_mouse_down = False
+class Slider:
+	
+	def __init__(self,x,y,w,h,callback,min_val,max_val,cur_val):
+		self.x=x
+		self.y=y
+		self.w=w
+		self.h=h
+		self.callback=callback
+		self.min_val=float(min_val)
+		self.max_val=float(max_val)
+		self.cur_val=float(cur_val)
+		self.color=(0,0,0)
+		callback(float(cur_val))
+	
+	def draw_self(self):
+		glPushMatrix()
+		glTranslatef(self.x, self.y, 0)
+	
+		(r,g,b) = self.color
+
+		glColor4f(r,g,b,0.4)
+		glBegin(GL_QUADS)
+		glVertex2f(0,self.h)
+		glVertex2f(0,0)
+		glVertex2f(self.w,0)
+		glVertex2f(self.w,self.h)
+		glEnd()
+
+		handle_x = self.w * self.cur_val / (self.max_val - self.min_val)
+		glColor4f(r,g,b,0.2)
+		glBegin(GL_QUADS)
+		glVertex2f(handle_x-3,self.h)
+		glVertex2f(handle_x-3,0)
+		glVertex2f(handle_x+3,0)
+		glVertex2f(handle_x+3,self.h)
+		glEnd()
+
+		glPopMatrix()
+		
+		draw_text(
+			str(self.cur_val),
+			self.x+0.5*self.w,
+			self.y+5,
+			'center',
+			self.h-5,
+			2.0,
+			(r,g,b))
+	
+	def set_color(self, r, g, b):
+		self.color=(r,g,b)		
+		
+	def change_val(self, new_val):
+		self.cur_val = new_val
+		self.callback(new_val)
+	
+	def	handle_mouse_down(self, x, y):
+		local_x = x-self.x
+		local_y = win_height-y-self.y
+		if local_x > 0 and local_x < self.w and local_y > 0 and local_y < self.h:
+			self.change_val(self.max_val * local_x / self.w)
+			return True
+		return False
+
+sliders = []
 
 # Resources
 compass_img = ()
@@ -54,6 +121,7 @@ boat_speed = 0 # px/s
 layline = rospy.get_param('/boat/layline')
 winch_min = rospy.get_param('/boat/winch_min')
 winch_max = rospy.get_param('/boat/winch_max')
+wind_speed = 0
 
 # ROS data
 wind_heading = 270
@@ -181,26 +249,41 @@ def resize(width, height):
 	glMatrixMode(GL_MODELVIEW)
 	glLoadIdentity()
 
-
 # Handler for mouse presses
 def mouse_handler(button, state, x, y):
 	global local_points
 	global gps_points
+	global sliders
+	global left_mouse_down
 	
+	if button == GLUT_LEFT_BUTTON:
+		left_mouse_down = state == GLUT_DOWN
+
 	if state != GLUT_DOWN:
 		return
-		
+	
 	if button == GLUT_RIGHT_BUTTON:
 		local_points = PointArray()
 		gps_points = PointArray()
 	else:
-		newPt = Point()
-		newPt.x = x - win_width/2
-		newPt.y = -y + win_height/2
-		coords = to_gps(newPt).pt
-		gps_points.points.append(coords)
+		sliders_changed = False
+		for slider in sliders:
+			if slider.handle_mouse_down(x,y):
+				sliders_changed = True
+		if not sliders_changed:
+			newPt = Point()
+			newPt.x = x - win_width/2
+			newPt.y = -y + win_height/2
+			coords = to_gps(newPt).pt
+			gps_points.points.append(coords)
 	waypoint_pub.publish(gps_points)
-
+	
+# Handler for mouse moving
+def motion_handler(x,y):
+	global sliders
+	global left_mouse_down
+	for slider in sliders:
+		slider.handle_mouse_down(x,y)
 
 # Handler for all key presses that cannot be represented by an ASCII code
 def keyboard_handler(key, mousex, mousey):
@@ -435,7 +518,12 @@ def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0)):
 	glDisable(GL_BLEND)
 
 	
-
+def draw_sliders():
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+	glEnable(GL_BLEND)
+	for slider in sliders:
+		slider.draw_self()
+	glDisable(GL_BLEND)
 
 # Draw all of the waypoint as red dots
 def draw_waypoints():
@@ -490,8 +578,8 @@ def draw_status():
 	glBegin(GL_QUADS)
 	glVertex2f(win_width,win_height)
 	glVertex2f(win_width, 0)
-	glVertex2f(win_width-120,0)
-	glVertex2f(win_width-120,win_height)
+	glVertex2f(win_width-200,0)
+	glVertex2f(win_width-200,win_height)
 	glEnd()
 	
 	# Set font
@@ -501,6 +589,9 @@ def draw_status():
 	glColor3f(0.0, 0.0, 0.0)
 	draw_text("Wind: " + str(wind_heading), win_width-60, win_height-20, 'center')
 	draw_wind_arrow(win_width-60,win_height-65)
+	
+	# Draw wind speed text
+	draw_text("Wind speed ", win_width-150, win_height-20, 'center')	
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
@@ -602,6 +693,8 @@ def draw_status_boat(x, y):
 		(x+1, y+20),
 		sail_angle,
 		(cur_sail_img[1][0]*sail_scale, cur_sail_img[1][1]*sail_scale))
+
+	draw_sliders()
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Physics =*=*=*=*=*=*=*=*=*=*=*=*=
 def calc_apparent_wind(true_wind, boat_speed, boat_heading):
@@ -911,6 +1004,16 @@ def load_font_resources():
 	open_sans_font = load_font('../meshes/OpenSans/OpenSans-Light.ttf', 2048)
 	cur_font = open_sans_font
 
+def init_sliders():
+	global sliders
+	wind_speed_slider = Slider(win_width-190,win_height-50,80,25, wind_speed_slider_callback, 0, 15, 5)
+	wind_speed_slider.set_color(0,0,0)
+	sliders.append(wind_speed_slider)
+
+def wind_speed_slider_callback(value):
+	global wind_speed
+	wind_speed = value
+
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
 	glViewport(0, 0, win_width, win_height)
@@ -929,12 +1032,15 @@ def init_GL():
 	glutDisplayFunc(redraw)
 	glutReshapeFunc(resize)
 	glutMouseFunc(mouse_handler)
+	glutMotionFunc(motion_handler)
 	glutKeyboardFunc(ASCII_handler)
 	glutSpecialFunc(keyboard_handler)
 	glutTimerFunc(1000/30, calc, 0)
 	
 	load_image_resources()
 	load_font_resources()
+	init_sliders()
+	
 	glutMainLoop()
 
 
@@ -956,6 +1062,7 @@ if __name__ == '__main__':
 	state.major = BoatState.MAJ_DISABLED
 	state.minor = BoatState.MIN_COMPLETE
 
+	
 	try:
 		listener()
 	except rospy.ROSInterruptException:
