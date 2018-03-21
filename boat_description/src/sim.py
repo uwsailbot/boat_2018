@@ -234,6 +234,22 @@ def target_heading_callback(angle):
 	target_heading = angle.data
 
 
+
+def lps_callback(lps):
+	global sim_mode	
+	global pos
+	
+	if sim_mode == 1:
+		pos = lps
+
+def compass_callback(compass):
+	global sim_mode
+	global heading
+	
+	if sim_mode == 1:
+		heading = compass.data
+	
+
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
 # Window resize callback
@@ -1052,6 +1068,10 @@ def listener():
 	rospy.Subscriber('winch', Int32, winch_callback)
 	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
 	rospy.Subscriber('target_heading', Float32, target_heading_callback)
+	
+	# subscribers for replay mode
+	rospy.Subscriber('lps', Point, lps_callback)
+	rospy.Subscriber('compass', Float32, compass_callback)
 
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
