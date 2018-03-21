@@ -710,9 +710,9 @@ def draw_status_boat(x, y):
 
 def calc_apparent_wind(true_wind, boat_speed, boat_heading):
 	# Use constant wind speed of 8 m/s
-	x = 8*math.cos(math.radians(true_wind))
+	x = wind_speed*math.cos(math.radians(true_wind))
 	x += boat_speed*math.cos(math.radians(boat_heading + 180))
-	y = 8*math.sin(math.radians(true_wind))
+	y = wind_speed*math.sin(math.radians(true_wind))
 	y += boat_speed*math.sin(math.radians(boat_heading + 180))
 	return (x, y)
 
