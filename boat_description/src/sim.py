@@ -190,7 +190,7 @@ def boat_state_callback(newState):
 	#	joy.buttons[2] = 1
 	#	joy.buttons[0] = 0
 	#joy_pub.publish(joy)
-
+	
 	state = newState
 	if state.major is not BoatState.MAJ_DISABLED and pause:
 		pause_sim()
@@ -216,7 +216,7 @@ def waypoints_callback(newPoints):
 	# Refresh GPS point list
 	gps_points = newPoints
 	temp_points = PointArray()
-
+	
 	if (len(local_points.points)-1) is len(newPoints.points) and sound and cur_boat_img is boat_imgs[2]:
 		pygame.mixer.music.play()
 	
@@ -273,13 +273,15 @@ def mouse_handler(button, state, x, y):
 			coords = to_gps(newPt).pt
 			gps_points.points.append(coords)
 	waypoint_pub.publish(gps_points)
-	
-# Handler for mouse moving
+
+
+# Handler for mouse dragging
 def motion_handler(x,y):
 	global sliders
 	global left_mouse_down
 	if cur_slider is not ():
 		cur_slider.handle_mouse(x,y)
+
 
 # Handler for all key presses that cannot be represented by an ASCII code
 def keyboard_handler(key, mousex, mousey):
@@ -300,7 +302,8 @@ def keyboard_handler(key, mousex, mousey):
 		joy_pub.publish(joy)
 		joy.axes[4] = 0
 		joy_pub.publish(joy)
-	
+
+
 # Handler for all key presses that can be represented by an ASCII code
 def ASCII_handler(key, mousex, mousey):
 	global speed
@@ -427,7 +430,8 @@ def draw_image(texture_id, position, angle, size, tint=(1.0,1.0,1.0)):
 	glPopMatrix()
 	glDisable(GL_TEXTURE_2D)
 	glDisable(GL_BLEND)
-	
+
+
 # Render a circle centered at (x,y) with radius r
 def draw_circle(r, x, y, quality=300):
 	glBegin(GL_POLYGON)
@@ -438,13 +442,14 @@ def draw_circle(r, x, y, quality=300):
 		glVertex2f(curx,cury)
 	glEnd()
 
+
 # Render the specified text with bottom left corner at (x,y)
 def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0)):
 	font_texture_id = cur_font[0]
 	font_map =  cur_font[1]
 	
 	scale = h/32.0
-
+	
 	glEnable(GL_TEXTURE_2D)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
@@ -490,30 +495,31 @@ def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0)):
 		glBegin(GL_QUADS)
 		glTexCoord2d(0, tex_y_start)
 		glVertex2f(x_offset, char_y_offset + char_height)
-
+		
 		glTexCoord2d(0, tex_y_end)
 		glVertex2f(x_offset, char_y_offset)
-
+		
 		glTexCoord2d(tex_x_end, tex_y_end)
 		glVertex2f(x_offset + char_width, char_y_offset)
-
+		
 		glTexCoord2d(tex_x_end, tex_y_start)
 		glVertex2f(x_offset + char_width, char_y_offset + char_height)
 		glEnd()
 		
 		x_offset += char_width + (spacing * scale)
-
+	
 	glPopMatrix()
 	glDisable(GL_TEXTURE_2D)
 	glDisable(GL_BLEND)
 
-	
+
 def draw_sliders():
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
 	for slider in sliders:
 		slider.draw_self()
 	glDisable(GL_BLEND)
+
 
 # Draw all of the waypoint as red dots
 def draw_waypoints():
@@ -523,7 +529,7 @@ def draw_waypoints():
 		glColor3f(1,1,1)
 		first_point = local_points.points[0]
 		draw_circle(7,first_point.x + win_width/2.0, first_point.y + win_height/2.0)
-
+	
 	glColor3f(1,0,0)
 	for p in local_points.points:
 		x = p.x + win_width/2.0
@@ -531,7 +537,7 @@ def draw_waypoints():
 		draw_circle(5,x,y)
 	
 	glPopMatrix()
-	
+
 
 # Draw boat's target heading as an arrow centered at (x, y) pointing in the target heading's dirction
 def draw_target_heading_arrow():
@@ -667,6 +673,7 @@ def draw_boat():
 		(cur_sail_img[1]))
 	glPopMatrix()
 
+
 # Draw the rudder diagram centered on (x, y)
 def draw_status_boat(x, y):
 	# draw boat
@@ -688,8 +695,9 @@ def draw_status_boat(x, y):
 		(x+1, y+20),
 		sail_angle,
 		(cur_sail_img[1][0]*sail_scale, cur_sail_img[1][1]*sail_scale))
-
+	
 	draw_sliders()
+
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Physics =*=*=*=*=*=*=*=*=*=*=*=*=
 def calc_apparent_wind(true_wind, boat_speed, boat_heading):
@@ -700,11 +708,13 @@ def calc_apparent_wind(true_wind, boat_speed, boat_heading):
 	y += boat_speed*math.sin(math.radians(boat_heading + 180))
 	return (x, y)
 
+
 def calc_direction(v):
 	angle = math.degrees(math.atan2(v[1], v[0]))
 	if angle < 0:
 		angle += 360
 	return angle
+
 
 # returns -1 for port, 1 for starboard
 def calc_tack(boat_heading, wind_heading): 
@@ -718,16 +728,18 @@ def calc_tack(boat_heading, wind_heading):
 		return 0
 	return diff/abs(diff)
 
+
 # returns heading of vector point from end of boom to mast
 def calc_boom_heading(boat_heading, wind_heading, winch):
 	global winch_min
 	global winch_max
 	winch_range = winch_max - winch_min
-
+	
 	tack = calc_tack(boat_heading, wind_heading)
 	# Note close-hauled boom is not quite parallel with boat
 	return boat_heading - tack * ((winch_max - winch) * 75/winch_range + 15)
-	
+
+
 def pause_sim():
 	global pause
 	global speed
@@ -737,6 +749,7 @@ def pause_sim():
 		speed = 0
 	else:
 		speed = 10
+
 
 def calc(_):
 	global pos
@@ -756,18 +769,18 @@ def calc(_):
 	dt = (time.time() - last_time) * speed
 	last_time = time.time()
 	clock += dt
-
+	
 	tack = calc_tack(heading, wind_heading)
 	boom_heading = calc_boom_heading(heading, wind_heading, winch_pos)
 	boom_vector = polar_to_rect(1, boom_heading)
 	boom_perp_vector = polar_to_rect(1, boom_heading + tack*90)
 	app_wind = calc_apparent_wind(wind_heading, boat_speed, heading)
 	heading_vector = polar_to_rect(1, heading)
-
+	
 	# components of wind parallel and perpendicular to sail
 	wind_par = -proj(app_wind, boom_vector)
 	wind_perp = proj(app_wind, boom_perp_vector)
-
+	
 	if (wind_perp < 0):
 		# Sail is backwinded/luffing
 		acc = 0
@@ -780,11 +793,11 @@ def calc(_):
 		if wind_par > 0:
 			a_par = 0.03*wind_par**2
 			acc += a_par * proj(boom_perp_vector, heading_vector)
-
+	
 	# Wind drag on boat (prominent when in irons)
 	acc += 0.005*proj(app_wind, heading_vector)
-
-	# Water drag	
+	
+	# Water drag
 	drag = 0.07*boat_speed*abs(boat_speed)
 	rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
 	drag += rudder_drag
@@ -810,15 +823,16 @@ def calc(_):
 		glutDestroyWindow(win_ID)
 		exit(0)
 
+
 # Returns magnitude of projection of u onto v
 def proj(u,v):
 	v_mag = math.sqrt(v[0]**2 + v[1]**2)
 	return (u[0]*v[0] + u[1]*v[1])/v_mag
 
+
 # Returns (x,y), given radius and angle in degrees
 def polar_to_rect(rad, ang):
 	return (rad * math.cos(math.radians(ang)), rad * math.sin(math.radians(ang)))
-
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
@@ -833,14 +847,15 @@ def rel_to_abs_filepath(filepath):
 		abs_filepath_arr = abs_filepath_arr[:-1]
 		abs_filepath =''.join(['/'+str(s) for s in abs_filepath_arr])[1:]
 	return abs_filepath + '/' + filepath
-	
+
+
 def load_image(filepath, resolution):
 	# loads and returns an image
 	abs_filepath = rel_to_abs_filepath(filepath)
 	im = Image.open(abs_filepath)
 	im = im.transpose(Image.FLIP_TOP_BOTTOM)
 	im = im.resize(resolution, Image.NEAREST)
-
+	
 	texture_id = glGenTextures(1)
 	glBindTexture(GL_TEXTURE_2D,texture_id)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -859,6 +874,7 @@ def load_image(filepath, resolution):
 	
 	return texture_id
 
+
 def load_image_resources():
 	global cur_boat_img
 	global cur_rudder_img
@@ -868,7 +884,7 @@ def load_image_resources():
 	# Load all the images
 	compass_img = load_image('../meshes/compass.png', (256,256))
 	compass_pointer_img = load_image('../meshes/compass_pointer.png', (23,128))
-
+	
 	codes.append("orig")
 	orig=load_image('../meshes/niceboat.png', (64,128))
 	boat_imgs.append((orig, (24,48)))
@@ -892,10 +908,11 @@ def load_image_resources():
 	roadster = load_image('../meshes/roadster.png', (128,256))
 	sail_imgs.append((roadster, (32,64)))
 	
-	
+	# Load stanard/orig boat by default
 	cur_boat_img = boat_imgs[0]
 	cur_rudder_img = rudder_imgs[0]
 	cur_sail_img = sail_imgs[1]
+
 
 def load_font(filepath, detail):
 	# load font with freetype
@@ -903,7 +920,7 @@ def load_font(filepath, detail):
 	face.set_char_size(detail)
 	
 	# we're going to load every character into one texture, placed in order vertically 
-
+	
 	# this is used to store data about location and size of each char in the texture
 	font_map = []
 	
@@ -990,11 +1007,13 @@ def load_font(filepath, detail):
 	
 	return (texture_id, font_map)	
 
+
 def load_font_resources():
 	global cur_font
 	global open_sans_font
 	open_sans_font = load_font('../meshes/OpenSans/OpenSans-Light.ttf', 2048)
 	cur_font = open_sans_font
+
 
 def init_sliders():
 	global sliders
@@ -1002,14 +1021,17 @@ def init_sliders():
 	wind_speed_slider.set_color(0,0,0)
 	sliders.append(wind_speed_slider)
 
+
 def wind_speed_slider_callback(value):
 	global wind_speed
 	wind_speed = value
+
 
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
 	glViewport(0, 0, win_width, win_height)
 	gluOrtho2D(0.0, win_width, 0.0, win_height)
+
 
 def init_GL():
 	global win_ID
@@ -1045,15 +1067,15 @@ def listener():
 	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
 	rospy.Subscriber('target_heading', Float32, target_heading_callback)
 
+
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
-
+	
 	pygame.mixer.init()
 	pygame.mixer.music.load(rel_to_abs_filepath("../meshes/lemme-smash.mp3"))
-
+	
 	state.major = BoatState.MAJ_DISABLED
 	state.minor = BoatState.MIN_COMPLETE
-
 	
 	try:
 		listener()
