@@ -41,8 +41,7 @@ class Slider:
 		self.color=(0,0,0)
 		callback(float(cur_val))
 	
-	def draw(self, x=None, y=None, w=None, h=None):
-		
+	def resize(self, x=None, y=None, w=None, h=None):
 		if x is None:
 			x = self.x
 		if y is None:
@@ -52,45 +51,52 @@ class Slider:
 		if h is None:
 			h = self.h
 		
+		self.x = x
+		self.y = y
+		self.w = w
+		self.h = h
+	
+	def draw(self):
+		
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 		glEnable(GL_BLEND)
 		glPushMatrix()
-		glTranslatef(x, y, 0)
+		glTranslatef(self.x, self.y, 0)
 		
 		(r,g,b) = self.color
 		
 		glColor4f(r,g,b,0.4)
 		glBegin(GL_QUADS)
-		glVertex2f(0,h)
+		glVertex2f(0,self.h)
 		glVertex2f(0,0)
-		glVertex2f(w,0)
-		glVertex2f(w,h)
+		glVertex2f(self.w,0)
+		glVertex2f(self.w,self.h)
 		glEnd()
 		
-		handle_x = w * self.cur_val / (self.max_val - self.min_val)
+		handle_x = self.w * self.cur_val / (self.max_val - self.min_val)
 		glColor4f(r,g,b,0.2)
 		glBegin(GL_QUADS)
-		glVertex2f(handle_x-3,h)
+		glVertex2f(handle_x-3,self.h)
 		glVertex2f(handle_x-3,0)
 		glVertex2f(handle_x+3,0)
-		glVertex2f(handle_x+3,h)
+		glVertex2f(handle_x+3,self.h)
 		glEnd()
 		
 		glPopMatrix()
 		
 		draw_text(
 			str(self.cur_val),
-			x+0.5*w,
-			y+5,
+			self.x+0.5*self.w,
+			self.y+5,
 			'center',
-			h-5,
+			self.h-5,
 			2.0,
 			(r,g,b))
 		
 		glDisable(GL_BLEND)
 	
 	def set_color(self, r, g, b):
-		self.color=(r,g,b)		
+		self.color=(r,g,b)
 		
 	def change_val(self, new_val):
 		self.cur_val = new_val
@@ -108,7 +114,7 @@ class Slider:
 		self.change_val(self.max_val * local_x / self.w)
 
 cur_slider = ()
-sliders = []
+sliders = {}
 
 # Resources
 compass_img = ()
@@ -277,10 +283,10 @@ def mouse_handler(button, state, x, y):
 		local_points = PointArray()
 		gps_points = PointArray()
 	else:
-		for slider in sliders:
-			if slider.contains(x,y):
-				slider.handle_mouse(x,y)
-				cur_slider = slider
+		for key in sliders:
+			if sliders[key].contains(x,y):
+				cur_slider = sliders[key]
+				cur_slider.handle_mouse(x,y)
 		if cur_slider is ():
 			newPt = Point()
 			newPt.x = x - win_width/2
@@ -600,7 +606,8 @@ def draw_status():
 	
 	# Draw wind speed text
 	draw_text("Wind speed ", win_width-60, win_height-125, 'center')
-	sliders[0].draw(win_width-100, win_height-160)
+	sliders["Wind speed"].resize(win_width-100, win_height-160)
+	sliders["Wind speed"].draw()
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
@@ -1027,7 +1034,7 @@ def init_sliders():
 	global sliders
 	wind_speed_slider = Slider(win_width-100,win_height-160,80,25, wind_speed_slider_callback, 0, 15, 5)
 	wind_speed_slider.set_color(0,0,0)
-	sliders.append(wind_speed_slider)
+	sliders["Wind speed"] = wind_speed_slider
 
 
 def wind_speed_slider_callback(value):
