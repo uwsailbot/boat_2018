@@ -17,7 +17,6 @@ from PIL import Image
 from sys import argv
 
 # Cheat codes
-codes = []
 cur_input = ""
 sound = False
 
@@ -119,9 +118,9 @@ sliders = {}
 # Resources
 compass_img = ()
 compass_pointer_img = ()
-boat_imgs = []
-rudder_imgs = []
-sail_imgs = []
+boat_imgs = {}
+rudder_imgs = {}
+sail_imgs = {}
 cur_boat_img = ()
 cur_rudder_img = ()
 cur_sail_img = ()
@@ -340,12 +339,11 @@ def ASCII_handler(key, mousex, mousey):
 	# Handle cheat codes
 	cur_input += key;
 	valid = False
-	for code in codes:
+	for code in boat_imgs:
 		if code == cur_input:
-			cur_boat_img = boat_imgs[codes.index(code)]
-			cur_rudder_img = rudder_imgs[codes.index(code)]
-			cur_sail_img = sail_imgs[codes.index(code)]
-			#print sail_imgs[codes.index(code)]
+			cur_boat_img = boat_imgs[code]
+			cur_rudder_img = rudder_imgs[code]
+			cur_sail_img = sail_imgs[code]
 			valid = False
 			break
 		if code.startswith(cur_input):
@@ -900,33 +898,30 @@ def load_image_resources():
 	compass_img = load_image('../meshes/compass.png', (256,256))
 	compass_pointer_img = load_image('../meshes/compass_pointer.png', (23,128))
 	
-	codes.append("orig")
 	orig=load_image('../meshes/niceboat.png', (64,128))
-	boat_imgs.append((orig, (24,48)))
+	boat_imgs["orig"] = orig, (24,48)
 	orig_rudder = load_image('../meshes/rudder.png', (32,64))
-	rudder_imgs.append((orig_rudder, (16,32)))
+	rudder_imgs["orig"] = orig_rudder, (16,32)
 	orig_sail = load_image('../meshes/sail.png', (32,64))
-	sail_imgs.append((orig_sail, (24,48)))
+	sail_imgs["orig"] = orig_sail, (24,48)
 	
-	codes.append("pirate")
 	pirate_id=load_image('../meshes/pirate_boat.png', (39,56))
-	boat_imgs.append((pirate_id, (36,48)))
+	boat_imgs["pirate"] = pirate_id, (36,48)
 	# use orig rudder and sail	
-	rudder_imgs.append((orig_rudder, (16,32)))
-	sail_imgs.append((orig_sail, (24,48)))
+	rudder_imgs["pirate"] = orig_rudder, (16,32)
+	sail_imgs["pirate"] = orig_sail, (24,48)
 	
-	codes.append("mars")
-	SPACE_X = load_image('../meshes/falcon_heavy.png', (1040/24,5842/24))
-	boat_imgs.append((SPACE_X, (1040/48,5842/48)))	
-	# use orig rudder	
-	rudder_imgs.append((orig_rudder, (16,32)))
+	SPACE_X = load_image('../meshes/falcon_heavy.png', (1040,5842))
+	boat_imgs["mars"] = SPACE_X, (1040/48,5842/48)
+	# use orig rudder
+	rudder_imgs["mars"] = orig_rudder, (16,32)
 	roadster = load_image('../meshes/roadster.png', (128,256))
-	sail_imgs.append((roadster, (32,64)))
+	sail_imgs["mars"] = roadster, (32,64)
 	
 	# Load stanard/orig boat by default
-	cur_boat_img = boat_imgs[0]
-	cur_rudder_img = rudder_imgs[0]
-	cur_sail_img = sail_imgs[1]
+	cur_boat_img = boat_imgs["orig"]
+	cur_rudder_img = rudder_imgs["orig"]
+	cur_sail_img = sail_imgs["orig"]
 
 
 def load_font(filepath, detail):
