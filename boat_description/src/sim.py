@@ -41,39 +41,53 @@ class Slider:
 		self.color=(0,0,0)
 		callback(float(cur_val))
 	
-	def draw_self(self):
+	def draw(self, x=None, y=None, w=None, h=None):
+		
+		if x is None:
+			x = self.x
+		if y is None:
+			y = self.y
+		if w is None:
+			w = self.w
+		if h is None:
+			h = self.h
+		
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+		glEnable(GL_BLEND)
 		glPushMatrix()
-		glTranslatef(self.x, self.y, 0)
+		glTranslatef(x, y, 0)
 		
 		(r,g,b) = self.color
 		
 		glColor4f(r,g,b,0.4)
 		glBegin(GL_QUADS)
-		glVertex2f(0,self.h)
+		glVertex2f(0,h)
 		glVertex2f(0,0)
-		glVertex2f(self.w,0)
-		glVertex2f(self.w,self.h)
+		glVertex2f(w,0)
+		glVertex2f(w,h)
 		glEnd()
 		
-		handle_x = self.w * self.cur_val / (self.max_val - self.min_val)
+		handle_x = w * self.cur_val / (self.max_val - self.min_val)
 		glColor4f(r,g,b,0.2)
 		glBegin(GL_QUADS)
-		glVertex2f(handle_x-3,self.h)
+		glVertex2f(handle_x-3,h)
 		glVertex2f(handle_x-3,0)
 		glVertex2f(handle_x+3,0)
-		glVertex2f(handle_x+3,self.h)
+		glVertex2f(handle_x+3,h)
 		glEnd()
 		
 		glPopMatrix()
 		
 		draw_text(
 			str(self.cur_val),
-			self.x+0.5*self.w,
-			self.y+5,
+			x+0.5*w,
+			y+5,
 			'center',
-			self.h-5,
+			h-5,
 			2.0,
 			(r,g,b))
+		
+		glDisable(GL_BLEND)
 	
 	def set_color(self, r, g, b):
 		self.color=(r,g,b)		
@@ -246,6 +260,7 @@ def resize(width, height):
 	gluOrtho2D(0.0, win_width, 0.0, win_height)
 	glMatrixMode(GL_MODELVIEW)
 	glLoadIdentity()
+
 
 # Handler for mouse presses
 def mouse_handler(button, state, x, y):
@@ -513,14 +528,6 @@ def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0)):
 	glDisable(GL_BLEND)
 
 
-def draw_sliders():
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-	glEnable(GL_BLEND)
-	for slider in sliders:
-		slider.draw_self()
-	glDisable(GL_BLEND)
-
-
 # Draw all of the waypoint as red dots
 def draw_waypoints():
 	glPushMatrix()
@@ -584,7 +591,7 @@ def draw_status():
 	glEnd()
 	
 	# Set font
-	cur_font = open_sans_font	
+	cur_font = open_sans_font
 	
 	# Draw the wind readout
 	glColor3f(0.0, 0.0, 0.0)
@@ -592,7 +599,8 @@ def draw_status():
 	draw_wind_arrow(win_width-60,win_height-65)
 	
 	# Draw wind speed text
-	draw_text("Wind speed ", win_width-60, win_height-125, 'center')	
+	draw_text("Wind speed ", win_width-60, win_height-125, 'center')
+	sliders[0].draw(win_width-100, win_height-160)
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
@@ -609,7 +617,7 @@ def draw_status():
 		major = "Auto"
 	elif state.major is BoatState.MAJ_DISABLED:
 		major = "Disabled"
-		
+	
 	minor = ""
 	if state.minor is BoatState.MIN_COMPLETE:
 		minor = "Complete"
@@ -623,7 +631,7 @@ def draw_status():
 	
 	# Draw the boat diagram
 	draw_status_boat(win_width-60, boat_offset)
-
+	
 	# Draw the rudder and winch pos
 	draw_text("Winch: %d" % winch_pos, win_width-60, boat_offset-30, 'center')
 	draw_text("Rudder: %.1f" % rudder_pos, win_width-60, boat_offset-45, 'center')
@@ -639,6 +647,7 @@ def draw_status():
 def draw_wind_arrow(x,y):
 	draw_image(compass_img, (x, y), 0, (70,70))
 	draw_image(compass_pointer_img, (x, y), wind_heading-90, (7,40))
+
 
 # Draw the boat on the water
 def draw_boat():
@@ -695,11 +704,10 @@ def draw_status_boat(x, y):
 		(x+1, y+20),
 		sail_angle,
 		(cur_sail_img[1][0]*sail_scale, cur_sail_img[1][1]*sail_scale))
-	
-	draw_sliders()
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Physics =*=*=*=*=*=*=*=*=*=*=*=*=
+
 def calc_apparent_wind(true_wind, boat_speed, boat_heading):
 	# Use constant wind speed of 8 m/s
 	x = 8*math.cos(math.radians(true_wind))
@@ -1005,7 +1013,7 @@ def load_font(filepath, detail):
 		GL_FLOAT,
 		pixels);
 	
-	return (texture_id, font_map)	
+	return (texture_id, font_map)
 
 
 def load_font_resources():
