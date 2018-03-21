@@ -791,7 +791,7 @@ def calc(_):
 	boat_speed += (acc - drag)*dt
 	
 	if(state.major != BoatState.MAJ_DISABLED):
-		heading -= (rudder_pos-90)*0.015*boat_speed
+		heading -= (rudder_pos-90)*0.05*boat_speed
 		heading %= 360
 		
 		# Update anemometer reading because of new heading and speed
