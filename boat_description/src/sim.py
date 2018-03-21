@@ -27,6 +27,7 @@ win_width = 720
 win_height = 480
 
 # UI objects and UI controls stuff
+left_mouse_down = False
 class Slider:
 	
 	def __init__(self,x,y,w,h,callback,min_val,max_val,cur_val):
@@ -248,7 +249,11 @@ def mouse_handler(button, state, x, y):
 	global local_points
 	global gps_points
 	global sliders
+	global left_mouse_down
 	
+	if button == GLUT_LEFT_BUTTON:
+		left_mouse_down = state == GLUT_DOWN
+
 	if state != GLUT_DOWN:
 		return
 	
@@ -268,6 +273,12 @@ def mouse_handler(button, state, x, y):
 			gps_points.points.append(coords)
 	waypoint_pub.publish(gps_points)
 	
+# Handler for mouse moving
+def motion_handler(x,y):
+	global sliders
+	global left_mouse_down
+	for slider in sliders:
+		slider.handle_mouse_down(x,y)
 
 # Handler for all key presses that cannot be represented by an ASCII code
 def keyboard_handler(key, mousex, mousey):
@@ -1007,6 +1018,7 @@ def init_GL():
 	glutDisplayFunc(redraw)
 	glutReshapeFunc(resize)
 	glutMouseFunc(mouse_handler)
+	glutMotionFunc(motion_handler)
 	glutKeyboardFunc(ASCII_handler)
 	glutSpecialFunc(keyboard_handler)
 	glutTimerFunc(1000/30, calc, 0)
