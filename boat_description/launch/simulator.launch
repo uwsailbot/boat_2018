@@ -10,9 +10,9 @@
     <node pkg="boat_description" type="sim.py" args="-j"
       name="visualizer" output="screen">
     </node>
-    <!-- receiver_reader.py interfaces with the RC controller's receiver over serial -->
-    <node pkg="boat_interfaces" type="receiver_reader.py"
-      args="$(arg controller)" name="receiver" output="screen">
+    <!-- Launches usb_joy node for the ps4 controller -->
+    <node pkg="boat_description" type="usb_joy.py" 
+      name="usb_joy" output="screen" >
     </node>
   </group>
 
