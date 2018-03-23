@@ -8,7 +8,7 @@ import time
 from boat_msgs.msg import BoatState, GPS, Point, PointArray
 from boat_msgs.srv import ConvertPoint
 from sensor_msgs.msg import Imu, Joy
-from std_msgs.msg import Float32, Int32
+from std_msgs.msg import Float32, Int32, Bool
 from tf.transformations import quaternion_from_euler
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -114,6 +114,8 @@ class Slider:
 
 cur_slider = ()
 sliders = {}
+show_details = False
+
 
 # Resources
 compass_img = ()
@@ -127,6 +129,11 @@ cur_sail_img = ()
 open_sans_font = ()
 cur_font = ()
 
+# Modes
+sim_mode = 0
+sim_mode_str =['default', 'replay everything']
+
+
 # Simulation data and consts
 should_sim_joy = False
 sim_is_running = True
@@ -138,10 +145,10 @@ boat_speed = 0 # px/s
 layline = rospy.get_param('/boat/layline')
 winch_min = rospy.get_param('/boat/winch_min')
 winch_max = rospy.get_param('/boat/winch_max')
-wind_speed = 0
 
 # ROS data
 wind_heading = 270
+wind_speed = 0
 ane_reading = 0
 pos = Point()
 heading = 90
@@ -154,6 +161,10 @@ gps_points = PointArray()
 joy = Joy()
 joy.axes = [0]*8
 joy.buttons = [0]*11
+rudder_output = 0
+rudder_input = 0
+rudder_setpoint = 0
+rudder_enable = False
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -250,6 +261,50 @@ def target_heading_callback(angle):
 	global target_heading
 	target_heading = angle.data
 
+def lps_callback(lps):
+	global sim_mode	
+	global pos
+	
+	if sim_mode == 1:
+		pos = lps
+
+def compass_callback(compass):
+	global sim_mode
+	global heading
+	
+	if sim_mode == 1:
+		heading = compass.data
+
+def anemometer_callback(anemometer):
+	global ane_reading
+	
+	if sim_mode == 1:
+		ane_reading = anemometer.data
+
+def rudder_output_callback(float32):
+	global rudder_output
+	
+	if sim_mode == 1:
+		rudder_output = float32.data
+
+def rudder_input_callback(float32):
+	global rudder_input
+	
+	if sim_mode == 1:
+		rudder_input = float32.data
+
+def rudder_setpoint_callback(float32):
+	global rudder_setpoint
+	
+	if sim_mode == 1:
+		rudder_setpoint = float32.data
+
+def rudder_enable_callback(enabled):
+	global rudder_enable
+	
+	if sim_mode == 1:
+		rudder_enable = enabled.data
+
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -273,26 +328,30 @@ def mouse_handler(button, state, x, y):
 	global gps_points
 	global sliders
 	global cur_slider
+	global sim_mode
 	
 	if state != GLUT_DOWN:
 		cur_slider = ()
 		return
 	
 	if button == GLUT_RIGHT_BUTTON:
-		local_points = PointArray()
-		gps_points = PointArray()
+		if sim_mode == 0:
+			local_points = PointArray()
+			gps_points = PointArray()
 	else:
 		for key in sliders:
 			if sliders[key].contains(x,y):
 				cur_slider = sliders[key]
 				cur_slider.handle_mouse(x,y)
-		if cur_slider is ():
+		if cur_slider is () and sim_mode == 0:
 			newPt = Point()
 			newPt.x = x - win_width/2
 			newPt.y = -y + win_height/2
 			coords = to_gps(newPt).pt
 			gps_points.points.append(coords)
-	waypoint_pub.publish(gps_points)
+
+	if sim_mode == 0:
+		waypoint_pub.publish(gps_points)
 
 
 # Handler for mouse dragging
@@ -335,6 +394,8 @@ def ASCII_handler(key, mousex, mousey):
 	global cur_sail_img
 	global sound
 	global wind_heading
+	global sim_mode
+	global show_details
 	
 	# Handle cheat codes
 	cur_input += key;
@@ -353,58 +414,69 @@ def ASCII_handler(key, mousex, mousey):
 	
 	if key is chr(27):
 		sim_is_running = False
-	elif key is '1' and should_sim_joy:
-		joy.buttons[4] = 1
-		joy.buttons[5] = 0
-		joy.buttons[8] = 0
-		joy_pub.publish(joy)
-	elif key is '2' and should_sim_joy:
-		joy.buttons[4] = 0
-		joy.buttons[5] = 1
-		joy.buttons[8] = 0
-		joy_pub.publish(joy)
-	elif key is '3' and should_sim_joy:
-		joy.buttons[4] = 0
-		joy.buttons[5] = 0
-		joy.buttons[8] = 1
-		joy_pub.publish(joy)
-	elif key is 't' and should_sim_joy:
-		joy.buttons[0] = 1
-		joy.buttons[2] = 0
-		joy.axes[0] = 0
-		joy_pub.publish(joy)
-		joy.buttons[0] = 0
-		joy_pub.publish(joy)
-	elif key is 'g' and should_sim_joy:
-		joy.buttons[2] = 1
-		joy.buttons[0] = 0
-		joy_pub.publish(joy)
-		joy.buttons[2] = 0
-		joy_pub.publish(joy)
-	elif key is 'q':
-		joy.axes[0] = 0
-		joy_pub.publish(joy)
-	elif key is 'a':
-		wind_heading += 5
-	elif key is 'd':
-		wind_heading -= 5
-	elif key is 'w':
-		speed += 0.1
-	elif key is 's':
-		speed -= 0.1
-		speed = max(speed, 0)
-	elif key is '0':
-		sound = not sound
 	elif key is 'p':
 		pause_sim()
-	elif key is ' ':
-		pos.x = 0
-		pos.y = 0
-		update_gps()
+	elif key is 'm':
+		if sim_mode is 1:
+			sim_mode = 0
+		else:
+			sim_mode += 1
+		print 'Changed sim mode, is now \'%s\'' % sim_mode_str[sim_mode] 
+	elif key is 'i':
+		show_details = not show_details
+
+	if sim_mode == 0:	
+		if key is '1' and should_sim_joy:
+			joy.buttons[4] = 1
+			joy.buttons[5] = 0
+			joy.buttons[8] = 0
+			joy_pub.publish(joy)
+		elif key is '2' and should_sim_joy:
+			joy.buttons[4] = 0
+			joy.buttons[5] = 1
+			joy.buttons[8] = 0
+			joy_pub.publish(joy)
+		elif key is '3' and should_sim_joy:
+			joy.buttons[4] = 0
+			joy.buttons[5] = 0
+			joy.buttons[8] = 1
+			joy_pub.publish(joy)
+		elif key is 't' and should_sim_joy:
+			joy.buttons[0] = 1
+			joy.buttons[2] = 0
+			joy.axes[0] = 0
+			joy_pub.publish(joy)
+			joy.buttons[0] = 0
+			joy_pub.publish(joy)
+		elif key is 'g' and should_sim_joy:
+			joy.buttons[2] = 1
+			joy.buttons[0] = 0
+			joy_pub.publish(joy)
+			joy.buttons[2] = 0
+			joy_pub.publish(joy)
+		elif key is 'q':
+			joy.axes[0] = 0
+			joy_pub.publish(joy)
+		elif key is 'a':
+			wind_heading += 5
+		elif key is 'd':
+			wind_heading -= 5
+		elif key is 'w':
+			speed += 0.1
+		elif key is 's':
+			speed -= 0.1
+			speed = max(speed, 0)
+		elif key is '0':
+			sound = not sound
+		elif key is ' ':
+			pos.x = 0
+			pos.y = 0
+			update_gps()
 
 
 # Main display rendering callback
 def redraw():
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 	
 	glViewport(0, 0, win_width, win_height)
@@ -414,6 +486,8 @@ def redraw():
 	draw_boat()
 	draw_target_heading_arrow()
 	draw_status()
+	if show_details:
+		draw_detailed_status()
 
 	glutSwapBuffers()
 
@@ -580,18 +654,19 @@ def draw_target_heading_arrow():
 def draw_status():
 	glPushMatrix()
 	
+	# Control positions of stuff
 	pos_offset = win_height*0.6
 	state_offset = win_height*0.4
 	boat_offset = win_height*0.2
 	
-	
 	# Draw the box
+	panel_width = 120
 	glColor3f(1.0, 1.0, 1.0)
 	glBegin(GL_QUADS)
 	glVertex2f(win_width,win_height)
 	glVertex2f(win_width, 0)
-	glVertex2f(win_width-120,0)
-	glVertex2f(win_width-120,win_height)
+	glVertex2f(win_width-panel_width,0)
+	glVertex2f(win_width-panel_width,win_height)
 	glEnd()
 	
 	# Set font
@@ -645,6 +720,55 @@ def draw_status():
 	draw_text("Spd: %.f%%" % (speed*100), win_width-60, 30, 'center')
 	draw_text("Time: %.1f" % clock + "s", win_width-60, 15, 'center')
 	
+	glPopMatrix()
+
+# Draw another panel to extend the status panel with more details and readings
+def draw_detailed_status():
+	global ane_reading
+	global rudder_output
+	global rudder_input
+	global rudder_setpoint
+	global rudder_enable
+
+	glPushMatrix()
+	
+	# width		
+	panel_width = 180
+	
+	# distance from right of window	
+	panel_right_offset = 120
+	
+	
+	# Control position of stuff
+	rudder_offset = 0.8
+	
+	glTranslatef(win_width-panel_width-panel_right_offset, 0, 0)
+
+	# Draw the box
+	glColor3f(1.0, 1.0, 1.0)
+	glBegin(GL_QUADS)
+	glVertex2f(0, win_height)
+	glVertex2f(0, 0)
+	glVertex2f(panel_width, 0)
+	glVertex2f(panel_width, win_height)
+	glEnd()
+	
+	# Set font
+	cur_font = open_sans_font
+	
+	# Draw anemometer reading
+	draw_text("Anemometer: %.1f" % ane_reading, panel_width/2, win_height-30, 'center')
+	
+	# Draw rudder pid values
+	draw_text("Rudder PID:", panel_width/2, win_height*rudder_offset, 'center', 18)
+	draw_text("output: %.1f" % rudder_output, panel_width/2, win_height*rudder_offset-20, 'center')
+	draw_text("input: %.1f" % rudder_input, panel_width/2, win_height*rudder_offset-35, 'center')
+	draw_text("setpoint: %.1f" % rudder_setpoint, panel_width/2, win_height*rudder_offset-50, 'center')
+	draw_text("enable: %s" % rudder_enable, panel_width/2, win_height*rudder_offset-65, 'center')
+	
+	# Draw mode
+	draw_text("Sim Mode:", panel_width/2, 40, 'center', 18)
+	draw_text(sim_mode_str[sim_mode], panel_width/2, 20, 'center') 
 	glPopMatrix()
 
 
@@ -752,7 +876,6 @@ def calc_boom_heading(boat_heading, wind_heading, winch):
 	# Note close-hauled boom is not quite parallel with boat
 	return boat_heading - tack * ((winch_max - winch) * 75/winch_range + 15)
 
-
 def pause_sim():
 	global pause
 	global speed
@@ -782,52 +905,54 @@ def calc(_):
 	dt = (time.time() - last_time) * speed
 	last_time = time.time()
 	clock += dt
+
+	if(sim_mode == 0):
+		# Calculate other things
+		tack = calc_tack(heading, wind_heading)
+		boom_heading = calc_boom_heading(heading, wind_heading, winch_pos)
+		boom_vector = polar_to_rect(1, boom_heading)
+		boom_perp_vector = polar_to_rect(1, boom_heading + tack*90)
+		app_wind = calc_apparent_wind(wind_heading, boat_speed, heading)
+		heading_vector = polar_to_rect(1, heading)
 	
-	tack = calc_tack(heading, wind_heading)
-	boom_heading = calc_boom_heading(heading, wind_heading, winch_pos)
-	boom_vector = polar_to_rect(1, boom_heading)
-	boom_perp_vector = polar_to_rect(1, boom_heading + tack*90)
-	app_wind = calc_apparent_wind(wind_heading, boat_speed, heading)
-	heading_vector = polar_to_rect(1, heading)
+		# components of wind parallel and perpendicular to sail
+		wind_par = -proj(app_wind, boom_vector)
+		wind_perp = proj(app_wind, boom_perp_vector)
 	
-	# components of wind parallel and perpendicular to sail
-	wind_par = -proj(app_wind, boom_vector)
-	wind_perp = proj(app_wind, boom_perp_vector)
-	
-	if (wind_perp < 0):
-		# Sail is backwinded/luffing
-		acc = 0
-	else:
-		# Calculate drag component (major component when on run)		
-		a_perp = 0.05*wind_perp**2
-		acc = a_perp * proj(boom_perp_vector, heading_vector)	
+		if (wind_perp < 0):
+			# Sail is backwinded/luffing
+			acc = 0
+		else:
+			# Calculate drag component (major component when on run)		
+			a_perp = 0.05*wind_perp**2
+			acc = a_perp * proj(boom_perp_vector, heading_vector)	
 		
-		#Calculate lift (major component when on reach)
-		if wind_par > 0:
-			a_par = 0.03*wind_par**2
-			acc += a_par * proj(boom_perp_vector, heading_vector)
+			#Calculate lift (major component when on reach)
+			if wind_par > 0:
+				a_par = 0.03*wind_par**2
+				acc += a_par * proj(boom_perp_vector, heading_vector)
 	
-	# Wind drag on boat (prominent when in irons)
-	acc += 0.005*proj(app_wind, heading_vector)
+		# Wind drag on boat (prominent when in irons)
+		acc += 0.005*proj(app_wind, heading_vector)
 	
-	# Water drag
-	drag = 0.07*boat_speed*abs(boat_speed)
-	rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
-	drag += rudder_drag
-	
-	boat_speed += (acc - drag)*dt
-	
-	if(state.major != BoatState.MAJ_DISABLED):
-		heading -= (rudder_pos-90)*0.05*boat_speed
-		heading %= 360
+		# Water drag
+		drag = 0.07*boat_speed*abs(boat_speed)
+		rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
+		drag += rudder_drag
+		boat_speed += (acc - drag)*dt
+
+		if(state.major != BoatState.MAJ_DISABLED):
+			heading -= (rudder_pos-90)*0.015*boat_speed
+			heading %= 360
+			
+			# Update anemometer reading because of new heading and speed
+			update_wind()
 		
-		# Update anemometer reading because of new heading and speed
-		update_wind()
-		
-	pos.x += math.cos(math.radians(heading)) * boat_speed * dt
-	pos.y += math.sin(math.radians(heading)) * boat_speed * dt
+		pos.x += math.cos(math.radians(heading)) * boat_speed * dt
+		pos.y += math.sin(math.radians(heading)) * boat_speed * dt
 	
-	update_gps()
+		update_gps()
+	
 	glutPostRedisplay()
 	
 	if sim_is_running:
@@ -1076,8 +1201,16 @@ def listener():
 	rospy.Subscriber('winch', Int32, winch_callback)
 	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
 	rospy.Subscriber('target_heading', Float32, target_heading_callback)
-
-
+	
+	# subscribers for replay mode
+	rospy.Subscriber('lps', Point, lps_callback)
+	rospy.Subscriber('compass', Float32, compass_callback)
+	rospy.Subscriber('anemometer', Float32, anemometer_callback)
+	rospy.Subscriber('rudder_pid/output', Float32, rudder_output_callback)
+	rospy.Subscriber('rudder_pid/input', Float32, rudder_input_callback)
+	rospy.Subscriber('rudder_pid/setpoint', Float32, rudder_setpoint_callback)
+	rospy.Subscriber('rudder_pid/enable', Bool, rudder_enable_callback)
+	
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
 	
