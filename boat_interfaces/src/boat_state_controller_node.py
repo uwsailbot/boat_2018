@@ -51,10 +51,10 @@ def joy_callback(controller):
 		# If a tack is requested, figure out which side we are tacking and set the rudder accordingly
 		if ane_reading > 180:
 			tacking_direction = -1
-			goal = TackingGoal(direction = tacking_direction, boat_state = state)
+			goal = TackingGoal(direction = tacking_direction)
 		else:
 			tacking_direction = 1
-			goal = TackingGoal(direction = tacking_direction, boat_state = state)
+			goal = TackingGoal(direction = tacking_direction)
 		client.send_goal(goal)
 
 	

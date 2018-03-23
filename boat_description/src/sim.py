@@ -980,7 +980,8 @@ def calc(_):
 	pos.x += math.cos(math.radians(heading)) * boat_speed * dt
 	pos.y += math.sin(math.radians(heading)) * boat_speed * dt
 
-	
+	update_gps()
+
 	glutPostRedisplay()
 	
 	if sim_is_running:

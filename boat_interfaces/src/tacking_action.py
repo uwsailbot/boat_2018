@@ -29,6 +29,7 @@ class TackingAction(object):
 		self.sub_ane = rospy.Subscriber('anemometer', Float32, self.anemometer_callback)
 		self.sub_tar = rospy.Subscriber('target_heading', Float32, self.target_callback)
 		self.sub_heading = rospy.Subscriber('compass', Float32, self.compass_callback)
+		self.sub_state = rospy.Subscriber('boat_state', BoatState, self.boat_state_callback)
 		self.rudder_pos_pub = rospy.Publisher('rudder', Float32, queue_size=10)
 		self.state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
 		self.pid_enable_pub = rospy.Publisher('rudder_pid/enable', Bool, queue_size=10)
@@ -43,6 +44,9 @@ class TackingAction(object):
 
  	def compass_callback(self, heading):
 		self.cur_boat_heading = heading.data
+
+	def boat_state_callback(self, state):
+		self.state = state
 	
 	def tacking_callback(self, goal):
 		# helper variables
@@ -53,7 +57,6 @@ class TackingAction(object):
 		
 		# publish info to the console for the user
 		rospy.loginfo('Tacking Action: Tacking Action Startup')
-		self.state = goal.boat_state
 		self.state.minor = BoatState.MIN_TACKING
 		self.state_pub.publish(self.state)
 				
@@ -108,6 +111,7 @@ class TackingAction(object):
 					self.state.minor = BoatState.MIN_PLANNING
 				self.state_pub.publish(self.state)
 				self._result.success = False
+				self._result.target_heading = self.target_heading
 				self._feedback.status = "Preempted"
 				self._as.set_preempted()
 				preempted = True
@@ -115,6 +119,7 @@ class TackingAction(object):
 		  
 		if success:
 			self._result.success = success
+			self._result.target_heading = self.target_heading
 			rospy.loginfo('Tacking Action: Success')
 			self._as.set_succeeded(self._result)
 		
