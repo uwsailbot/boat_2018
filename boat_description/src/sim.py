@@ -261,8 +261,6 @@ def target_heading_callback(angle):
 	global target_heading
 	target_heading = angle.data
 
-
-
 def lps_callback(lps):
 	global sim_mode	
 	global pos
@@ -286,22 +284,26 @@ def anemometer_callback(anemometer):
 def rudder_output_callback(float32):
 	global rudder_output
 	
-	rudder_output = float32.data
+	if sim_mode == 1:
+		rudder_output = float32.data
 
 def rudder_input_callback(float32):
 	global rudder_input
 	
-	rudder_input = float32.data
+	if sim_mode == 1:
+		rudder_input = float32.data
 
 def rudder_setpoint_callback(float32):
 	global rudder_setpoint
 	
-	rudder_setpoint = float32.data
+	if sim_mode == 1:
+		rudder_setpoint = float32.data
 
 def rudder_enable_callback(enabled):
 	global rudder_enable
 	
-	rudder_enable = enabled.data
+	if sim_mode == 1:
+		rudder_enable = enabled.data
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
