@@ -70,6 +70,7 @@ class TackingAction(object):
 			if goal.direction == 1:
 				if self.ane_reading < (180 + self.layline):
 					if self.cur_boat_heading < self.init_target:
+						# Nothing relevant to publish it for other than debugging and the simulator
 						self.target_pub.publish(Float32(self.cur_boat_heading))
 					if not self.rudder_pos == self.rudder_max:
 						self.rudder_pos = self.rudder_max
@@ -87,7 +88,8 @@ class TackingAction(object):
 			elif goal.direction == -1:
 				if self.ane_reading > (180 - self.layline):
 					if self.cur_boat_heading > self.init_target:
-						self.target_pub.publish(Float32(self.cur_boat_heading))
+						# Nothing relevant to publish it for other than debugging and the simulator
+						self.target_pub.publish(Float32(self.cur_boat_heading)) 
 					if not self.rudder_pos == self.rudder_min:
 						self.rudder_pos = self.rudder_min
 						self.rudder_pos_pub.publish(Float32(self.rudder_pos))
@@ -119,6 +121,11 @@ class TackingAction(object):
 		  
 		if success:
 			self._result.success = success
+			if (goal.direction == -1 and self.cur_boat_heading > self.init_target) or\
+					(goal.direction == 1 and self.cur_boat_heading < self.init_target):
+						# Publish and return the accurate curent heading for the navigator node to use
+						self.target_pub.publish(Float32(self.cur_boat_heading))
+						self.target_heading = self.cur_boat_heading
 			self._result.target_heading = self.target_heading
 			rospy.loginfo('Tacking Action: Success')
 			self._as.set_succeeded(self._result)

@@ -18,16 +18,21 @@ class LaylineAction(object):
 		self.tacking_client = actionlib.SimpleActionClient('tacking_action', TackingAction)
 		self.cur_pos = Point()
 		self.target_heading = 0
+		self.cur_boat_heading = 0
 		self.target_sub = rospy.Subscriber('target_heading', Float32, self.target_heading_callback)
 		self.pos_sub = rospy.Subscriber('lps', Point, self.position_callback)
+		self.compass_sub = rospy.Subscriber('compass', Float32, self.orientation_callback)
 		self.rate = rospy.Rate(100)
 		self.tacking_client.wait_for_server()
 
-	def position_callback(self, position):
-		self.cur_pos = position
+	def orientation_callback(self, orientation):
+		self.cur_boat_heading = orientation.data
 
 	def target_heading_callback(self, new_target_heading):
 		self.target_heading = new_target_heading.data
+
+	def position_callback(self, position):
+		self.cur_pos = position
 
 	def is_within_bounds(self, val, boundA, boundB):
 		return (boundA < val and val < boundB) or (boundB < val and val < boundA)
@@ -68,7 +73,8 @@ class LaylineAction(object):
 		# Wait until we hit the layline heading
 		while not hit_layline and not preempted:
 			direct_heading = math.atan2(goal.target.y - self.cur_pos.y, goal.target.x - self.cur_pos.x) * 180 / math.pi
-			if direct_heading > (goal.alt_tack_angle + goal.overshoot_angle):
+			if (tacking_direction is 1 and direct_heading > (goal.alt_tack_angle + goal.overshoot_angle)) or\
+				(tacking_direction is -1 and direct_heading < (goal.alt_tack_angle - goal.overshoot_angle)):
 				hit_layline = True
 
 			if self._as.is_preempt_requested():
@@ -100,6 +106,7 @@ class LaylineAction(object):
 			return
 
 		self.target_heading = self.tacking_client.get_result().target_heading
+		print "SECOND TARGET HEADING RETURN VS COMPASS", self.target_heading, self.cur_boat_heading
 		success = True
 		self._result.success = success
 		self._result.target_heading = self.target_heading

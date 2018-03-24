@@ -49,9 +49,6 @@ direct_heading = 0
 ## The angle within which the boat cannot go (Irons)
 layline = rospy.get_param('/boat/layline')
 
-## Flag to disable layline path planning for a certain time period after the action completes
-no_layline_planning = False
-
 # Declare the publishers for the node
 heading_pub = rospy.Publisher('target_heading', Float32, queue_size=10)
 boat_state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
@@ -146,13 +143,6 @@ def position_callback(position):
 	
 	awa_algorithm()
 
-##	Callback for setting the boat's current target heading when the '/target_heading' topic is updated. Currently only occurs in layline and tacking actions
-#	
-#	@param new_target_heading The new heading to set, in degrees CCW from East
-#
-def target_heading_callback(new_target_heading):
-	global target_heading
-	target_heading = new_target_heading.data
 
 ##  Callback for timer that is set after a tack or layline maneover, is used to make sure that ros messages are caught up on after actions are executed
 #
@@ -301,15 +291,11 @@ def remaining_course():
 #	@return True for can make it, and false for not
 #
 def on_layline(wind_coming, tolerance):
-	#print "Determining layline: ", wind_coming, direct_heading, target_heading
-	#print target, '\n'
-	#print cur_pos, '\n'
 	# On left side of the wind
 	if direct_heading >= wind_coming:
 		if (target_heading - direct_heading) <= tolerance:
 			return True
 		else:
-			#print "Not at layline on left", target_heading - direct_heading 
 			return False
 
 	# On right side of the wind
@@ -317,7 +303,6 @@ def on_layline(wind_coming, tolerance):
 		if (target_heading - direct_heading) >= tolerance:
 			return True
 		else:
-			#print "Not at layline on right", target_heading - direct_heading 
 			return False
 	
 
@@ -330,7 +315,6 @@ def awa_algorithm():
 	global new_wind
 	global is_new_target
 	global direct_heading
-	global no_layline_planning
 	
 	# Calculate the direct heading to the next waypoint
 	old_direct_heading = direct_heading
@@ -358,10 +342,6 @@ def awa_algorithm():
 		#rospy.loginfo(rospy.get_caller_id() +" Cur VMG: %f Max VMG: %f with Heading: %f Cur Tack VMG: %f with Heading: %f Direct Heading: %f", cur_vmg, global_max_vmg, global_vmg_heading, cur_tack_max_vmg, cur_tack_vmg_heading, direct_heading)
 		per_course_left = remaining_course()
 		
-		if cur_tack_max_vmg > global_max_vmg:
-			print "WARNING: \n"
-			rospy.loginfo(rospy.get_caller_id() +" Cur VMG: %f Max VMG: %f with Heading: %f Cur Tack VMG: %f with Heading: %f Direct Heading: %f", cur_vmg, global_max_vmg, global_vmg_heading, cur_tack_max_vmg, cur_tack_vmg_heading, direct_heading)
-
 		# TODO: Tolerance these properly
 		# If not currently at our optimal vmg, during our regular upwind routine (not layline setup)
 		if (global_max_vmg > cur_vmg or cur_tack_max_vmg > cur_vmg):
@@ -385,7 +365,6 @@ def awa_algorithm():
 						tacking_direction = 1
 					
 					heading_pub.publish(target_heading)
-					
 					goal = TackingGoal(direction = tacking_direction)
 					tacking_client.send_goal(goal)
 					
@@ -408,7 +387,7 @@ def awa_algorithm():
 
 		#Final leg of the course, traveling on an optimal vmg course, time to get to layline.  Second condition to make sure this doesn't run if we are already on the layline
 		# TODO: Tolerance correctly	
-		elif per_course_left <= 40 and not on_layline(wind_coming, 1.0) and not no_layline_planning:
+		elif per_course_left <= 40 and not on_layline(wind_coming, 1.0) :
 			rospy.loginfo(rospy.get_caller_id() + " Entering the navigate to layline routine. Saved current tack angle as: %f ", target_heading)
 			goal = LaylineGoal(alt_tack_angle = target_heading, overshoot_angle = 3.0, target = target)
 			layline_client.send_goal(goal)
@@ -417,10 +396,10 @@ def awa_algorithm():
 			if not layline_client.wait_for_result(rospy.Duration(40)):
 				layline_client.cancel_goal()
 			target_heading = layline_client.get_result().target_heading
-			
+
 			# Disable planning while messages are caught up on
-			no_layline_planning = True
-			rospy.Timer(rospy.Duration(1), timer_callback)
+			#no_layline_planning = True
+			#rospy.Timer(rospy.Duration(0.1), timer_callback)
 #		else:
 #			# If the waypoint is to the right of the wind...
 #			if direct_heading > cur_boat_heading:
@@ -520,19 +499,18 @@ def taras_algorithm():
 ##	Initialize the node
 #	
 #	Sets up all of the subscribers, initializes the node, and blocks until
-#	the max_vmg_client and tacking_client action servers are ready
+#	the action servers are ready
 #	
 def init():
 	rospy.init_node('navigator')
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
 	rospy.Subscriber('gps_raw', GPS, gps_callback)
-	rospy.Subscriber('anemometer', Float32, anemometer_callback)
+	rospy.Subscriber('anemometer', Float32, anemometer_callback, queue_size=1)
 	rospy.Subscriber('target_point', Point, target_callback)
-	rospy.Subscriber('compass', Float32, compass_callback)
-	rospy.Subscriber('target_heading', Float32, target_heading_callback)
+	rospy.Subscriber('compass', Float32, compass_callback, queue_size=1) # Only want it to receive the most recent orientation
 	
 	# If the filters work, change lps to use /odometry/filtered
-	rospy.Subscriber('lps', Point, position_callback)
+	rospy.Subscriber('lps', Point, position_callback, queue_size=1) # Only want it to receive the most recent position
 	max_vmg_client.wait_for_server()
 	tacking_client.wait_for_server()
 	layline_client.wait_for_server()

@@ -155,6 +155,7 @@ include_directories(
    src/navigator_node.py
    src/sensor_parser_node.py
    src/max_vmg_action.py
+   src/layline_action.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
