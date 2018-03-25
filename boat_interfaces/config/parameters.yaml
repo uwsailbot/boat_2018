@@ -5,3 +5,4 @@ boat:
   rudder_max: 150
   rudder_min: 30
   radius: 6378137.0
+  min_tacking_speed: 1.0

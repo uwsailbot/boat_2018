@@ -37,6 +37,9 @@ cur_pos =  Point()
 ## The boat's speed, in m/s
 boat_speed = 0
 
+## Minimum boat speed (in knots) required to tack:
+min_tacking_speed = rospy.get_param('/boat/min_tacking_speed')
+
 ## The maximum VMG found, in m/s
 max_vmg = 0
 
@@ -143,15 +146,6 @@ def position_callback(position):
 	
 	awa_algorithm()
 
-
-##  Callback for timer that is set after a tack or layline maneover, is used to make sure that ros messages are caught up on after actions are executed
-#
-#	@param event Timer event
-#
-def timer_callback(event):
-	no_layline_planning = False
-
-
 # =*=*=*=*=*=*=*=*=*=*=*=*= Calculations =*=*=*=*=*=*=*=*=*=*=*=*=
 
 '''
@@ -178,14 +172,14 @@ def calc_global_max_vmg(wind_coming):
 		theoretic_boat_speed = 0
 		if direct_heading >= wind_coming:
 			vmg_heading = wind_coming + layline 
-			theoretic_boat_speed = 2.5 * 0.54444
+			theoretic_boat_speed = 2.5 * 0.514444
 		else :
 			vmg_heading = wind_coming - layline
-			theoretic_boat_speed = 2.5 * 0.54444
+			theoretic_boat_speed = 2.5 * 0.514444
 	
 	# Otherwise max vmg is just the direct heading
 	else:
-		theoretic_boat_speed = 2.5 * 0.54444 # 2.5 Knots to m/s (measured boat speed)
+		theoretic_boat_speed = 2.5 * 0.514444 # 2.5 Knots to m/s (measured boat speed)
 		vmg_heading = direct_heading
 	
 	max_vmg = theoretic_boat_speed * math.cos(math.radians(vmg_heading - direct_heading))
@@ -205,18 +199,18 @@ def calc_cur_tack_max_vmg(wind_coming):
 		theoretic_boat_speed = 0
 		if target_heading >= wind_coming:
 			vmg_heading = wind_coming + layline 
-			theoretic_boat_speed = 2.5 * 0.54444
+			theoretic_boat_speed = 2.5 * 0.514444
 		else :
 			vmg_heading = wind_coming - layline
-			theoretic_boat_speed = 2.5 * 0.54444
+			theoretic_boat_speed = 2.5 * 0.514444
 	# Direct heading lies on navigatable path elsewhere in our current tack
 	elif (is_within_bounds(direct_heading, wind_coming, apparent_wind_heading) and is_within_bounds(target_heading, wind_coming, apparent_wind_heading))or\
 		(not is_within_bounds(direct_heading, wind_coming, apparent_wind_heading) and not is_within_bounds(target_heading, wind_coming, apparent_wind_heading)):
-		theoretic_boat_speed = 2.5 * 0.54444 # 2.5 Knots to m/s (measured boat speed)
+		theoretic_boat_speed = 2.5 * 0.514444 # 2.5 Knots to m/s (measured boat speed)
 		vmg_heading = direct_heading
 	# If none of the above, the best heading will be the one closest to the other tack
 	else: 
-		theoretic_boat_speed = 2.5 * 0.54444
+		theoretic_boat_speed = 2.5 * 0.514444
 		vmg_heading = apparent_wind_heading
 	
 	max_vmg = theoretic_boat_speed * math.cos(math.radians(vmg_heading - direct_heading))
@@ -232,7 +226,7 @@ def calc_vmg(wind_coming):
 	if target_heading > wind_coming-layline and target_heading < wind_coming+layline:
 		theoretic_boat_speed = 0		
 	else:
-		theoretic_boat_speed = 2.5 * 0.54444 # 2.5 Knots to m/s (measured boat speed)
+		theoretic_boat_speed = 2.5 * 0.514444 # 2.5 Knots to m/s (measured boat speed)
 
 	cur_vmg = theoretic_boat_speed * math.cos(math.radians(target_heading - direct_heading))
 	return cur_vmg
@@ -356,7 +350,7 @@ def awa_algorithm():
 				(boat_dir is -1 and is_within_bounds(wind_coming, global_vmg_heading, target_heading)):
 				# If this loop is entered, then getting to vmg_heading requires a tack
 				# Now we need to calculate if the tack is worth it
-				if global_max_vmg > cur_tack_max_vmg * n:
+				if global_max_vmg > cur_tack_max_vmg * n and boat_speed > min_tacking_speed:
 					# Worth the tack, therefore determine the tacking direction and execute the action
 					target_heading = global_vmg_heading
 					if is_within_bounds(target_heading, 90, 270):
@@ -371,7 +365,10 @@ def awa_algorithm():
 					# Adjust time delay until the tack is considered failed, and we return to planning
 					if not tacking_client.wait_for_result(rospy.Duration(10)):
 						tacking_client.cancel_goal()
-						# TODO: Add other conditions upon tack failure
+						goal.direction = goal.direction * -1
+						tacking_client.send_goal(goal)
+						if not tacking_client.wait_for_result(rospy.Duration(10)):
+							tacking_client.cancel_goal()
 					target_heading = tacking_client.get_result().target_heading
 					rospy.loginfo(rospy.get_caller_id() + " Boat State = 'Autonomous - Planning'")
 
@@ -387,7 +384,8 @@ def awa_algorithm():
 
 		#Final leg of the course, traveling on an optimal vmg course, time to get to layline.  Second condition to make sure this doesn't run if we are already on the layline
 		# TODO: Tolerance correctly	
-		elif per_course_left <= 40 and not on_layline(wind_coming, 1.0) :
+		elif per_course_left <= 40 and not on_layline(wind_coming, 1.0) and boat_speed > min_tacking_speed:
+			print boat_speed
 			rospy.loginfo(rospy.get_caller_id() + " Entering the navigate to layline routine. Saved current tack angle as: %f ", target_heading)
 			goal = LaylineGoal(alt_tack_angle = target_heading, overshoot_angle = 3.0, target = target)
 			layline_client.send_goal(goal)

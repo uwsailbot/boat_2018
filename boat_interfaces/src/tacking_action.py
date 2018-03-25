@@ -47,7 +47,7 @@ class TackingAction(object):
 
 	def boat_state_callback(self, state):
 		self.state = state
-	
+
 	def tacking_callback(self, goal):
 		# helper variables
 		success = False
