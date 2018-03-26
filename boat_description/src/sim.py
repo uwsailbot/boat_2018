@@ -968,7 +968,7 @@ def calc(_):
 	#old_wind_head = ane_reading
 	
 	if(state.major != BoatState.MAJ_DISABLED):
-		heading -= (rudder_pos-90)*0.05*boat_speed
+		heading -= (rudder_pos-90)*0.05*boat_speed * dt
 		heading %= 360
 		
 		# Update anemometer reading because of new heading and speed
