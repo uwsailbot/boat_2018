@@ -927,9 +927,9 @@ def calc(_):
 	# Calculate the in-simulator time
 	if(last_time == -1):
 		last_time = time.time()
-	dt = (time.time() - last_time) * speed
+	dt = (time.time() - last_time)
 	last_time = time.time()
-	clock += dt
+	clock += dt* speed
 	
 	tack = calc_tack(heading, wind_heading)
 	boom_heading = calc_boom_heading(heading, wind_heading, winch_pos)
@@ -968,7 +968,7 @@ def calc(_):
 	#old_wind_head = ane_reading
 	
 	if(state.major != BoatState.MAJ_DISABLED):
-		heading -= (rudder_pos-90)*0.05*boat_speed
+		heading -= (rudder_pos-90)*0.005*boat_speed * speed
 		heading %= 360
 		
 		# Update anemometer reading because of new heading and speed
@@ -977,8 +977,8 @@ def calc(_):
 	
 	speed_graph[int(ane_reading)%360] = boat_speed
 	
-	pos.x += math.cos(math.radians(heading)) * boat_speed * dt
-	pos.y += math.sin(math.radians(heading)) * boat_speed * dt
+	pos.x += math.cos(math.radians(heading)) * boat_speed * dt * speed
+	pos.y += math.sin(math.radians(heading)) * boat_speed * dt * speed
 
 	update_gps()
 
