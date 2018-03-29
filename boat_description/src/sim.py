@@ -167,6 +167,9 @@ rudder_output = 0
 rudder_input = 0
 rudder_setpoint = 0
 rudder_enable = False
+replay_gps_raw = GPS()
+obstacle_points = PointArray()
+target_point = Point()
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -279,34 +282,35 @@ def compass_callback(compass):
 
 def anemometer_callback(anemometer):
 	global ane_reading
-	
-	if sim_mode == 1:
-		ane_reading = anemometer.data
+	ane_reading = anemometer.data
 
 def rudder_output_callback(float32):
 	global rudder_output
-	
-	if sim_mode == 1:
-		rudder_output = float32.data
+	rudder_output = float32.data
 
 def rudder_input_callback(float32):
 	global rudder_input
-	
-	if sim_mode == 1:
-		rudder_input = float32.data
+	rudder_input = float32.data
 
 def rudder_setpoint_callback(float32):
 	global rudder_setpoint
-	
-	if sim_mode == 1:
-		rudder_setpoint = float32.data
+	rudder_setpoint = float32.data
 
 def rudder_enable_callback(enabled):
 	global rudder_enable
-	
-	if sim_mode == 1:
-		rudder_enable = enabled.data
+	rudder_enable = enabled.data
 
+def gps_raw_callback(gps_raw):
+	global replay_gps_raw
+	replay_gps_raw = gps_raw
+	
+def obstacles_callback(obstacles):
+	global obstacle_points
+	obstacle_points = obstacles
+
+def target_point_callback(target_pt):
+	global target_point
+	target_point = target_pt
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -484,7 +488,9 @@ def redraw():
 	glViewport(0, 0, win_width, win_height)
 	
 	# Render stuff
+	draw_target_point()
 	draw_waypoints()
+	draw_obstacles()
 	draw_boat()
 	draw_target_heading_arrow()
 	draw_status()
@@ -560,7 +566,10 @@ def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0)):
 		if ord(c)<32 or ord(c)>127:
 			print 'invalid character to draw: ord(c)=%i' % ord(c)
 			return
-		total_width += (font_map[ord(c)-32][1] + spacing) * scale
+		elif c is ' ':
+			total_width += (h/2 + spacing) * scale
+		else:			
+			total_width += (font_map[ord(c)-32][1] + spacing) * scale
 	
 	# set alignment
 	if align == 'left':
@@ -576,32 +585,35 @@ def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0)):
 	
 	x_offset = 0
 	for c in text:
-		char_info = font_map[ord(c)-32]
-		start_index = char_info[0]
-		char_width = char_info[1] * scale
-		char_height = char_info[2] * scale
-		char_y_offset = char_info[3] * scale
-		tex_y_start = char_info[4]
-		tex_y_end = char_info[5]
-		tex_x_end = char_info[6]
+		if c is ' ':
+			x_offset += (h/2 + spacing) * scale
+		else:		
+			char_info = font_map[ord(c)-32]
+			start_index = char_info[0]
+			char_width = char_info[1] * scale
+			char_height = char_info[2] * scale
+			char_y_offset = char_info[3] * scale
+			tex_y_start = char_info[4]
+			tex_y_end = char_info[5]
+			tex_x_end = char_info[6]
 		
-		# use x and y as bottom left corner
-		# also flip these textures, since by default everything is upside down
-		glBegin(GL_QUADS)
-		glTexCoord2d(0, tex_y_start)
-		glVertex2f(x_offset, char_y_offset + char_height)
+			# use x and y as bottom left corner
+			# also flip these textures, since by default everything is upside down
+			glBegin(GL_QUADS)
+			glTexCoord2d(0, tex_y_start)
+			glVertex2f(x_offset, char_y_offset + char_height)
 		
-		glTexCoord2d(0, tex_y_end)
-		glVertex2f(x_offset, char_y_offset)
+			glTexCoord2d(0, tex_y_end)
+			glVertex2f(x_offset, char_y_offset)
 		
-		glTexCoord2d(tex_x_end, tex_y_end)
-		glVertex2f(x_offset + char_width, char_y_offset)
+			glTexCoord2d(tex_x_end, tex_y_end)
+			glVertex2f(x_offset + char_width, char_y_offset)
 		
-		glTexCoord2d(tex_x_end, tex_y_start)
-		glVertex2f(x_offset + char_width, char_y_offset + char_height)
-		glEnd()
+			glTexCoord2d(tex_x_end, tex_y_start)
+			glVertex2f(x_offset + char_width, char_y_offset + char_height)
+			glEnd()
 		
-		x_offset += char_width + (spacing * scale)
+			x_offset += char_width + (spacing * scale)
 	
 	glPopMatrix()
 	glDisable(GL_TEXTURE_2D)
@@ -612,13 +624,24 @@ def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0)):
 def draw_waypoints():
 	glPushMatrix()
 	
-	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
-		glColor3f(1,1,1)
-		first_point = local_points.points[0]
-		draw_circle(7,first_point.x + win_width/2.0, first_point.y + win_height/2.0)
-	
 	glColor3f(1,0,0)
 	for p in local_points.points:
+		x = p.x + win_width/2.0
+		y = p.y + win_height/2.0
+		draw_circle(5,x,y)
+	
+	glPopMatrix()
+
+def draw_target_point():	
+	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
+		glColor3f(1,1,1)
+		draw_circle(7, target_point.x + win_width/2.0, target_point.y + win_height/2.0)
+
+def draw_obstacles():
+	glPushMatrix()
+	
+	glColor3f(0.2, 0.2, 0.2)
+	for p in obstacle_points.points:
 		x = p.x + win_width/2.0
 		y = p.y + win_height/2.0
 		draw_circle(5,x,y)
@@ -733,21 +756,17 @@ def draw_detailed_status():
 	global rudder_input
 	global rudder_setpoint
 	global rudder_enable
+	global replay_gps_raw
 
 	glPushMatrix()
 	
 	# width		
 	panel_width = 180
-	
-	# distance from right of window	
-	panel_right_offset = 120
-	
-	
+		
 	# Control position of stuff
 	rudder_offset = 0.8
+	gps_offset = 0.5
 	
-	glTranslatef(win_width-panel_width-panel_right_offset, 0, 0)
-
 	# Draw the box
 	glColor3f(1.0, 1.0, 1.0)
 	glBegin(GL_QUADS)
@@ -769,6 +788,17 @@ def draw_detailed_status():
 	draw_text("input: %.1f" % rudder_input, panel_width/2, win_height*rudder_offset-35, 'center')
 	draw_text("setpoint: %.1f" % rudder_setpoint, panel_width/2, win_height*rudder_offset-50, 'center')
 	draw_text("enable: %s" % rudder_enable, panel_width/2, win_height*rudder_offset-65, 'center')
+	
+	# Draw gps_raw values:
+	draw_text("GPS Raw:", panel_width/2, win_height*gps_offset, 'center', 18)
+	draw_text("status: %f" % replay_gps_raw.status, panel_width/2, win_height*gps_offset-20, 'center')
+	draw_text("satellites_used: %.1f" % replay_gps_raw.satellites_used, panel_width/2, win_height*gps_offset-35, 'center')
+	draw_text("lat: %.0000001f" % replay_gps_raw.latitude, panel_width/2, win_height*gps_offset-50, 'center')
+	draw_text("long: %.0000001f" % replay_gps_raw.longitude, panel_width/2, win_height*gps_offset-65, 'center')
+	draw_text("alt: %.0000001f" % replay_gps_raw.altitude, panel_width/2, win_height*gps_offset-80, 'center')
+	draw_text("track: %.0000001f" % replay_gps_raw.track, panel_width/2, win_height*gps_offset-95, 'center')
+	draw_text("speed: %.001f" % replay_gps_raw.speed, panel_width/2, win_height*gps_offset-110, 'center')
+	draw_text("hdop: %.01f" % replay_gps_raw.hdop, panel_width/2, win_height*gps_offset-125, 'center')
 	
 	# Draw mode
 	draw_text("Sim Mode:", panel_width/2, 40, 'center', 18)
@@ -1239,7 +1269,12 @@ def listener():
 	rospy.Subscriber('rudder_pid/input', Float32, rudder_input_callback)
 	rospy.Subscriber('rudder_pid/setpoint', Float32, rudder_setpoint_callback)
 	rospy.Subscriber('rudder_pid/enable', Bool, rudder_enable_callback)
-	
+	rospy.Subscriber('gps_raw', GPS, gps_raw_callback)
+	rospy.Subscriber('obstacles', PointArray, obstacles_callback)
+	rospy.Subscriber('target_point', Point, target_point_callback)
+
+
+
 if __name__ == '__main__':
 	should_sim_joy = not("-j" in argv or "-J" in argv)
 	
