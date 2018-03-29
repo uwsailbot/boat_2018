@@ -152,7 +152,7 @@ speed_graph = {0 : 0}
 wind_heading = 270
 wind_speed = 0
 ane_reading = 0
-pos = Point()
+pos = Point(0,0)
 heading = 270
 target_heading = 270
 state = BoatState()
@@ -960,58 +960,63 @@ def calc(_):
 	dt = (time.time() - last_time) * speed
 	last_time = time.time()
 	clock += dt
-	
-	tack = calc_tack(heading, wind_heading)
-	boom_heading = calc_boom_heading(heading, wind_heading, winch_pos)
-	boom_vector = polar_to_rect(1, boom_heading)
-	boom_perp_vector = polar_to_rect(1, boom_heading + tack*90)
-	app_wind = calc_apparent_wind(wind_heading, boat_speed, heading)
-	heading_vector = polar_to_rect(1, heading)
-	
-	# components of wind parallel and perpendicular to sail
-	wind_par = -proj(app_wind, boom_vector)
-	wind_perp = proj(app_wind, boom_perp_vector)
-	
-	if (wind_perp < 0):
-		# Sail is backwinded/luffing
-		acc = 0
-	else:
-		# Calculate drag component (major component when on run)		
-		a_perp = 0.05*wind_perp**2
-		acc = a_perp * proj(boom_perp_vector, heading_vector)	
-		
-		#Calculate lift (major component when on reach)
-		if wind_par > 0:
-			a_par = 0.03*wind_par**2
-			acc += a_par * proj(boom_perp_vector, heading_vector)
-	
-	# Wind drag on boat (prominent when in irons)
-	acc += 0.005*proj(app_wind, heading_vector)
-	
-	# Water drag
-	drag = 0.07*boat_speed*abs(boat_speed)
-	rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
-	drag += rudder_drag
-	
-	boat_speed += (acc - drag)*dt
-	
-	#old_wind_head = ane_reading
-	
-	if(state.major != BoatState.MAJ_DISABLED):
-		heading -= (rudder_pos-90)*0.05*boat_speed * dt
-		heading %= 360
-		
-		# Update anemometer reading because of new heading and speed
-		update_wind()
-	
-	
-	speed_graph[int(ane_reading)%360] = boat_speed
-	
-	pos.x += math.cos(math.radians(heading)) * boat_speed * dt
-	pos.y += math.sin(math.radians(heading)) * boat_speed * dt
 
-	update_gps()
-
+	if sim_mode == 0:
+		tack = calc_tack(heading, wind_heading)
+		boom_heading = calc_boom_heading(heading, wind_heading, winch_pos)
+		boom_vector = polar_to_rect(1, boom_heading)
+		boom_perp_vector = polar_to_rect(1, boom_heading + tack*90)
+		app_wind = calc_apparent_wind(wind_heading, boat_speed, heading)
+		heading_vector = polar_to_rect(1, heading)
+		
+		# components of wind parallel and perpendicular to sail
+		wind_par = -proj(app_wind, boom_vector)
+		wind_perp = proj(app_wind, boom_perp_vector)
+		
+		if (wind_perp < 0):
+			# Sail is backwinded/luffing
+			acc = 0
+		else:
+			# Calculate drag component (major component when on run)		
+			a_perp = 0.05*wind_perp**2
+			acc = a_perp * proj(boom_perp_vector, heading_vector)	
+			
+			#Calculate lift (major component when on reach)
+			if wind_par > 0:
+				a_par = 0.03*wind_par**2
+				acc += a_par * proj(boom_perp_vector, heading_vector)
+		
+		# Wind drag on boat (prominent when in irons)
+		acc += 0.005*proj(app_wind, heading_vector)
+		
+		# Water drag
+		drag = 0.07*boat_speed*abs(boat_speed)
+		rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
+		drag += rudder_drag
+		
+		boat_speed += (acc - drag)*dt
+		
+		#old_wind_head = ane_reading
+		
+		if(state.major != BoatState.MAJ_DISABLED):
+			heading -= (rudder_pos-90)*0.05*boat_speed * dt
+			heading %= 360
+			
+			# Update anemometer reading because of new heading and speed
+			update_wind()
+		
+		
+		speed_graph[int(ane_reading)%360] = boat_speed
+		
+		pos.x += math.cos(math.radians(heading)) * boat_speed * dt
+		pos.y += math.sin(math.radians(heading)) * boat_speed * dt
+		
+		if abs(pos.x) > 10000 or abs(pos.y) > 10000:
+			pos.x = 0
+			pos.y = 0
+		
+		update_gps()
+	
 	glutPostRedisplay()
 	
 	if sim_is_running:
