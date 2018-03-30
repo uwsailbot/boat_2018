@@ -447,6 +447,18 @@ def ASCII_handler(key, mousex, mousey):
 			joy.buttons[5] = 0
 			joy.buttons[8] = 1
 			joy_pub.publish(joy)
+		elif key is '4' and should_sim_joy:
+			joy.buttons[1] = 1
+			joy.buttons[3] = 0
+			joy_pub.publish(joy)
+			joy.buttons[1] = 0
+			joy_pub.publish(joy)
+		elif key is '5' and should_sim_joy:
+			joy.buttons[1] = 0
+			joy.buttons[3] = 1
+			joy_pub.publish(joy)
+			joy.buttons[3] = 0
+			joy_pub.publish(joy)
 		elif key is 't' and should_sim_joy:
 			joy.buttons[0] = 1
 			joy.buttons[2] = 0
@@ -681,8 +693,8 @@ def draw_status():
 	
 	# Control positions of stuff
 	pos_offset = win_height*0.6
-	state_offset = win_height*0.4
-	boat_offset = win_height*0.2
+	state_offset = win_height*0.45
+	boat_offset = win_height*0.22
 	
 	# Draw the box
 	panel_width = 120
@@ -722,6 +734,20 @@ def draw_status():
 		major = "Auto"
 	elif state.major is BoatState.MAJ_DISABLED:
 		major = "Disabled"
+
+	challenge = ""
+	if state.challenge is BoatState.CHA_NONE:
+		challenge = "None"
+	elif state.challenge is BoatState.CHA_STATION:
+		challenge = "Station"
+	elif state.challenge is BoatState.CHA_NAV:
+		challenge = "Navigation"
+	elif state.challenge is BoatState.CHA_LONG:
+		challenge = "Long Distance"
+	elif state.challenge is BoatState.CHA_AVOID:
+		challenge = "Avoidance"
+	elif state.challenge is BoatState.CHA_SEARCH:
+		challenge = "Search"
 	
 	minor = ""
 	if state.minor is BoatState.MIN_COMPLETE:
@@ -730,16 +756,18 @@ def draw_status():
 		minor = "Planning"
 	elif state.minor is BoatState.MIN_TACKING:
 		minor = "Tacking"
+
 	draw_text("State", win_width-60, state_offset, 'center', 24)
 	draw_text("M: " + major, win_width-60, state_offset-20, 'center')
 	draw_text("m: " + minor, win_width-60, state_offset-35, 'center')
+	draw_text("C: " + challenge, win_width-60, state_offset-50, 'center')
 	
 	# Draw the boat diagram
 	draw_status_boat(win_width-60, boat_offset)
 	
 	# Draw the rudder and winch pos
-	draw_text("Winch: %d" % winch_pos, win_width-60, boat_offset-30, 'center')
-	draw_text("Rudder: %.1f" % rudder_pos, win_width-60, boat_offset-45, 'center')
+	draw_text("Winch: %d" % winch_pos, win_width-60, boat_offset-35, 'center')
+	draw_text("Rudder: %.1f" % rudder_pos, win_width-60, boat_offset-50, 'center')
 	
 	# Draw the simulation speed
 	draw_text("Spd: %.f%%" % (speed*100), win_width-60, 30, 'center')
@@ -1288,6 +1316,7 @@ if __name__ == '__main__':
 	
 	state.major = BoatState.MAJ_DISABLED
 	state.minor = BoatState.MIN_COMPLETE
+	state.challenge = BoatState.CHA_NONE
 	
 	try:
 		listener()

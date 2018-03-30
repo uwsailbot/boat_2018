@@ -6,5 +6,13 @@ uint32 MIN_COMPLETE=0
 uint32 MIN_PLANNING=1
 uint32 MIN_TACKING=2
 
+uint32 CHA_NONE=0
+uint32 CHA_STATION=1
+uint32 CHA_NAV=2
+uint32 CHA_LONG=3
+uint32 CHA_AVOID=4
+uint32 CHA_SEARCH=5
+
 uint32 major
 uint32 minor
+uint32 challenge
