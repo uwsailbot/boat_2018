@@ -134,7 +134,7 @@ sim_mode = 0
 sim_mode_str =['default', 'replay everything']
 
 
-# Simulation data and consts
+# Simulation data and constsf
 should_sim_joy = False
 sim_is_running = True
 speed = 10
@@ -147,6 +147,9 @@ winch_min = rospy.get_param('/boat/winch_min')
 winch_max = rospy.get_param('/boat/winch_max')
 wind_speed = 0
 speed_graph = {0 : 0}
+display_path = True
+path = PointArray()
+prev_path_time = 0
 
 # ROS data
 wind_heading = 270
@@ -170,6 +173,7 @@ rudder_enable = False
 replay_gps_raw = GPS()
 obstacle_points = PointArray()
 target_point = Point()
+
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -339,17 +343,20 @@ def mouse_handler(button, state, x, y):
 	if state != GLUT_DOWN:
 		cur_slider = ()
 		return
-	
-	if button == GLUT_RIGHT_BUTTON:
-		if sim_mode == 0:
-			local_points = PointArray()
-			gps_points = PointArray()
-	else:
+
+	# If status panels are being clicked on
+	if (x <= 180 and show_details) or (x >= win_width - 120) and button == GLUT_LEFT_BUTTON:
 		for key in sliders:
 			if sliders[key].contains(x,y):
 				cur_slider = sliders[key]
 				cur_slider.handle_mouse(x,y)
-		if cur_slider is () and sim_mode == 0:
+		return
+				
+	if button == GLUT_RIGHT_BUTTON:
+		if sim_mode == 0:
+			local_points = PointArray()
+			gps_points = PointArray()
+	elif cur_slider is () and sim_mode == 0:
 			newPt = Point()
 			newPt.x = x - win_width/2
 			newPt.y = -y + win_height/2
@@ -402,6 +409,8 @@ def ASCII_handler(key, mousex, mousey):
 	global wind_heading
 	global sim_mode
 	global show_details
+	global display_path
+	global path
 	
 	# Handle cheat codes
 	cur_input += key;
@@ -479,17 +488,16 @@ def ASCII_handler(key, mousex, mousey):
 			wind_heading += 5
 		elif key is 'd':
 			wind_heading -= 5
-		elif key is 'w':
-			speed += 0.1
-		elif key is 's':
-			speed -= 0.1
-			speed = max(speed, 0)
+		elif key is 'c':
+			path = PointArray()
+			display_path = not display_path
 		elif key is '0':
 			sound = not sound
 		elif key is ' ':
 			pos.x = 0
 			pos.y = 0
 			update_gps()
+			path = PointArray()
 
 
 # Main display rendering callback
@@ -506,6 +514,8 @@ def redraw():
 	draw_boat()
 	draw_target_heading_arrow()
 	draw_status()
+	if display_path:
+		draw_path()
 	if show_details:
 		draw_detailed_status()
 
@@ -692,9 +702,9 @@ def draw_status():
 	glPushMatrix()
 	
 	# Control positions of stuff
-	pos_offset = win_height*0.6
-	state_offset = win_height*0.45
-	boat_offset = win_height*0.22
+	pos_offset = win_height*0.62
+	state_offset = win_height*0.47
+	boat_offset = win_height*0.25
 	
 	# Draw the box
 	panel_width = 120
@@ -770,8 +780,10 @@ def draw_status():
 	draw_text("Rudder: %.1f" % rudder_pos, win_width-60, boat_offset-50, 'center')
 	
 	# Draw the simulation speed
-	draw_text("Spd: %.f%%" % (speed*100), win_width-60, 30, 'center')
-	draw_text("Time: %.1f" % clock + "s", win_width-60, 15, 'center')
+	draw_text("Sim speed ", win_width-60, 50, 'center')
+	sliders["Sim speed"].resize(win_width-100, 20)
+	sliders["Sim speed"].draw()
+	draw_text("Time: %.1f" % clock + "s", win_width-60, 5, 'center')
 	
 	draw_speed_graph(75, 75, 100)
 	
@@ -917,6 +929,16 @@ def draw_speed_graph(x, y, size):
 	
 	glPopMatrix()
 
+def draw_path():
+	glPushMatrix()
+	glColor3f(1.0, 1.0, 1.0)
+	glBegin(GL_LINES)
+	for i in range(0, len(path.points)-1):
+		glVertex2f(path.points[i].x + win_width/2.0 , path.points[i].y + win_height/2.0)
+		glVertex2f(path.points[i+1].x + win_width/2.0, path.points[i+1].y + win_height/2.0)
+	glEnd()
+	glPopMatrix()
+	
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Physics =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -981,7 +1003,8 @@ def calc(_):
 	global layline
 	global ane_reading
 	global boat_speed
-	
+	global path
+	global prev_path_time
 	# Calculate the in-simulator time
 	if(last_time == -1):
 		last_time = time.time()
@@ -1021,7 +1044,6 @@ def calc(_):
 		drag = 0.07*boat_speed*abs(boat_speed)
 		rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
 		drag += rudder_drag
-		
 		boat_speed += (acc - drag)*dt
 		
 		#old_wind_head = ane_reading
@@ -1042,8 +1064,21 @@ def calc(_):
 		if abs(pos.x) > 10000 or abs(pos.y) > 10000:
 			pos.x = 0
 			pos.y = 0
+			path = PointArray()
 		
 		update_gps()
+
+		# Don't let drawn path be too long 
+		if display_path:
+			if len(path.points) > 1000:
+				path = PointArray()
+			# Only add current point every half second
+			if clock > 0.5 + prev_path_time:
+				pt = Point()
+				pt.x = pos.x
+				pt.y = pos.y
+				path.points.append(pt)
+				prev_path_time = clock
 	
 	glutPostRedisplay()
 	
@@ -1248,11 +1283,18 @@ def init_sliders():
 	wind_speed_slider.set_color(0,0,0)
 	sliders["Wind speed"] = wind_speed_slider
 
+	sim_speed_slider = Slider(win_width-100,win_height-200,80,25, sim_speed_slider_callback, 0, 1000, 1000)
+	sim_speed_slider.set_color(0,0,0)
+	sliders["Sim speed"] = sim_speed_slider
+
 
 def wind_speed_slider_callback(value):
 	global wind_speed
 	wind_speed = value
 
+def sim_speed_slider_callback(value):
+	global speed
+	speed = value / 100.0
 
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
