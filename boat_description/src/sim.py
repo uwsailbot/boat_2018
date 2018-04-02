@@ -476,11 +476,6 @@ def ASCII_handler(key, mousex, mousey):
 			wind_heading += 5
 		elif key is 'd':
 			wind_heading -= 5
-		elif key is 'w':
-			speed += 0.1
-		elif key is 's':
-			speed -= 0.1
-			speed = max(speed, 0)
 		elif key is 'c':
 			path = PointArray()
 			display_path = not display_path
@@ -695,9 +690,9 @@ def draw_status():
 	glPushMatrix()
 	
 	# Control positions of stuff
-	pos_offset = win_height*0.6
-	state_offset = win_height*0.4
-	boat_offset = win_height*0.2
+	pos_offset = win_height*0.62
+	state_offset = win_height*0.47
+	boat_offset = win_height*0.25
 	
 	# Draw the box
 	panel_width = 120
@@ -757,8 +752,10 @@ def draw_status():
 	draw_text("Rudder: %.1f" % rudder_pos, win_width-60, boat_offset-45, 'center')
 	
 	# Draw the simulation speed
-	draw_text("Spd: %.f%%" % (speed*100), win_width-60, 30, 'center')
-	draw_text("Time: %.1f" % clock + "s", win_width-60, 15, 'center')
+	draw_text("Sim speed ", win_width-60, 50, 'center')
+	sliders["Sim speed"].resize(win_width-100, 20)
+	sliders["Sim speed"].draw()
+	draw_text("Time: %.1f" % clock + "s", win_width-60, 5, 'center')
 	
 	draw_speed_graph(75, 75, 100)
 	
@@ -980,7 +977,6 @@ def calc(_):
 	global boat_speed
 	global path
 	global prev_path_time
-	
 	# Calculate the in-simulator time
 	if(last_time == -1):
 		last_time = time.time()
@@ -1020,7 +1016,6 @@ def calc(_):
 		drag = 0.07*boat_speed*abs(boat_speed)
 		rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
 		drag += rudder_drag
-		
 		boat_speed += (acc - drag)*dt
 		
 		#old_wind_head = ane_reading
@@ -1260,11 +1255,18 @@ def init_sliders():
 	wind_speed_slider.set_color(0,0,0)
 	sliders["Wind speed"] = wind_speed_slider
 
+	sim_speed_slider = Slider(win_width-100,win_height-200,80,25, sim_speed_slider_callback, 0, 1000, 1000)
+	sim_speed_slider.set_color(0,0,0)
+	sliders["Sim speed"] = sim_speed_slider
+
 
 def wind_speed_slider_callback(value):
 	global wind_speed
 	wind_speed = value
 
+def sim_speed_slider_callback(value):
+	global speed
+	speed = value / 100.0
 
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
