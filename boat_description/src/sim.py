@@ -173,6 +173,8 @@ rudder_enable = False
 replay_gps_raw = GPS()
 obstacle_points = PointArray()
 target_point = Point()
+local_bounding_box = PointArray()
+gps_bounding_box = PointArray()
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
@@ -182,6 +184,7 @@ wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 10)
 gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
 orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
 joy_pub = rospy.Publisher('joy', Joy, queue_size = 10)
+square_pub = rospy.Publisher('bounding_box', PointArray, queue_size = 10)
 to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
 to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 
@@ -234,8 +237,6 @@ def boat_state_callback(newState):
 	if state.major is not BoatState.MAJ_DISABLED and pause:
 		pause_sim()
 	
-
-
 def rudder_callback(pos):
 	global rudder_pos
 	rudder_pos = pos.data
@@ -312,6 +313,43 @@ def obstacles_callback(obstacles):
 	global obstacle_points
 	obstacle_points = obstacles
 
+def bounding_box_callback(box):
+	global gps_bounding_box
+	global local_bounding_box
+	gps_bounding_box = box
+
+	# Reorganize the local points to create a box when drawn, if there are four
+	if len(gps_bounding_box.points) == 4:
+		x_sum = 0
+		y_sum = 0
+		for p in gps_bounding_box.points:
+			x_sum += p.x
+			y_sum += p.y
+		x_avr = x_sum / 4.0
+		y_avr = y_sum / 4.0
+		
+		temp_points = PointArray()
+		temp_points.points = [None]*4
+		for p in gps_bounding_box.points:
+			if p.x > x_avr:
+				if p.y < y_avr:
+					temp_points.points[0] = to_lps(p).pt
+				else: 
+					temp_points.points[1] = to_lps(p).pt
+			else:
+				if p.y < y_avr:
+					temp_points.points[3] = to_lps(p).pt
+				else:
+					temp_points.points[2] = to_lps(p).pt
+	
+	else:
+		temp_points = PointArray()
+		for point in gps_bounding_box.points:
+			local_point = to_lps(point).pt
+			temp_points.points.append(local_point)
+
+	local_bounding_box = temp_points	
+
 def target_point_callback(target_pt):
 	global target_point
 	target_point = target_pt
@@ -333,14 +371,16 @@ def resize(width, height):
 
 
 # Handler for mouse presses
-def mouse_handler(button, state, x, y):
+def mouse_handler(button, mouse_state, x, y):
 	global local_points
 	global gps_points
 	global sliders
 	global cur_slider
 	global sim_mode
+	global local_bounding_box
+	global gps_bounding_box
 	
-	if state != GLUT_DOWN:
+	if mouse_state != GLUT_DOWN:
 		cur_slider = ()
 		return
 
@@ -351,17 +391,31 @@ def mouse_handler(button, state, x, y):
 				cur_slider = sliders[key]
 				cur_slider.handle_mouse(x,y)
 		return
-				
+
 	if button == GLUT_RIGHT_BUTTON:
 		if sim_mode == 0:
 			local_points = PointArray()
 			gps_points = PointArray()
-	elif cur_slider is () and sim_mode == 0:
-			newPt = Point()
-			newPt.x = x - win_width/2
-			newPt.y = -y + win_height/2
-			coords = to_gps(newPt).pt
-			gps_points.points.append(coords)
+			local_bounding_box = PointArray()
+			gps_bounding_box = PointArray()
+
+	elif cur_slider is () and sim_mode == 0 and state.challenge is not BoatState.CHA_STATION:
+		newPt = Point()
+		newPt.x = x - win_width/2
+		newPt.y = -y + win_height/2
+		coords = to_gps(newPt).pt
+		gps_points.points.append(coords)
+
+	elif cur_slider is () and sim_mode == 0 and state.challenge is BoatState.CHA_STATION:
+		newPt = Point()
+		newPt.x = x - win_width/2
+		newPt.y = -y + win_height/2
+		coords = to_gps(newPt).pt
+		if len(local_bounding_box.points) == 4:
+			gps_bounding_box = PointArray()
+			local_bounding_box = PointArray()
+		gps_bounding_box.points.append(coords)
+		square_pub.publish(gps_bounding_box)
 
 	if sim_mode == 0:
 		waypoint_pub.publish(gps_points)
@@ -511,6 +565,7 @@ def redraw():
 	draw_target_point()
 	draw_waypoints()
 	draw_obstacles()
+	draw_bounding_box()
 	draw_boat()
 	draw_target_heading_arrow()
 	draw_status()
@@ -653,6 +708,26 @@ def draw_waypoints():
 		draw_circle(5,x,y)
 	
 	glPopMatrix()
+
+def draw_bounding_box():
+	glPushMatrix()
+
+	glColor3f(0,1,0)
+	for p in local_bounding_box.points:
+		x = p.x + win_width/2.0
+		y = p.y + win_height/2.0
+		draw_circle(5,x,y)
+
+	if len(local_bounding_box.points) == 4:
+		glLineWidth(1.0)
+		glBegin(GL_LINES)
+		for i in range(0, 4):
+			glVertex2f(local_bounding_box.points[i].x + win_width/2.0, local_bounding_box.points[i].y + win_height/2.0)
+			glVertex2f(local_bounding_box.points[(i+1) % 4].x + win_width/2.0, local_bounding_box.points[(i+1) % 4].y + win_height/2.0)
+		glEnd()
+		
+	glPopMatrix()
+	
 
 def draw_target_point():	
 	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
@@ -1347,6 +1422,7 @@ def listener():
 	rospy.Subscriber('gps_raw', GPS, gps_raw_callback)
 	rospy.Subscriber('obstacles', PointArray, obstacles_callback)
 	rospy.Subscriber('target_point', Point, target_point_callback)
+	rospy.Subscriber('bounding_box', PointArray, bounding_box_callback)
 
 
 

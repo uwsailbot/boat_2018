@@ -23,6 +23,10 @@ def boat_state_callback(new_state):
 	if state.major is BoatState.MAJ_AUTONOMOUS and state.minor is BoatState.MIN_COMPLETE and len(waypoints)>0:
 		state.minor = BoatState.MIN_PLANNING
 		boat_state_pub.publish(state)
+	
+	if state.challenge is BoatState.CHA_STATION:
+		waypoints = []
+		waypoints_pub.publish(waypoints)
 		
 
 def waypoints_callback(new_waypoint):
@@ -33,7 +37,7 @@ def waypoints_callback(new_waypoint):
 	if(len(waypoints) > 0):
 		publish_target(waypoints[0])
 	
-		# If we are waiting in autonomous-complete, and a new waypoint is added, move to planning state
+	# If we are waiting in autonomous-complete, and a new waypoint is added, move to planning state
 	if state.major is BoatState.MAJ_AUTONOMOUS and state.minor is BoatState.MIN_COMPLETE and len(waypoints)>0:
 		state.minor = BoatState.MIN_PLANNING
 		boat_state_pub.publish(state)
