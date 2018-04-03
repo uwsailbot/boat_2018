@@ -565,7 +565,8 @@ def redraw():
 	draw_target_point()
 	draw_waypoints()
 	draw_obstacles()
-	draw_bounding_box()
+	if state.challenge is BoatState.CHA_STATION:
+		draw_bounding_box()
 	draw_boat()
 	draw_target_heading_arrow()
 	draw_status()
