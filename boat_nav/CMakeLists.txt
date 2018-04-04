@@ -9,10 +9,11 @@ project(boat_nav)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   boat_msgs
+  actionlib
+  roslaunch
   roscpp
   rospy
   std_msgs
-  roslaunch
   phidgets_imu
   imu_filter_madgwick
 )
@@ -95,7 +96,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES boat_nav
-  CATKIN_DEPENDS boat_msgs roscpp rospy std_msgs
+#  CATKIN_DEPENDS boat_msgs roscpp rospy std_msgs
 #  DEPENDS system_lib
 )
 
@@ -153,6 +154,8 @@ include_directories(
    src/path_planner_node.py
    src/navigator_node.py
    src/sensor_parser_node.py
+   src/max_vmg_action.py
+   src/layline_action.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
