@@ -26,6 +26,22 @@ win_width = 720
 win_height = 480
 
 # UI objects and UI controls stuff
+class Camera:
+	
+	def __init__(self,x,y,scale):
+		self.x=x
+		self.y=y
+		self.scale=scale
+	
+	def lps_to_screen(self, lps_x, lps_y):
+		scrn_x = (lps_x - self.x) * self.scale
+		scrn_x += win_width/2
+		scrn_y = (lps_y - self.y) * self.scale
+		scrn_y += win_height/2
+		return (scrn_x, scrn_y)
+
+camera = Camera(0,0,1)
+
 class Slider:
 	
 	def __init__(self,x,y,w,h,callback,min_val,max_val,cur_val):
@@ -98,8 +114,13 @@ class Slider:
 		self.color=(r,g,b)
 		
 	def change_val(self, new_val):
-		self.cur_val = new_val
-		self.callback(new_val)
+		val = new_val
+		if val < self.min_val:
+			val = self.min_val
+		if val > self.max_val:
+			val = self.max_val
+		self.cur_val = val
+		self.callback(val)
 	
 	def contains(self, x, y):
 		local_x = x-self.x
@@ -115,6 +136,10 @@ class Slider:
 cur_slider = ()
 sliders = {}
 show_details = False
+gridsize = 100
+# set camera move speed (pixels per second)
+camera_move_speed = 100
+camera_velocity = Point(0, 0)
 
 
 # Resources
@@ -342,7 +367,7 @@ def mouse_handler(button, state, x, y):
 		if sim_mode == 0:
 			local_points = PointArray()
 			gps_points = PointArray()
-	else:
+	elif button == GLUT_LEFT_BUTTON:
 		for key in sliders:
 			if sliders[key].contains(x,y):
 				cur_slider = sliders[key]
@@ -357,11 +382,27 @@ def mouse_handler(button, state, x, y):
 	if sim_mode == 0:
 		waypoint_pub.publish(gps_points)
 
+# Handler for mouse position
+def passive_mouse_handler(x,y):
+	global camera_velocity
+	
+	# set camera_velocity when mouse is near edge of screen
+	if x < 50:
+		camera_velocity.x = -camera_move_speed / camera.scale
+	elif x > win_width-120-50 and x < win_width-120:
+		camera_velocity.x = camera_move_speed / camera.scale
+	else:
+		camera_velocity.x = 0
+		
+	if y < 50:
+		camera_velocity.y = camera_move_speed / camera.scale
+	elif y > win_height-50:
+		camera_velocity.y = -camera_move_speed / camera.scale
+	else:
+		camera_velocity.y = 0	
 
 # Handler for mouse dragging
 def motion_handler(x,y):
-	global sliders
-	global left_mouse_down
 	if cur_slider is not ():
 		cur_slider.handle_mouse(x,y)
 
@@ -475,6 +516,9 @@ def ASCII_handler(key, mousex, mousey):
 		elif key is ' ':
 			pos.x = 0
 			pos.y = 0
+			camera.x = 0
+			camera.y = 0
+			camera.scale = 1
 			update_gps()
 
 
@@ -486,6 +530,7 @@ def redraw():
 	glViewport(0, 0, win_width, win_height)
 	
 	# Render stuff
+	draw_grid()
 	draw_target_point()
 	draw_waypoints()
 	draw_obstacles()
@@ -624,8 +669,7 @@ def draw_waypoints():
 	
 	glColor3f(1,0,0)
 	for p in local_points.points:
-		x = p.x + win_width/2.0
-		y = p.y + win_height/2.0
+		(x,y) = camera.lps_to_screen(p.x, p.y)
 		draw_circle(5,x,y)
 	
 	glPopMatrix()
@@ -633,15 +677,15 @@ def draw_waypoints():
 def draw_target_point():	
 	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
 		glColor3f(1,1,1)
-		draw_circle(7, target_point.x + win_width/2.0, target_point.y + win_height/2.0)
+		(x,y) = camera.lps_to_screen(target_point.x, target_point.y)
+		draw_circle(7, x, y)
 
 def draw_obstacles():
 	glPushMatrix()
 	
 	glColor3f(0.2, 0.2, 0.2)
 	for p in obstacle_points.points:
-		x = p.x + win_width/2.0
-		y = p.y + win_height/2.0
+		(x,y) = camera.lps_to_screen(p.x, p.y)
 		draw_circle(5,x,y)
 	
 	glPopMatrix()
@@ -653,8 +697,7 @@ def draw_target_heading_arrow():
 		return
 	glPushMatrix()
 	
-	boat_x = pos.x + win_width/2.0
-	boat_y = pos.y + win_height/2.0
+	(boat_x, boat_y) = camera.lps_to_screen(pos.x, pos.y)
 	
 	glTranslatef(boat_x, boat_y, 0)
 	glRotatef(target_heading, 0, 0, 1)
@@ -704,6 +747,7 @@ def draw_status():
 	draw_text("Wind speed ", win_width-60, win_height-125, 'center')
 	sliders["Wind speed"].resize(win_width-100, win_height-160)
 	sliders["Wind speed"].draw()
+	sliders["Camera scale"].draw()
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
@@ -807,25 +851,53 @@ def draw_wind_arrow(x,y):
 	draw_image(compass_img, (x, y), 0, (70,70))
 	draw_image(compass_pointer_img, (x, y), wind_heading-90, (7,40))
 
+# Draw grid
+def draw_grid():
+	screen_gridsize = int(gridsize * camera.scale)
+	if screen_gridsize == 0:
+		screen_gridsize = 1
+	x = int(win_width/2.0 - camera.x * camera.scale) % screen_gridsize
+	y = int(win_height/2.0 - camera.y * camera.scale) % screen_gridsize
+
+	glColor3f(30/255.0,118/255.0,110/255.0)
+	
+	for i in range(0, int(win_width/screen_gridsize)+1):
+		glBegin(GL_QUADS)
+		glVertex2f(x+i*screen_gridsize,win_height)
+		glVertex2f(x+i*screen_gridsize,0)
+		glVertex2f(x+i*screen_gridsize+1,0)
+		glVertex2f(x+i*screen_gridsize+1,win_height)
+		glEnd()
+
+	for i in range(0, int(win_height/screen_gridsize)+1):
+		glBegin(GL_QUADS)
+		glVertex2f(win_width, y+i*screen_gridsize)
+		glVertex2f(0, y+i*screen_gridsize)
+		glVertex2f(0, y+i*screen_gridsize+1)
+		glVertex2f(win_width, y+i*screen_gridsize+1)
+		glEnd()
 
 # Draw the boat on the water
 def draw_boat():
-	x = pos.x + win_width/2.0
-	y = pos.y + win_height/2.0
-	
+	(x, y) = camera.lps_to_screen(pos.x, pos.y)
+
 	#draw rudder
 	glPushMatrix()
 	glTranslatef(x, y, 0)
 	glRotatef(heading-90, 0, 0, 1)
 	draw_image(
 		cur_rudder_img[0], # texture id
-		(0, -cur_boat_img[1][1]/2+cur_rudder_img[1][1]*0.1), # local y coord of rudder, moves to end of boat 
+		(0, (-cur_boat_img[1][1]/2+cur_rudder_img[1][1]*0.1)*camera.scale), # local y coord of rudder, moves to end of boat 
 		rudder_pos-90, # rudder pos
-		cur_rudder_img[1]) # rudder visual size
+		(cur_rudder_img[1][0]*camera.scale,cur_rudder_img[1][1]*camera.scale)) # rudder visual size
 	glPopMatrix()
 	
 	#draw boat
-	draw_image(cur_boat_img[0], (x, y), heading-90, cur_boat_img[1])
+	draw_image(
+		cur_boat_img[0],
+		(x, y),
+		heading-90,
+		(cur_boat_img[1][0]*camera.scale, cur_boat_img[1][1]*camera.scale))
 	
 	#draw sail
 	sail_angle = 90 * float(winch_max - winch_pos)/(winch_max - winch_min)
@@ -836,10 +908,11 @@ def draw_boat():
 	glRotatef(heading-90, 0, 0, 1)
 	draw_image(
 		cur_sail_img[0],
-		(1, 5),
+		(1*camera.scale, 5*camera.scale),
 		sail_angle,
-		(cur_sail_img[1]))
+		(cur_sail_img[1][0]*camera.scale, cur_sail_img[1][1]*camera.scale))
 	glPopMatrix()
+
 
 
 # Draw the rudder diagram centered on (x, y)
@@ -932,9 +1005,15 @@ def calc(_):
 	# Calculate the in-simulator time
 	if(last_time == -1):
 		last_time = time.time()
-	dt = (time.time() - last_time) * speed
+	real_dt = time.time() - last_time
+	dt = real_dt * speed
 	last_time = time.time()
 	clock += dt
+
+	# Move camera when mouse is near edge of screen
+	# I put this in here so that camera move speed is bound to time and not fps
+	camera.x +=	camera_velocity.x * real_dt
+	camera.y += camera_velocity.y * real_dt
 
 	if(sim_mode == 0):
 		# Calculate other things
@@ -1184,13 +1263,19 @@ def init_sliders():
 	global sliders
 	wind_speed_slider = Slider(win_width-100,win_height-160,80,25, wind_speed_slider_callback, 0, 15, 5)
 	wind_speed_slider.set_color(0,0,0)
+	camera_scale_slider = Slider(20,160,80,25, camera_scale_slider_callback, 0.1, 10, 1)
+	camera_scale_slider.set_color(0,0,0)
 	sliders["Wind speed"] = wind_speed_slider
+	sliders["Camera scale"] = camera_scale_slider
 
 
 def wind_speed_slider_callback(value):
 	global wind_speed
 	wind_speed = value
 
+def camera_scale_slider_callback(value):
+	global camera
+	camera.scale = value
 
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
@@ -1207,10 +1292,11 @@ def init_GL():
 	win_ID = glutCreateWindow('Simulator')
 	
 	#Setup the window with blue background
-	init_2D(66/255.0,134/255.0,244/255.0)
+	init_2D(90/255.0,155/255.0,230/255.0)
 	glutDisplayFunc(redraw)
 	glutReshapeFunc(resize)
 	glutMouseFunc(mouse_handler)
+	glutPassiveMotionFunc(passive_mouse_handler)
 	glutMotionFunc(motion_handler)
 	glutKeyboardFunc(ASCII_handler)
 	glutSpecialFunc(keyboard_handler)
