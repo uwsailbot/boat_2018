@@ -39,6 +39,17 @@ class Camera:
 		scrn_y = (lps_y - self.y) * self.scale
 		scrn_y += win_height/2
 		return (scrn_x, scrn_y)
+	
+	def screen_to_lps(self, scrn_x, scrn_y):
+		lps_x = scrn_x - win_width/2
+		lps_x /= self.scale
+		lps_x += self.x 
+		lps_y = scrn_y - win_height/2
+		lps_y /= self.scale
+		lps_y += self.y
+				
+		return (lps_x, lps_y)
+
 
 camera = Camera(0,0,1)
 
@@ -374,8 +385,9 @@ def mouse_handler(button, state, x, y):
 				cur_slider.handle_mouse(x,y)
 		if cur_slider is () and sim_mode == 0:
 			newPt = Point()
-			newPt.x = x - win_width/2
-			newPt.y = -y + win_height/2
+			(lps_x,lps_y) = camera.screen_to_lps(x,y)			
+			newPt.x = lps_x
+			newPt.y = -lps_y
 			coords = to_gps(newPt).pt
 			gps_points.points.append(coords)
 	elif button == 3 and state == GLUT_DOWN:
