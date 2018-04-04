@@ -696,7 +696,7 @@ def draw_waypoints():
 	glColor3f(1,0,0)
 	for p in local_points.points:
 		(x,y) = camera.lps_to_screen(p.x, p.y)
-		draw_circle(5,x,y)
+		draw_circle(5 * camera.scale,x,y)
 	
 	glPopMatrix()
 
@@ -704,7 +704,7 @@ def draw_target_point():
 	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
 		glColor3f(1,1,1)
 		(x,y) = camera.lps_to_screen(target_point.x, target_point.y)
-		draw_circle(7, x, y)
+		draw_circle(7 * camera.scale, x, y)
 
 def draw_obstacles():
 	glPushMatrix()
@@ -712,7 +712,7 @@ def draw_obstacles():
 	glColor3f(0.2, 0.2, 0.2)
 	for p in obstacle_points.points:
 		(x,y) = camera.lps_to_screen(p.x, p.y)
-		draw_circle(5,x,y)
+		draw_circle(5 * camera.scale,x,y)
 	
 	glPopMatrix()
 
