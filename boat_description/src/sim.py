@@ -378,7 +378,15 @@ def mouse_handler(button, state, x, y):
 			newPt.y = -y + win_height/2
 			coords = to_gps(newPt).pt
 			gps_points.points.append(coords)
-
+	elif button == 3 and state == GLUT_DOWN:
+		camera.scale *= 1.04
+		if camera.scale > 10:
+			camera.scale = 10
+	elif button == 4 and state == GLUT_DOWN:
+		camera.scale *= 0.96
+		if camera.scale < 0.1:
+			camera.scale = 0.1
+	
 	if sim_mode == 0:
 		waypoint_pub.publish(gps_points)
 
@@ -386,10 +394,16 @@ def mouse_handler(button, state, x, y):
 def passive_mouse_handler(x,y):
 	global camera_velocity
 	
+	# if mouse is on right info panel, don't move camera
+	if x > win_width-120:
+		camera_velocity.x = 0
+		camera_velocity.y = 0
+		return
+	
 	# set camera_velocity when mouse is near edge of screen
 	if x < 50:
 		camera_velocity.x = -camera_move_speed / camera.scale
-	elif x > win_width-120-50 and x < win_width-120:
+	elif x > win_width-120-50:
 		camera_velocity.x = camera_move_speed / camera.scale
 	else:
 		camera_velocity.x = 0
@@ -747,7 +761,6 @@ def draw_status():
 	draw_text("Wind speed ", win_width-60, win_height-125, 'center')
 	sliders["Wind speed"].resize(win_width-100, win_height-160)
 	sliders["Wind speed"].draw()
-	sliders["Camera scale"].draw()
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
@@ -1263,19 +1276,12 @@ def init_sliders():
 	global sliders
 	wind_speed_slider = Slider(win_width-100,win_height-160,80,25, wind_speed_slider_callback, 0, 15, 5)
 	wind_speed_slider.set_color(0,0,0)
-	camera_scale_slider = Slider(20,160,80,25, camera_scale_slider_callback, 0.1, 10, 1)
-	camera_scale_slider.set_color(0,0,0)
 	sliders["Wind speed"] = wind_speed_slider
-	sliders["Camera scale"] = camera_scale_slider
 
 
 def wind_speed_slider_callback(value):
 	global wind_speed
 	wind_speed = value
-
-def camera_scale_slider_callback(value):
-	global camera
-	camera.scale = value
 
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
