@@ -54,7 +54,7 @@ class LaylineAction(object):
 		# Adjust time delay until the tack is considered failed, and we return to planning
 		if not self.tacking_client.wait_for_result(rospy.Duration(10)):
 			self.tacking_client.cancel_goal()
-			self.tacking_goal.direction = tacking_goal.direction * -1
+			tacking_goal.direction = tacking_goal.direction * -1
 			self.tacking_client.send_goal(tacking_goal)
 			if not self.tacking_client.wait_for_result(rospy.Duration(10)):
 				self.tacking_client.cancel_goal()
