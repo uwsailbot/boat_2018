@@ -35,19 +35,19 @@ class Camera:
 	
 	def lps_to_screen(self, lps_x, lps_y):
 		scrn_x = (lps_x - self.x) * self.scale
-		scrn_x += win_width/2
+		scrn_x += win_width/2.0
 		scrn_y = (lps_y - self.y) * self.scale
-		scrn_y += win_height/2
+		scrn_y += win_height/2.0
 		return (scrn_x, scrn_y)
 	
 	def screen_to_lps(self, scrn_x, scrn_y):
-		lps_x = scrn_x - win_width/2
+		lps_x = scrn_x - win_width/2.0
 		lps_x /= self.scale
-		lps_x += self.x 
-		lps_y = scrn_y - win_height/2
+		lps_x += self.x
+		# Screen y axis is flipped
+		lps_y = -1 * (scrn_y - win_height/2.0)
 		lps_y /= self.scale
 		lps_y += self.y
-				
 		return (lps_x, lps_y)
 
 
@@ -391,11 +391,12 @@ def mouse_handler(button, state, x, y):
 		if sim_mode == 0:
 			local_points = PointArray()
 			gps_points = PointArray()
-	elif cur_slider is () and sim_mode == 0:
+	elif cur_slider is () and sim_mode == 0 and button == GLUT_LEFT_BUTTON:
 			newPt = Point()
+			#print x,y
 			(lps_x,lps_y) = camera.screen_to_lps(x,y)			
 			newPt.x = lps_x
-			newPt.y = -lps_y
+			newPt.y = lps_y
 			coords = to_gps(newPt).pt
 			gps_points.points.append(coords)
 	elif button == 3 and state == GLUT_DOWN:
@@ -553,8 +554,9 @@ def ASCII_handler(key, mousex, mousey):
 			camera.x = 0
 			camera.y = 0
 			camera.scale = 1
+			path = PointArray()			
 			update_gps()
-			path = PointArray()
+			
 
 
 # Main display rendering callback
@@ -1003,8 +1005,10 @@ def draw_path():
 	glColor3f(1.0, 1.0, 1.0)
 	glBegin(GL_LINES)
 	for i in range(0, len(path.points)-1):
-		glVertex2f(path.points[i].x + win_width/2.0 , path.points[i].y + win_height/2.0)
-		glVertex2f(path.points[i+1].x + win_width/2.0, path.points[i+1].y + win_height/2.0)
+		(x, y) = camera.lps_to_screen(path.points[i].x, path.points[i].y)
+		(x_n, y_n) = camera.lps_to_screen(path.points[i+1].x, path.points[i+1].y)
+		glVertex2f(x, y)
+		glVertex2f(x_n ,y_n)
 	glEnd()
 	glPopMatrix()
 	
@@ -1082,10 +1086,9 @@ def calc(_):
 	last_time = time.time()
 	clock += dt
 
-	if sim_mode == 0:
 	# Move camera when mouse is near edge of screen
 	# I put this in here so that camera move speed is bound to time and not fps
-	camera.x +=	camera_velocity.x * real_dt
+	camera.x += camera_velocity.x * real_dt
 	camera.y += camera_velocity.y * real_dt
 
 	if(sim_mode == 0):
@@ -1138,9 +1141,12 @@ def calc(_):
 		pos.x += math.cos(math.radians(heading)) * boat_speed * dt
 		pos.y += math.sin(math.radians(heading)) * boat_speed * dt
 		
+		# Reset boat if out of bounds
 		if abs(pos.x) > 10000 or abs(pos.y) > 10000:
 			pos.x = 0
 			pos.y = 0
+			camera.x = 0
+			camera.y = 0
 			path = PointArray()
 		
 		update_gps()
