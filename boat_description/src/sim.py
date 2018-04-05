@@ -386,7 +386,7 @@ def mouse_handler(button, state, x, y):
 				cur_slider = sliders[key]
 				cur_slider.handle_mouse(x,y)
 		return
-				
+	
 	if button == GLUT_RIGHT_BUTTON:
 		if sim_mode == 0:
 			local_points = PointArray()
@@ -421,17 +421,17 @@ def passive_mouse_handler(x,y):
 		camera_velocity.y = 0
 		return
 	
-	# set camera_velocity when mouse is near edge of screen
-	if x < 50:
+	# set camera_velocity when mouse is near edge of screen or edge of info display panel
+	if (x < 55 and x > 5 and not show_details) or (x < 180+50 and x > 180 and show_details):
 		camera_velocity.x = -camera_move_speed / camera.scale
 	elif x > win_width-120-50:
 		camera_velocity.x = camera_move_speed / camera.scale
 	else:
 		camera_velocity.x = 0
-		
-	if y < 50:
+	# The > 5 makes sure that when we scroll off the window, the camera stops moving
+	if y < 55 and y > 5:
 		camera_velocity.y = camera_move_speed / camera.scale
-	elif y > win_height-50:
+	elif y > win_height-55 and y < win_height-5:
 		camera_velocity.y = -camera_move_speed / camera.scale
 	else:
 		camera_velocity.y = 0	
