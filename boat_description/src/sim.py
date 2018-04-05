@@ -643,12 +643,12 @@ def redraw():
 	draw_waypoints()
 	draw_obstacles()
 	if state.challenge is BoatState.CHA_STATION:
-		draw_bounding_box()
+		draw_bounding_box()	
+	if display_path:
+		draw_path()
 	draw_boat()
 	draw_target_heading_arrow()
 	draw_status()
-	if display_path:
-		draw_path()
 	if show_details:
 		draw_detailed_status()
 
@@ -791,16 +791,17 @@ def draw_bounding_box():
 
 	glColor3f(0,1,0)
 	for p in local_bounding_box.points:
-		x = p.x + win_width/2.0
-		y = p.y + win_height/2.0
-		draw_circle(5,x,y)
+		(x,y) = camera.lps_to_screen(p.x, p.y)
+		draw_circle(5 * camera.scale,x,y)
 
 	if len(local_bounding_box.points) == 4:
 		glLineWidth(1.0)
 		glBegin(GL_LINES)
 		for i in range(0, 4):
-			glVertex2f(local_bounding_box.points[i].x + win_width/2.0, local_bounding_box.points[i].y + win_height/2.0)
-			glVertex2f(local_bounding_box.points[(i+1) % 4].x + win_width/2.0, local_bounding_box.points[(i+1) % 4].y + win_height/2.0)
+			(x,y) = camera.lps_to_screen(local_bounding_box.points[i].x, local_bounding_box.points[i].y)
+			(x_n,y_n) = camera.lps_to_screen(local_bounding_box.points[(i+1) % 4].x, local_bounding_box.points[(i+1) % 4].y)
+			glVertex2f(x, y)
+			glVertex2f(x_n, y_n)
 		glEnd()
 		
 	glPopMatrix()
