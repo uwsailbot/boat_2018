@@ -325,6 +325,10 @@ def anemometer_callback(anemometer):
 	global ane_reading
 	ane_reading = anemometer.data
 
+def mock_true_wind_callback(anemometer):
+	global wind_heading
+	wind_heading = anemometer.data
+
 def rudder_output_callback(float32):
 	global rudder_output
 	rudder_output = float32.data
@@ -937,7 +941,7 @@ def draw_status():
 	sliders["Sim speed"].draw()
 	draw_text("Time: %.1f" % clock + "s", win_width-60, 5, 'center')
 	
-	draw_speed_graph(75, 75, 100)
+	#draw_speed_graph(75, 75, 100)
 	
 	glPopMatrix()
 
@@ -1529,6 +1533,9 @@ def listener():
 	rospy.Subscriber('winch', Int32, winch_callback)
 	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
 	rospy.Subscriber('target_heading', Float32, target_heading_callback)
+	
+	# So we can use real wind data in simulation mode
+	rospy.Subscriber('mock_true_wind', Float32, mock_true_wind_callback)
 	
 	# subscribers for replay mode
 	rospy.Subscriber('lps', Point, lps_callback)
