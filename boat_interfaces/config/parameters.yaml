@@ -1,3 +1,5 @@
+use_sim_time: true
+
 boat:
   layline: 30.0
   winch_max: 2000.0

@@ -9,6 +9,7 @@ from boat_msgs.msg import BoatState, GPS, Point, PointArray
 from boat_msgs.srv import ConvertPoint
 from sensor_msgs.msg import Imu, Joy
 from std_msgs.msg import Float32, Int32, Bool
+from rosgraph_msgs.msg import Clock
 from tf.transformations import quaternion_from_euler
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -221,6 +222,7 @@ gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
 orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
 joy_pub = rospy.Publisher('joy', Joy, queue_size = 10)
 square_pub = rospy.Publisher('bounding_box', PointArray, queue_size = 10)
+clock_pub = rospy.Publisher('clock', Clock, queue_size = 1)
 to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
 to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 
@@ -263,11 +265,6 @@ def update_wind():
 
 def boat_state_callback(newState):
 	global state
-	# Unpush the tacking button if tacking has completed so we don't tack forever
-	#if state.minor is BoatState.MIN_TACKING and newState.minor is not BoatState.MIN_TACKING:
-	#	joy.buttons[2] = 1
-	#	joy.buttons[0] = 0
-	#joy_pub.publish(joy)
 	
 	state = newState
 	if state.major is not BoatState.MAJ_DISABLED and pause:
@@ -371,7 +368,7 @@ def bounding_box_callback(box):
 		temp_points = PointArray()
 		temp_points.points = [None]*4
 		for p in gps_bounding_box.points:
-			if p.x > x_avr:
+			if p.x < x_avr:
 				if p.y < y_avr:
 					temp_points.points[0] = to_lps(p).pt
 				else: 
@@ -381,7 +378,12 @@ def bounding_box_callback(box):
 					temp_points.points[3] = to_lps(p).pt
 				else:
 					temp_points.points[2] = to_lps(p).pt
-	
+		for p in temp_points.points:
+			if p is None:
+				gps_bounding_box = PointArray()
+				local_bounding_box = PointArray()
+				square_pub.publish(gps_bounding_box)
+				print "Invalid box configuration."
 	else:
 		temp_points = PointArray()
 		for point in gps_bounding_box.points:
@@ -461,12 +463,12 @@ def mouse_handler(button, mouse_state, x, y):
 		gps_bounding_box.points.append(coords)
 		square_pub.publish(gps_bounding_box)
 
-	elif button == 3 and state == GLUT_DOWN:
+	elif button == 3 and mouse_state == GLUT_DOWN:
 		camera.scale *= 1.04
 		if camera.scale > 10:
 			camera.scale = 10
 
-	elif button == 4 and state == GLUT_DOWN:
+	elif button == 4 and mouse_state == GLUT_DOWN:
 		camera.scale *= 0.96
 		if camera.scale < 0.1:
 			camera.scale = 0.1
@@ -902,9 +904,7 @@ def draw_status():
 		major = "Disabled"
 
 	challenge = ""
-	if state.challenge is BoatState.CHA_NONE:
-		challenge = "None"
-	elif state.challenge is BoatState.CHA_STATION:
+	if state.challenge is BoatState.CHA_STATION:
 		challenge = "Station"
 	elif state.challenge is BoatState.CHA_NAV:
 		challenge = "Navigation"
@@ -1199,6 +1199,10 @@ def calc(_):
 	dt = real_dt * speed
 	last_time = time.time()
 	clock += dt
+	time_msg = Clock()
+	time_msg.clock.secs = clock
+	time_msg.clock.nsecs = (clock % 1) * (10**9)
+	clock_pub.publish(time_msg)
 
 	# Move camera when mouse is near edge of screen
 	# I put this in here so that camera move speed is bound to time and not fps
@@ -1560,7 +1564,7 @@ if __name__ == '__main__':
 	
 	state.major = BoatState.MAJ_DISABLED
 	state.minor = BoatState.MIN_COMPLETE
-	state.challenge = BoatState.CHA_NONE
+	state.challenge = BoatState.CHA_NAV
 	
 	try:
 		listener()
