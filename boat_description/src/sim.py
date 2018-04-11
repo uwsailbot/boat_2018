@@ -906,9 +906,9 @@ def draw_status():
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
-	draw_text("X: %.1f" % pos.x, win_width-60, pos_offset, 'center')
-	draw_text("Y: %.1f" % pos.y, win_width-60, pos_offset-15, 'center')
-	draw_text("Spd: %.1f" % boat_speed, win_width-60, pos_offset-30, 'center')
+	draw_text("X: %.1f m" % pos.x, win_width-60, pos_offset, 'center')
+	draw_text("Y: %.1f m" % pos.y, win_width-60, pos_offset-15, 'center')
+	draw_text("Spd: %.1f m/s" % boat_speed, win_width-60, pos_offset-30, 'center')
 	draw_text("Head: %.1f" % heading, win_width-60, pos_offset-45, 'center')
 	
 	# Draw the boat state
@@ -1170,15 +1170,13 @@ def calc_tack(boat_heading, wind_heading):
 	elif diff < -180:
 		diff += 360
 	
+	# Dead run	
 	if diff == 0:
-		return 0
+		return 1.0
 	return diff/abs(diff)
-
 
 # returns heading of vector point from end of boom to mast
 def calc_boom_heading(boat_heading, wind_heading, winch):
-	global winch_min
-	global winch_max
 	winch_range = winch_max - winch_min
 	
 	tack = calc_tack(boat_heading, wind_heading)
@@ -1240,7 +1238,6 @@ def calc(_):
 		boom_perp_vector = polar_to_rect(1, boom_heading + tack*90)
 		app_wind = calc_apparent_wind(wind_heading, boat_speed, heading)
 		heading_vector = polar_to_rect(1, heading)
-		
 		# components of wind parallel and perpendicular to sail
 		wind_par = -proj(app_wind, boom_vector)
 		wind_perp = proj(app_wind, boom_perp_vector)
@@ -1250,19 +1247,18 @@ def calc(_):
 			acc = 0
 		else:
 			# Calculate drag component (major component when on run)		
-			a_perp = 0.05*wind_perp**2
-			acc = a_perp * proj(boom_perp_vector, heading_vector)	
-			
-			#Calculate lift (major component when on reach)
+			a_perp = 0.03*wind_perp**2
+			acc = a_perp * proj(boom_perp_vector, heading_vector)
+			# Calculate lift (major component when on reach)
 			if wind_par > 0:
 				a_par = 0.03*wind_par**2
 				acc += a_par * proj(boom_perp_vector, heading_vector)
 		
 		# Wind drag on boat (prominent when in irons)
-		acc += 0.005*proj(app_wind, heading_vector)
-		
+		acc += 0.01*proj(app_wind, heading_vector)
+
 		# Water drag
-		drag = 0.07*boat_speed*abs(boat_speed)
+		drag = 0.25*boat_speed*abs(boat_speed)
 		rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
 		drag += rudder_drag
 		boat_speed += (acc - drag)*dt
@@ -1270,7 +1266,7 @@ def calc(_):
 		#old_wind_head = ane_reading
 		
 		if(state.major != BoatState.MAJ_DISABLED):
-			heading -= (rudder_pos-90)*0.05*boat_speed * dt
+			heading -= (rudder_pos-90)*0.4*boat_speed * dt
 			heading %= 360
 			
 			# Update anemometer reading because of new heading and speed

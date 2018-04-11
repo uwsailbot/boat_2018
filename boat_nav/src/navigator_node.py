@@ -37,7 +37,7 @@ cur_pos =  Point()
 ## The boat's speed, in m/s
 boat_speed = 0
 
-## Minimum boat speed (in knots) required to tack:
+## Minimum boat speed (in m/s) required to tack:
 min_tacking_speed = rospy.get_param('/boat/min_tacking_speed')
 
 ## The maximum VMG found, in m/s
@@ -209,7 +209,7 @@ def calc_cur_tack_max_vmg(wind_coming):
 		theoretic_boat_speed = 2.5 * 0.514444 # 2.5 Knots to m/s (measured boat speed)
 		vmg_heading = direct_heading
 	# If none of the above, the best heading will be the one closest to the other tack
-	else: 
+	else:
 		theoretic_boat_speed = 2.5 * 0.514444
 		vmg_heading = apparent_wind_heading
 	
@@ -332,7 +332,7 @@ def awa_algorithm():
 		
 		cur_vmg = calc_vmg(wind_coming) # Calculate vmg on current path
 		global_max_vmg, global_vmg_heading = calc_global_max_vmg(wind_coming) # Calculate max global vmg 
-		cur_tack_max_vmg, cur_tack_vmg_heading = calc_cur_tack_max_vmg(wind_coming) # Calculate the max vmg on the current talk
+		cur_tack_max_vmg, cur_tack_vmg_heading = calc_cur_tack_max_vmg(wind_coming) # Calculate the max vmg on the current tack
 		#rospy.loginfo(rospy.get_caller_id() +" Cur VMG: %f Max VMG: %f with Heading: %f Cur Tack VMG: %f with Heading: %f Direct Heading: %f", cur_vmg, global_max_vmg, global_vmg_heading, cur_tack_max_vmg, cur_tack_vmg_heading, direct_heading)
 		per_course_left = remaining_course()
 		
@@ -369,7 +369,8 @@ def awa_algorithm():
 						tacking_client.send_goal(goal)
 						if not tacking_client.wait_for_result(rospy.Duration(10)):
 							tacking_client.cancel_goal()
-					target_heading = tacking_client.get_result().target_heading
+					if tacking_client.get_result() is not None:
+						target_heading = tacking_client.get_result().target_heading
 					rospy.loginfo(rospy.get_caller_id() + " Boat State = 'Autonomous - Planning'")
 
 				# If the tack is not worth preforming, set the current heading to be the max vmg of our current tack
@@ -378,9 +379,12 @@ def awa_algorithm():
 					heading_pub.publish(target_heading)
 					
 			# Tack is not required to get to vmg_heading, therefore set it
-			else: 
-				target_heading = global_vmg_heading
-				heading_pub.publish(target_heading)
+			else:
+				# Make sure that current heading and last requested target are close before updating this 
+				# That way we don't turn the other way (tack instead of jibe first for instance) (only if there is a large discrepancy 					# between current target and new target, that way we still update for drift
+				if abs(target_heading - cur_boat_heading) < 5.0 or abs(global_vmg_heading - target_heading) < 10:
+					target_heading = global_vmg_heading
+					heading_pub.publish(target_heading)
 
 		#Final leg of the course, traveling on an optimal vmg course, time to get to layline.  Second condition to make sure this doesn't run if we are already on the layline
 		# TODO: Tolerance correctly	
@@ -393,7 +397,8 @@ def awa_algorithm():
 			# Adjust time delay until the layline setup action is considered failed, and we return to planning
 			if not layline_client.wait_for_result(rospy.Duration(40)):
 				layline_client.cancel_goal()
-			target_heading = layline_client.get_result().target_heading
+			if layline_client.get_result() is not None:
+				target_heading = layline_client.get_result().target_heading
 
 			# Disable planning while messages are caught up on
 			#no_layline_planning = True

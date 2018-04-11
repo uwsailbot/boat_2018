@@ -3,7 +3,7 @@ import actionlib
 import boat_msgs.msg
 import rospy
 import math
-from boat_msgs.msg import BoatState, Point, TackingAction, TackingGoal
+from boat_msgs.msg import BoatState, Point, TackingAction, TackingGoal, GPS
 from std_msgs.msg import Float32
 
 class LaylineAction(object):
@@ -17,9 +17,12 @@ class LaylineAction(object):
 		self._as.start()
 		self.tacking_client = actionlib.SimpleActionClient('tacking_action', TackingAction)
 		self.cur_pos = Point()
+		self.min_speed = rospy.get_param('/boat/min_tacking_speed')
 		self.target_heading = 0
+		self.boat_speed = 0
 		self.target_sub = rospy.Subscriber('target_heading', Float32, self.target_heading_callback)
 		self.pos_sub = rospy.Subscriber('lps', Point, self.position_callback)
+		self.gps_sub = rospy.Subscriber('gps_raw', GPS, self.gps_callback)
 		self.rate = rospy.Rate(100)
 		self.tacking_client.wait_for_server()
 
@@ -28,6 +31,9 @@ class LaylineAction(object):
 
 	def position_callback(self, position):
 		self.cur_pos = position
+
+	def gps_callback(self, gps):
+		self.boat_speed = gps.speed * 0.514444 # Knots to m/s
 
 	def is_within_bounds(self, val, boundA, boundB):
 		return (boundA < val and val < boundB) or (boundB < val and val < boundA)
@@ -70,7 +76,7 @@ class LaylineAction(object):
 		rospy.loginfo(rospy.get_caller_id() + self._feedback.status)
 
 		# Wait until we hit the layline heading
-		while not hit_layline and not preempted:
+		while (not hit_layline or self.boat_speed < self.min_speed) and not preempted:
 			direct_heading = math.atan2(goal.target.y - self.cur_pos.y, goal.target.x - self.cur_pos.x) * 180 / math.pi
 			if (tacking_direction is 1 and direct_heading > (goal.alt_tack_angle + goal.overshoot_angle)) or\
 				(tacking_direction is -1 and direct_heading < (goal.alt_tack_angle - goal.overshoot_angle)):
