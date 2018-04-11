@@ -52,7 +52,7 @@ class Camera:
 		return (lps_x, lps_y)
 
 
-camera = Camera(0,0,1)
+camera = Camera(0,0,10)
 
 class Slider:
 	
@@ -148,7 +148,7 @@ class Slider:
 cur_slider = ()
 sliders = {}
 show_details = False
-gridsize = 100
+gridsize = 10
 # set camera move speed (pixels per second)
 camera_move_speed = 100
 camera_velocity = Point(0, 0)
@@ -465,8 +465,8 @@ def mouse_handler(button, mouse_state, x, y):
 
 	elif button == 3 and mouse_state == GLUT_DOWN:
 		camera.scale *= 1.04
-		if camera.scale > 10:
-			camera.scale = 10
+		if camera.scale > 100:
+			camera.scale = 100
 
 	elif button == 4 and mouse_state == GLUT_DOWN:
 		camera.scale *= 0.96
@@ -630,7 +630,7 @@ def ASCII_handler(key, mousex, mousey):
 			pos.y = 0
 			camera.x = 0
 			camera.y = 0
-			camera.scale = 1
+			camera.scale = 10
 			path = PointArray()			
 			update_gps()
 			
@@ -788,7 +788,7 @@ def draw_waypoints():
 	glColor3f(1,0,0)
 	for p in local_points.points:
 		(x,y) = camera.lps_to_screen(p.x, p.y)
-		draw_circle(5 * camera.scale,x,y)
+		draw_circle(0.5 * camera.scale,x,y)
 	
 	glPopMatrix()
 
@@ -798,7 +798,7 @@ def draw_bounding_box():
 	glColor3f(0,1,0)
 	for p in local_bounding_box.points:
 		(x,y) = camera.lps_to_screen(p.x, p.y)
-		draw_circle(5 * camera.scale,x,y)
+		draw_circle(0.5 * camera.scale,x,y)
 
 	if len(local_bounding_box.points) == 4:
 		glLineWidth(1.0)
@@ -817,7 +817,7 @@ def draw_target_point():
 	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
 		glColor3f(1,1,1)
 		(x,y) = camera.lps_to_screen(target_point.x, target_point.y)
-		draw_circle(7 * camera.scale, x, y)
+		draw_circle(0.7 * camera.scale, x, y)
 
 def draw_obstacles():
 	glPushMatrix()
@@ -825,7 +825,7 @@ def draw_obstacles():
 	glColor3f(0.2, 0.2, 0.2)
 	for p in obstacle_points.points:
 		(x,y) = camera.lps_to_screen(p.x, p.y)
-		draw_circle(5 * camera.scale,x,y)
+		draw_circle(0.5 * camera.scale,x,y)
 	
 	glPopMatrix()
 
@@ -1064,7 +1064,7 @@ def draw_boat():
 	glRotatef(heading-90, 0, 0, 1)
 	draw_image(
 		cur_sail_img[0],
-		(1*camera.scale, 5*camera.scale),
+		(0.1*camera.scale, 0.5*camera.scale),
 		sail_angle,
 		(cur_sail_img[1][0]*camera.scale, cur_sail_img[1][1]*camera.scale))
 	glPopMatrix()
@@ -1352,24 +1352,24 @@ def load_image_resources():
 	compass_pointer_img = load_image('../meshes/compass_pointer.png', (23,128))
 	
 	orig=load_image('../meshes/niceboat.png', (64,128))
-	boat_imgs["orig"] = orig, (24,48)
+	boat_imgs["orig"] = orig, (2,4)
 	orig_rudder = load_image('../meshes/rudder.png', (32,64))
-	rudder_imgs["orig"] = orig_rudder, (16,32)
+	rudder_imgs["orig"] = orig_rudder, (1.5,3)
 	orig_sail = load_image('../meshes/sail.png', (32,64))
-	sail_imgs["orig"] = orig_sail, (24,48)
+	sail_imgs["orig"] = orig_sail, (2,4)
 	
 	pirate_id=load_image('../meshes/pirate_boat.png', (39,56))
-	boat_imgs["pirate"] = pirate_id, (36,48)
+	boat_imgs["pirate"] = pirate_id, (3,4)
 	# use orig rudder and sail	
-	rudder_imgs["pirate"] = orig_rudder, (16,32)
-	sail_imgs["pirate"] = orig_sail, (24,48)
+	rudder_imgs["pirate"] = orig_rudder, (1.5,3)
+	sail_imgs["pirate"] = orig_sail, (2,4)
 	
 	SPACE_X = load_image('../meshes/falcon_heavy.png', (1040,5842))
-	boat_imgs["mars"] = SPACE_X, (1040/48,5842/48)
+	boat_imgs["mars"] = SPACE_X, (2,10)
 	# use orig rudder
-	rudder_imgs["mars"] = orig_rudder, (16,32)
+	rudder_imgs["mars"] = orig_rudder, (2,3)
 	roadster = load_image('../meshes/roadster.png', (128,256))
-	sail_imgs["mars"] = roadster, (32,64)
+	sail_imgs["mars"] = roadster, (3,6)
 	
 	# Load stanard/orig boat by default
 	cur_boat_img = boat_imgs["orig"]
@@ -1484,7 +1484,7 @@ def init_sliders():
 	wind_speed_slider.set_color(0,0,0)
 	sliders["Wind speed"] = wind_speed_slider
 
-	sim_speed_slider = Slider(win_width-100,win_height-200,80,25, sim_speed_slider_callback, 0, 1000, 1000)
+	sim_speed_slider = Slider(win_width-100,win_height-200,80,25, sim_speed_slider_callback, 0, 1000, 200)
 	sim_speed_slider.set_color(0,0,0)
 	sliders["Sim speed"] = sim_speed_slider
 
