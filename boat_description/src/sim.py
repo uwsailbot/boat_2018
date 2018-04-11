@@ -152,6 +152,8 @@ gridsize = 10
 # set camera move speed (pixels per second)
 camera_move_speed = 100
 camera_velocity = Point(0, 0)
+# should camera follow boat?
+follow_boat = False
 
 
 # Resources
@@ -463,16 +465,27 @@ def mouse_handler(button, mouse_state, x, y):
 		gps_bounding_box.points.append(coords)
 		square_pub.publish(gps_bounding_box)
 
-	elif button == 3 and mouse_state == GLUT_DOWN:
-		camera.scale *= 1.04
-		if camera.scale > 100:
-			camera.scale = 100
-
-	elif button == 4 and mouse_state == GLUT_DOWN:
-		camera.scale *= 0.96
-		if camera.scale < 0.1:
-			camera.scale = 0.1
-
+	elif (button == 3 or button == 4) and mouse_state == GLUT_DOWN:
+		
+		if not follow_boat:
+			# used to keep mouse pointing at same lps position when zooming
+			(mouse_x, mouse_y) = camera.screen_to_lps(x,y)
+		
+		if button == 3:
+			camera.scale *= 1.04
+			if camera.scale > 100:
+				camera.scale = 100
+		else:
+			camera.scale *= 0.96
+			if camera.scale < 0.1:
+				camera.scale = 0.1
+		
+		if not follow_boat:
+			# keep mouse pointing at same lps position when zooming
+			(new_mouse_x, new_mouse_y) = camera.screen_to_lps(x,y)
+			camera.x -= new_mouse_x - mouse_x
+			camera.y -= new_mouse_y - mouse_y
+	
 	if sim_mode == 0:
 		waypoint_pub.publish(gps_points)
 
@@ -543,6 +556,7 @@ def ASCII_handler(key, mousex, mousey):
 	global show_details
 	global display_path
 	global path
+	global follow_boat
 	
 	# Handle cheat codes
 	cur_input += key;
@@ -571,7 +585,12 @@ def ASCII_handler(key, mousex, mousey):
 		print 'Changed sim mode, is now \'%s\'' % sim_mode_str[sim_mode] 
 	elif key is 'i':
 		show_details = not show_details
-
+	elif key is 'c':
+		path = PointArray()
+		display_path = not display_path
+	elif key is 'y':
+		follow_boat = not follow_boat
+	
 	if sim_mode == 0:	
 		if key is '1' and should_sim_joy:
 			joy.buttons[4] = 1
@@ -620,9 +639,6 @@ def ASCII_handler(key, mousex, mousey):
 			wind_heading += 5
 		elif key is 'd':
 			wind_heading -= 5
-		elif key is 'c':
-			path = PointArray()
-			display_path = not display_path
 		elif key is '0':
 			sound = not sound
 		elif key is ' ':
@@ -1204,11 +1220,15 @@ def calc(_):
 	time_msg.clock.nsecs = (clock % 1) * (10**9)
 	clock_pub.publish(time_msg)
 
-	# Move camera when mouse is near edge of screen
-	# I put this in here so that camera move speed is bound to time and not fps
-	camera.x += camera_velocity.x * real_dt
-	camera.y += camera_velocity.y * real_dt
-
+	if follow_boat:
+		camera.x = pos.x
+		camera.y = pos.y
+	else:	
+		# Move camera when mouse is near edge of screen
+		# I put this in here so that camera move speed is bound to time and not fps
+		camera.x += camera_velocity.x * real_dt
+		camera.y += camera_velocity.y * real_dt
+	
 	if(sim_mode == 0):
 		# Calculate other things
 		tack = calc_tack(heading, wind_heading)
