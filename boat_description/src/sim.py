@@ -177,6 +177,7 @@ sim_mode_str =['default', 'replay everything']
 should_sim_joy = False
 sim_is_running = True
 speed = 10
+pre_pause_speed = 10
 pause = False
 clock = 0
 last_time = -1
@@ -1187,12 +1188,14 @@ def calc_boom_heading(boat_heading, wind_heading, winch):
 def pause_sim():
 	global pause
 	global speed
+	global pre_pause_speed
 	#if state.major is BoatState.MAJ_DISABLED:
 	pause = not pause
 	if pause is True:
+		pre_pause_speed = speed
 		speed = 0
 	else:
-		speed = 10
+		speed = pre_pause_speed
 
 
 def calc(_):
