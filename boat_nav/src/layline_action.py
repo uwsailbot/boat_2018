@@ -17,7 +17,7 @@ class LaylineAction(object):
 		self._as.start()
 		self.tacking_client = actionlib.SimpleActionClient('tacking_action', TackingAction)
 		self.cur_pos = Point()
-		self.min_speed = rospy.get_param('/boat/min_tacking_speed')
+		self.min_speed = rospy.get_param('/boat/nav/min_tacking_speed')
 		self.target_heading = 0
 		self.boat_speed = 0
 		self.target_sub = rospy.Subscriber('target_heading', Float32, self.target_heading_callback)

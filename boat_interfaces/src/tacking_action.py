@@ -14,9 +14,9 @@ class TackingAction(object):
 		self._name = name
 		self._as = actionlib.SimpleActionServer(self._name, boat_msgs.msg.TackingAction, execute_cb=self.tacking_callback, auto_start = False)
 		self._as.start()
-		self.layline = rospy.get_param('/boat/layline')
-		self.rudder_max = rospy.get_param('boat/rudder_max')
-		self.rudder_min = rospy.get_param('boat/rudder_min')
+		self.layline = rospy.get_param('/boat/nav/layline')
+		self.rudder_max = rospy.get_param('boat/interfaces/rudder_max')
+		self.rudder_min = rospy.get_param('boat/interfaces/rudder_min')
 		self.rudder_pos = 90.0
 		self.app_wind_shift = 0
 		self.target_heading = 0

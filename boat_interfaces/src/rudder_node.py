@@ -12,9 +12,8 @@ ane_reading = 0
 wind_heading = 0
 state = BoatState()
 pid_is_enabled = False
-layline = rospy.get_param('/boat/layline')
-rudder_max = rospy.get_param('boat/rudder_max')
-rudder_min = rospy.get_param('boat/rudder_min')
+rudder_max = rospy.get_param('boat/interfaces/rudder_max')
+rudder_min = rospy.get_param('boat/interfaces/rudder_min')
 
 # Declare the publishers for the node
 rudder_pos_pub = rospy.Publisher('rudder', Float32, queue_size=10)
