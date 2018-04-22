@@ -190,6 +190,8 @@ speed_graph = {0 : 0}
 display_path = True
 path = PointArray()
 prev_path_time = 0
+fov_radius = 15
+fov_angle = 60
 
 # ROS data
 wind_heading = 270
@@ -669,6 +671,7 @@ def redraw():
 		draw_bounding_box()	
 	if display_path:
 		draw_path()
+	draw_fov()
 	draw_boat()
 	draw_target_heading_arrow()
 	draw_status()
@@ -871,6 +874,36 @@ def draw_target_heading_arrow():
 	
 	glPopMatrix()
 
+def draw_fov():
+	(boat_x, boat_y) = camera.lps_to_screen(pos.x, pos.y)
+	cone_x = math.sin(math.radians(fov_angle/2)) * fov_radius * camera.scale
+	cone_y = math.cos(math.radians(fov_angle/2)) * fov_radius * camera.scale
+
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+	glEnable(GL_BLEND)
+	glColor4f(245/255.0, 150/255.0, 25/255.0, 0.2)
+	
+	glPushMatrix()
+	glTranslatef(boat_x, boat_y, 0)
+	glRotatef(heading-90, 0, 0, 1)
+ 	glBegin(GL_TRIANGLES)
+	glVertex2f(0, 0)
+	glVertex2f(-cone_x, cone_y)
+	glVertex2f(cone_x, cone_y)
+	glEnd()
+	glBegin(GL_LINES)
+	glColor4f(245/255.0, 150/255.0, 25/255.0, 0.9)
+	glVertex2f(0, 0)
+	glVertex2f(-cone_x, cone_y)
+	glVertex2f(-cone_x, cone_y)
+	glVertex2f(cone_x, cone_y)
+	glVertex2f(cone_x, cone_y)
+	glVertex2f(0, 0)
+	glEnd()
+	glPopMatrix()
+
+	glDisable(GL_BLEND)
+	
 
 # Draw the right-hand 'status' panel and all of its data
 def draw_status():
