@@ -190,6 +190,8 @@ speed_graph = {0 : 0}
 display_path = True
 path = PointArray()
 prev_path_time = 0
+fov_radius = 15
+fov_angle = 60
 
 # ROS data
 wind_heading = 270
@@ -251,6 +253,27 @@ def update_gps():
 	
 	orientation_pub.publish(imu)
 
+# check if point (lps) is within fov cone
+def point_is_in_fov(point):
+	dx = point.x - pos.x
+	dy = point.y - pos.y
+	# within range
+	if dx*dx + dy*dy < fov_radius*fov_radius:
+		# within angle
+		angle = math.degrees(math.atan2(dy, dx))
+		if angle < 0:
+			angle += 360
+		if abs(angle-heading) < fov_angle / 2:
+			return True
+	return False
+
+# publish pixel coordinates for points in vision
+def update_vision():
+	# TODO for obstacles as well
+	points_in_fov = []
+	for point in local_points.points:
+		if point_is_in_fov(point):
+			points_in_fov.append(point)
 
 def update_wind():
 	global wind_heading
@@ -677,6 +700,7 @@ def redraw():
 		draw_bounding_box()	
 	if display_path:
 		draw_path()
+	draw_fov()
 	draw_boat()
 	draw_target_heading_arrow()
 	draw_status()
@@ -879,6 +903,42 @@ def draw_target_heading_arrow():
 	
 	glPopMatrix()
 
+def draw_fov():
+	(boat_x, boat_y) = camera.lps_to_screen(pos.x, pos.y)
+	
+	# calculate points for drawing fov cone (facing up)
+	resolution = 5
+	angle_step = float(fov_angle) / resolution
+	cone_points = PointArray()
+	cone_points.points.append(Point(0, 0))
+	for i in range(-resolution, resolution):
+		if i is not 0:
+			angle = i * angle_step
+			x = math.sin(math.radians(angle/2)) * fov_radius * camera.scale
+			y = math.cos(math.radians(angle/2)) * fov_radius * camera.scale
+			cone_points.points.append(Point(x,y))
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+	glEnable(GL_BLEND)
+	glColor4f(245/255.0, 150/255.0, 25/255.0, 0.2)
+	
+	glPushMatrix()
+	glTranslatef(boat_x, boat_y, 0)
+	glRotatef(heading-90, 0, 0, 1)
+
+ 	glBegin(GL_POLYGON)
+	for point in cone_points.points:
+		glVertex2f(point.x,point.y)
+	glEnd()
+
+	glColor4f(245/255.0, 150/255.0, 25/255.0, 0.9)
+	glBegin(GL_LINE_LOOP)
+	for point in cone_points.points:
+		glVertex2f(point.x,point.y)
+	glEnd()
+	glPopMatrix()
+
+	glDisable(GL_BLEND)
+	
 
 # Draw the right-hand 'status' panel and all of its data
 def draw_status():
@@ -1294,6 +1354,8 @@ def calc(_):
 			camera.y = 0
 			path = PointArray()
 		
+		update_vision()
+
 		update_gps()
 
 		# Don't let drawn path be too long 
