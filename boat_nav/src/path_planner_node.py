@@ -9,12 +9,16 @@ state = BoatState()
 waypoints = []
 rate = 0
 ane_reading = 0
+buoy_tol = rospy.get_param('/boat/planner/buoy_tol')
+height_to_travel = rospy.get_param('/boat/planner/station/height')
+max_width = rospy.get_param('/boat/planner/station/width')
 box = []
 cur_pos = Point()
 start_station = Point()
 end_station = Point()
 final_buoy_station = False
 station_setup = False
+not_within_box = False
 
 # Declare the publishers for the node
 boat_state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
@@ -55,27 +59,27 @@ def bounding_box_callback(bounding_box):
 			y_sum += p.y
 		x_avr = x_sum / 4.0
 		y_avr = y_sum / 4.0
-		box = [Point()]*4
+		temp = [None]*4
 		for p in bounding_box.points:
+			if p is None:
+				return
 			if p.x < x_avr:
 				if p.y < y_avr:
-					box[0] = p
+					temp[0] = p
 				else: 
-					box[1] = p
+					temp[1] = p
 			else:
 				if p.y < y_avr:
-					box[3] = p
+					temp[3] = p
 				else:
-					box[2] = p
-		for p in box:
-			print gps_to_lps(p).pt
+					temp[2] = p
+		box = temp
 	else:
 		box = bounding_box.points
 
 	# For if bounding box is added after we are in station mode
 	if state.challenge is BoatState.CHA_STATION and len(box) is 4:
 		rospy.Timer(rospy.Duration(5*60), station_timer_callback, oneshot=True)
-		print rospy.Time.now().secs
 		station_setup()
 
 def station_timer_callback(event):
@@ -96,9 +100,8 @@ def station_timer_callback(event):
 	
 	# Use service to determine 100m dist in gps
 	# Use this distance on how far to put the buoy outside the box
-	tol_dist = lps_to_gps(Point(100,0)).pt.x
+	tol_dist = lps_to_gps(Point(20,0)).pt.x
 	cur_pos_gps = lps_to_gps(cur_pos).pt
-	print tol_dist
 	
 	final_point = {0 : Point(box[0].x - tol_dist, cur_pos_gps.y),
 				1 : Point(cur_pos_gps.x, box[1].y + tol_dist),
@@ -156,11 +159,6 @@ def station_setup():
 	waypoints = []
 	waypoints_pub.publish(waypoints)
 	target_pub.publish(Point())
-	# TODO: get these from yaml and make global
-	# Width of the box to sail, leave tol for turning
-	max_width = 0.6
-	# Factor away from bottom of square
-	height_to_travel = 0.3
 
 	# Determine wall angles and box widths
 	station_angle = math.atan2(box[3].y - box[0].y, box[3].x - box[0].x) * 180.0 / math.pi
@@ -175,19 +173,28 @@ def station_setup():
 	
 	# Determine the two points that will alternate
 	start_x = ((box[3].x + box[0].x) / 2.0) - station_width / 2.0
-	start_y = math.tan(math.radians(station_angle)) * start_x + box[0].y + station_height
+	y_int = box[0].y - math.tan(math.radians(station_angle)) * box[0].x
+	start_y = math.tan(math.radians(station_angle)) * start_x + y_int + station_height
 	start_station = Point(start_x, start_y)
 	end_x = start_x + station_width
-	end_y = math.tan(math.radians(station_angle)) * end_x + box[0].y + station_height
+	end_y = math.tan(math.radians(station_angle)) * end_x + y_int + station_height
 	end_station = Point(end_x, end_y)
-	print gps_to_lps(start_station).pt
-	print gps_to_lps(end_station).pt
 	
 	waypoints.append(start_station)
 	waypoints_pub.publish(waypoints)
 	
 def station_waypoint_planner():
 	global waypoints
+	if not_within_box:
+		x_sum = 0
+		y_sum = 0
+		for p in box:
+			x_sum += p.x
+			y_sum += p.y
+		x_avr = x_sum / 4.0
+		y_avr = y_sum / 4.0
+		waypoints.append(Point(x_avr, y_avr))
+		return
 	diff_point = Point()
 	diff_point.x = waypoints[0].x - start_station.x
 	diff_point.y = waypoints[0].y - start_station.y
@@ -205,11 +212,8 @@ def position_callback(position):
 	global waypoints
 	global rate
 	global cur_pos
+	global not_within_box
 	cur_pos = position
-
-	# TODO: Get this from yaml
-	buoy_tolerance = 5
-	
 	rate = rospy.Rate(100)
 	
 	# If the boat isn't in the autonomous planning state, exit
@@ -219,7 +223,7 @@ def position_callback(position):
 	# If the list of waypoints is not empty 
 	if(len(waypoints) > 0):
 		# If the boat is close enough to the waypoint...
-		if is_within_dist(position, gps_to_lps(waypoints[0]).pt, buoy_tolerance):
+		if is_within_dist(position, gps_to_lps(waypoints[0]).pt, buoy_tol):
 			rospy.loginfo(rospy.get_caller_id() + " Reached intermediate waypoint (lat: %.2f, long: %.2f)", waypoints[0].y, waypoints[0].x)
 			update_waypoints()
 	
@@ -230,17 +234,17 @@ def position_callback(position):
 		rospy.loginfo(rospy.get_caller_id() + " No waypoints left. Boat State = 'Autonomous - Complete'")
 
 	# If in station keeping mode and outside of desired box, cycle to next waypoint
-	if state.challenge is BoatState.CHA_STATION and len(box) is 4:
+	if state.challenge is BoatState.CHA_STATION and len(box) is 4 and not final_buoy_station:
 		if not within_box():
+			not_within_box = True
 			update_waypoints()
+		else:
+			not_within_box = False
 	
 	# Adjust the sleep to suit the node
 	rate.sleep()
 
 def within_box():
-	max_width = 0.8
-	# Factor away from bottom of square
-	height_to_travel = 0.2
 	l_dist = dist_from_line(box[0], box[1])
 	t_dist = dist_from_line(box[1], box[2])
 	r_dist = dist_from_line(box[3], box[2])
@@ -254,11 +258,11 @@ def within_box():
 	right_box_height = math.hypot(box[3].y - box[2].y, box[3].x - box[2].x)
 	width_tol = (bottom_box_width + (top_box_width-bottom_box_width) * height_to_travel) * 0.1
 	height_tol =  (left_box_height + (right_box_height-left_box_height) * (1 - max_width) / 2.0) * 0.1
-
-	if l_dist >= width_tol and r_dist <= width_tol and t_dist >= height_tol and b_dist <= height_tol:
+	
+	if l_dist >= width_tol and r_dist <= -1 * width_tol and t_dist >= height_tol and b_dist <= -1 * height_tol:
 		return True
 	else:
-		print "Not inside box"
+		print "Not within inner box."
 		return False
 	
 

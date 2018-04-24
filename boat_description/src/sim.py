@@ -371,6 +371,12 @@ def bounding_box_callback(box):
 		temp_points = PointArray()
 		temp_points.points = [None]*4
 		for p in gps_bounding_box.points:
+			if p is None:
+				gps_bounding_box = PointArray()
+				local_bounding_box = PointArray()
+				square_pub.publish(gps_bounding_box)
+				print "Invalid box configuration. Make more square."
+				return;
 			if p.x < x_avr:
 				if p.y < y_avr:
 					temp_points.points[0] = to_lps(p).pt
@@ -381,12 +387,6 @@ def bounding_box_callback(box):
 					temp_points.points[3] = to_lps(p).pt
 				else:
 					temp_points.points[2] = to_lps(p).pt
-		for p in temp_points.points:
-			if p is None:
-				gps_bounding_box = PointArray()
-				local_bounding_box = PointArray()
-				square_pub.publish(gps_bounding_box)
-				print "Invalid box configuration."
 	else:
 		temp_points = PointArray()
 		for point in gps_bounding_box.points:
@@ -458,6 +458,11 @@ def mouse_handler(button, mouse_state, x, y):
 		newPt.x = lps_x
 		newPt.y = lps_y
 		coords = to_gps(newPt).pt
+
+		for p in local_bounding_box.points:
+			if math.hypot(p.y - newPt.y, p.x-newPt.x) < 15:
+				print "Distance between buoys is too small, must be at least 15m"
+				return
 		# Reset if we were gonna add to a list of 4 points already
 		if len(local_bounding_box.points) == 4:
 			gps_bounding_box = PointArray()
@@ -638,8 +643,11 @@ def ASCII_handler(key, mousex, mousey):
 			joy_pub.publish(joy)
 		elif key is 'a':
 			wind_heading += 5
+			wind_heading = wind_heading % 360
 		elif key is 'd':
 			wind_heading -= 5
+			if wind_heading < 0:
+				wind_heading += 360
 		elif key is '0':
 			sound = not sound
 		elif key is ' ':
@@ -1187,13 +1195,14 @@ def pause_sim():
 	global pause
 	global speed
 	global pre_pause_speed
-	#if state.major is BoatState.MAJ_DISABLED:
+
 	pause = not pause
 	if pause is True:
 		pre_pause_speed = speed
 		speed = 0
 	else:
 		speed = pre_pause_speed
+	sliders["Sim speed"].change_val(speed*100)
 
 
 def calc(_):
@@ -1265,12 +1274,11 @@ def calc(_):
 		
 		#old_wind_head = ane_reading
 		
-		if(state.major != BoatState.MAJ_DISABLED):
-			heading -= (rudder_pos-90)*0.4*boat_speed * dt
-			heading %= 360
+		heading -= (rudder_pos-90)*0.4*boat_speed * dt
+		heading %= 360
 			
-			# Update anemometer reading because of new heading and speed
-			update_wind()
+		# Update anemometer reading because of new heading and speed
+		update_wind()
 		
 		
 		speed_graph[int(ane_reading)%360] = boat_speed

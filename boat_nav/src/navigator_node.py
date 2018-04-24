@@ -146,7 +146,6 @@ def position_callback(position):
 	# If the boat isn't in the autonomous planning state, exit
 	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
 		return
-	
 	awa_algorithm()
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Calculations =*=*=*=*=*=*=*=*=*=*=*=*=
@@ -169,15 +168,19 @@ def vmg(direct_heading):
 def calc_global_max_vmg(wind_coming):
 	
 	# TODO: Make a service and make more general for object avoidance
-	
+	upper_bound = wind_coming + layline
+	lower_bound = wind_coming - layline
 	# If direct heading is in irons, then max_vmg will be on the edge of the no go zone
-	if direct_heading > wind_coming-layline and direct_heading < wind_coming+layline:
+	if is_within_bounds(direct_heading, upper_bound, lower_bound):
 		theoretic_boat_speed = 0
-		if direct_heading >= wind_coming:
-			vmg_heading = wind_coming + layline 
+
+		if gtAngle(direct_heading, wind_coming):
+			vmg_heading = (wind_coming + layline) % 360
 			theoretic_boat_speed = 2.5 * 0.514444
-		else :
+		else:
 			vmg_heading = wind_coming - layline
+			if vmg_heading < 0:
+				vmg_heading += 360
 			theoretic_boat_speed = 2.5 * 0.514444
 	
 	# Otherwise max vmg is just the direct heading
@@ -186,8 +189,8 @@ def calc_global_max_vmg(wind_coming):
 		vmg_heading = direct_heading
 	
 	max_vmg = theoretic_boat_speed * math.cos(math.radians(vmg_heading - direct_heading))
-	return max_vmg, vmg_heading
-
+	return max_vmg, vmg_heading		
+	
 ##	Calculate the maximum velocity made good on the current tack
 #	
 #	@param wind_coming The heading of the apparent wind, in degrees CCW from East
@@ -196,37 +199,46 @@ def calc_global_max_vmg(wind_coming):
 def calc_cur_tack_max_vmg(wind_coming):
 
 	# TODO: Make a service and make more general for object avoidance
-
+	upper_bound = wind_coming + layline
+	lower_bound = wind_coming - layline
 	# Direct heading in irons on left of wind
-	if direct_heading > wind_coming-layline and direct_heading < wind_coming+layline:
+	if is_within_bounds(direct_heading, upper_bound, lower_bound):
 		theoretic_boat_speed = 0
-		if target_heading >= wind_coming:
-			vmg_heading = wind_coming + layline 
+
+		if gtAngle(target_heading, wind_coming):
+			vmg_heading = (wind_coming + layline) % 360
 			theoretic_boat_speed = 2.5 * 0.514444
 		else :
 			vmg_heading = wind_coming - layline
+			if vmg_heading < 0:
+				vmg_heading += 360
 			theoretic_boat_speed = 2.5 * 0.514444
+
 	# Direct heading lies on navigatable path elsewhere in our current tack
-	elif (is_within_bounds(direct_heading, wind_coming, apparent_wind_heading) and is_within_bounds(target_heading, wind_coming, apparent_wind_heading))or\
-		(not is_within_bounds(direct_heading, wind_coming, apparent_wind_heading) and not is_within_bounds(target_heading, wind_coming, apparent_wind_heading)):
+	elif (ltAngle(direct_heading, wind_coming) and ltAngle(target_heading, wind_coming)) or\
+		(gtAngle(direct_heading, wind_coming) and gtAngle(target_heading, wind_coming)):
 		theoretic_boat_speed = 2.5 * 0.514444 # 2.5 Knots to m/s (measured boat speed)
 		vmg_heading = direct_heading
-	# If none of the above, the best heading will be the one closest to the other tack
+
+	# If none of the above, the best heading will be the one closest to the other tack, however it is extremely unfavourable because clearly no best heading lies on this tack
 	else:
-		theoretic_boat_speed = 2.5 * 0.514444
+		theoretic_boat_speed = 0
 		vmg_heading = apparent_wind_heading
 	
 	max_vmg = theoretic_boat_speed * math.cos(math.radians(vmg_heading - direct_heading))
 	return max_vmg, vmg_heading
 
-##	Calculate the current velocity made good along the specified heading
+##	Calculate the current velocity made good along the current target heading
 #	
 #	@param wind_coming The heading of the apparent wind, in degrees CCW from East
 #	@return The velocity made good
 #	
 def calc_vmg(wind_coming):
-	global target_heading
-	if target_heading > wind_coming-layline and target_heading < wind_coming+layline:
+	upper_bound = wind_coming + layline
+	lower_bound = wind_coming - layline
+	
+	# Add a buffer for boat sailing on the layline
+	if is_within_bounds(target_heading, upper_bound - 1.0, lower_bound + 1.0):
 		theoretic_boat_speed = 0		
 	else:
 		theoretic_boat_speed = 2.5 * 0.514444 # 2.5 Knots to m/s (measured boat speed)
@@ -242,7 +254,6 @@ def calc_vmg(wind_coming):
 def dist_to_target(position):
 	return math.sqrt(math.pow((target.y - position.y), 2) +  math.pow((target.x - position.x), 2))
 
-
 ##	Determine if the dist between two points is within the specified tolerance
 #	
 #	@param p1 The first `boat_msgs.msg.Point`
@@ -254,6 +265,19 @@ def is_within_dist(p1, p2, dist):
 	a = math.pow(p1.x-p2.x, 2) + math.pow(p1.y - p2.y, 2)
 	return math.sqrt(a) < dist
 
+def gtAngle(angle1, angle2):
+	comp_angle = (angle2 + 180) % 360
+	if angle2 >= 180:
+		return not is_within_bounds(angle1, angle2, comp_angle)
+	else:
+		return is_within_bounds(angle1, angle2, comp_angle)
+
+def ltAngle(angle1, angle2):
+	comp_angle = (angle2 + 180) % 360
+	if angle2 >= 180:
+		return is_within_bounds(angle1, angle2, comp_angle)
+	else:
+		return not is_within_bounds(angle1, angle2, comp_angle)
 
 ##	Determine whether the specified value is between `boundA` and `boundB`.
 #	
@@ -265,7 +289,18 @@ def is_within_dist(p1, p2, dist):
 #	@return `True` if the value is between the specified bounds
 #	
 def is_within_bounds(val, boundA, boundB):
-	return (boundA < val and val < boundB) or (boundB < val and val < boundA)
+	if boundA < boundB:
+		val -= boundA
+		boundB -= boundA
+		boundA = 0
+	else:
+		val -= boundB
+		boundA -= boundB
+		boundB = 0
+	if val < 0:
+		val += 360
+	val = val % 360
+	return (boundA <= val and val <= boundB) or (boundB <= val and val <= boundA)
 
 ## Determine the percentage of the course to the target is remaining
 #
@@ -289,18 +324,17 @@ def remaining_course():
 #
 def on_layline(wind_coming, tolerance):
 	# On left side of the wind
-	if direct_heading >= wind_coming:
-		if (target_heading - direct_heading) <= tolerance:
-			return True
-		else:
-			return False
+	if gtAngle(direct_heading, wind_coming):
+		val = ltAngle(target_heading, (direct_heading + tolerance) % 360)
 
 	# On right side of the wind
 	else:
-		if (target_heading - direct_heading) >= -1 * tolerance:
-			return True
+		if direct_heading - tolerance < 0:
+			val = gtAngle(target_heading, direct_heading - tolerance + 360)
 		else:
-			return False
+			val = gtAngle(target_heading, direct_heading - tolerance)
+		
+	return val
 	
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Algorithms =*=*=*=*=*=*=*=*=*=*=*=*=
@@ -338,26 +372,20 @@ def awa_algorithm():
 		# TODO: Tolerance these properly
 		# If not currently at our optimal vmg, during our regular upwind routine (not layline setup)
 		if (global_max_vmg > cur_vmg or cur_tack_max_vmg > cur_vmg):
-			# If the our headings are more that 180 degrees apart, reverse travel direction
-			if (abs(global_vmg_heading - target_heading)) > 180:
-				boat_dir = 1 
-			else:
-				boat_dir = -1
-			
 			# Is tack required to get to vmg_heading
-			if (boat_dir is 1 and not is_within_bounds(wind_coming, global_vmg_heading, target_heading)) or\
-				(boat_dir is -1 and is_within_bounds(wind_coming, global_vmg_heading, target_heading)):
+			if (gtAngle(global_vmg_heading, target_heading) and gtAngle(wind_coming, target_heading) and ltAngle(wind_coming, global_vmg_heading)) or\
+				(ltAngle(global_vmg_heading, target_heading) and gtAngle(wind_coming, global_vmg_heading) and ltAngle(wind_coming, target_heading)):
 				# If this loop is entered, then getting to vmg_heading requires a tack
 				# Now we need to calculate if the tack is worth it
 				if global_max_vmg > cur_tack_max_vmg * n and boat_speed >= min_tacking_speed:
 					# Worth the tack, therefore determine the tacking direction and execute the action
 					target_heading = global_vmg_heading
-					if is_within_bounds(target_heading, 90, 270):
+					if gtAngle(target_heading, wind_coming):
 						tacking_direction = -1
 					else:
 						tacking_direction = 1
 					
-					heading_pub.publish(target_heading)
+					heading_pub.publish(Float32(target_heading))
 					goal = TackingGoal(direction = tacking_direction)
 					tacking_client.send_goal(goal)
 					
@@ -371,24 +399,22 @@ def awa_algorithm():
 					if tacking_client.get_result() is not None:
 						target_heading = tacking_client.get_result().target_heading
 					rospy.loginfo(rospy.get_caller_id() + " Boat State = 'Autonomous - Planning'")
+					heading_pub.publish(target_heading)
 
 				# If the tack is not worth preforming, set the current heading to be the max vmg of our current tack
 				else:
 					target_heading = cur_tack_vmg_heading
-					heading_pub.publish(target_heading)
+					print target_heading
+					heading_pub.publish(Float32(target_heading))
 					
 			# Tack is not required to get to vmg_heading, therefore set it
 			else:
-				# Make sure that current heading and last requested target are close before updating this 
-				# That way we don't turn the other way (tack instead of jibe first for instance) (only if there is a large discrepancy 					# between current target and new target, that way we still update for drift
-				if abs(target_heading - cur_boat_heading) < 10.0 or abs(global_vmg_heading - target_heading) < 10.0:
-					target_heading = global_vmg_heading
-					heading_pub.publish(target_heading)
+				target_heading = global_vmg_heading
+				heading_pub.publish(Float32(target_heading))
 
 		#Final leg of the course, traveling on an optimal vmg course, time to get to layline.  Second condition to make sure this doesn't run if we are already on the layline
-		# TODO: Tolerance correctly	
+		# TODO: Tolerance correctly, make sure this isnt called on a downwind cuz we mistolerance it.  Shouldnt be because target_heading will constantly be updating to be equal to global_vmg_heading above
 		elif per_course_left <= 40 and not on_layline(wind_coming, 1.0) and boat_speed >= min_tacking_speed:
-			print boat_speed
 			rospy.loginfo(rospy.get_caller_id() + " Entering the navigate to layline routine. Saved current tack angle as: %f ", target_heading)
 			goal = LaylineGoal(alt_tack_angle = target_heading, overshoot_angle = 3.0, target = target)
 			layline_client.send_goal(goal)
@@ -399,24 +425,6 @@ def awa_algorithm():
 			if layline_client.get_result() is not None:
 				target_heading = layline_client.get_result().target_heading
 
-			# Disable planning while messages are caught up on
-			#no_layline_planning = True
-			#rospy.Timer(rospy.Duration(0.1), timer_callback)
-#		else:
-#			# If the waypoint is to the right of the wind...
-#			if direct_heading > cur_boat_heading:
-#				wind_side = 1
-#			else:
-#				wind_side = -1
-#			
-# UNCOMMENT IF WE WANT TO FIND REAL VMG
-#			goal = MaxVMGGoal(wind_side, target)
-#			max_vmg_client.send_goal(goal)
-#		
-#			# Adjust time delay until the tack is considered failed, and we return to planning
-#			if not max_vmg_client.wait_for_result(rospy.Duration(10)):
-#				max_vmg_client.cancel_goal()
-	
 	
 	rospy.Rate(100).sleep()
 
@@ -428,7 +436,6 @@ def taras_algorithm():
 	global target
 	global is_new_target
 	global target_heading
-	buoy_tolerance = 5
 	
 	# Calculate the direct heading to the next waypoint
 	# This should never be undefined, as the atan2(0,0) case would already be caught by the proximity check above
