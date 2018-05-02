@@ -192,6 +192,7 @@ path = PointArray()
 prev_path_time = 0
 fov_radius = 15
 fov_angle = 60
+points_in_fov = PointArray()
 
 # ROS data
 wind_heading = 270
@@ -267,13 +268,32 @@ def point_is_in_fov(point):
 			return True
 	return False
 
+def get_vision_coords(point):
+	dx = point.x - pos.x
+	dy = point.y - pos.y
+	
+	# get angle from boat heading
+	angle = math.degrees(math.atan2(dy, dx))
+	if angle < 0:
+		angle += 360
+	angle = angle - heading
+	
+	# ???
+
 # publish pixel coordinates for points in vision
 def update_vision():
 	# TODO for obstacles as well
-	points_in_fov = []
+	global points_in_fov
+
+	points_in_fov = PointArray()
 	for point in local_points.points:
 		if point_is_in_fov(point):
-			points_in_fov.append(point)
+			points_in_fov.points.append(point)
+	for point in points_in_fov.points:
+		# pixel_coord = get_vision_coords(point)
+		pass
+	
+	# visions pixel coord format?
 
 def update_wind():
 	global wind_heading
@@ -693,14 +713,15 @@ def redraw():
 	
 	# Render stuff
 	draw_grid()
-	draw_target_point()
-	draw_waypoints()
-	draw_obstacles()
 	if state.challenge is BoatState.CHA_STATION:
 		draw_bounding_box()	
 	if display_path:
 		draw_path()
 	draw_fov()
+	draw_target_point()
+	draw_waypoints()
+	draw_waypoints_in_fov()
+	draw_obstacles()
 	draw_boat()
 	draw_target_heading_arrow()
 	draw_status()
@@ -911,7 +932,7 @@ def draw_fov():
 	angle_step = float(fov_angle) / resolution
 	cone_points = PointArray()
 	cone_points.points.append(Point(0, 0))
-	for i in range(-resolution, resolution):
+	for i in range(-resolution, resolution + 1):
 		if i is not 0:
 			angle = i * angle_step
 			x = math.sin(math.radians(angle/2)) * fov_radius * camera.scale
@@ -919,7 +940,7 @@ def draw_fov():
 			cone_points.points.append(Point(x,y))
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
-	glColor4f(245/255.0, 150/255.0, 25/255.0, 0.2)
+	glColor4f(245/255.0, 150/255.0, 25/255.0, 0.1)
 	
 	glPushMatrix()
 	glTranslatef(boat_x, boat_y, 0)
@@ -930,7 +951,7 @@ def draw_fov():
 		glVertex2f(point.x,point.y)
 	glEnd()
 
-	glColor4f(245/255.0, 150/255.0, 25/255.0, 0.9)
+	glColor4f(245/255.0, 150/255.0, 25/255.0, 0.8)
 	glBegin(GL_LINE_LOOP)
 	for point in cone_points.points:
 		glVertex2f(point.x,point.y)
@@ -938,7 +959,18 @@ def draw_fov():
 	glPopMatrix()
 
 	glDisable(GL_BLEND)
-	
+
+
+def draw_waypoints_in_fov():
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+	glEnable(GL_BLEND)
+	glColor4f(245/255.0, 200/255.0, 5/255.0, 0.3)
+	for point in points_in_fov.points:
+		(x,y) = camera.lps_to_screen(point.x, point.y)
+		draw_circle(0.8 * camera.scale, x, y)
+
+	glDisable(GL_BLEND)
+
 
 # Draw the right-hand 'status' panel and all of its data
 def draw_status():
