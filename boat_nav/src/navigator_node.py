@@ -89,7 +89,7 @@ def anemometer_callback(new_heading):
 	
 	# Tolerance on a wind shift to be determined
 	# Only update wind heading if a significant shift is detected, because it will then replan our upwind path
-	if abs(new_wind_heading - apparent_wind_heading) > 0.1 :
+	if abs(new_wind_heading - apparent_wind_heading) > 0.1:
 		new_wind = True
 		apparent_wind_heading = new_wind_heading
 

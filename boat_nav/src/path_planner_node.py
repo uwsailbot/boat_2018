@@ -36,7 +36,6 @@ def boat_state_callback(new_state):
 	# For if bounding box is already present when we switch to station mode
 	if new_state.challenge is BoatState.CHA_STATION and state.challenge is not BoatState.CHA_STATION and len(box) is 4:
 		rospy.Timer(rospy.Duration(5*60), station_timer_callback, oneshot=True)
-		print rospy.Time.now().secs
 		station_setup()
 
 	state = new_state

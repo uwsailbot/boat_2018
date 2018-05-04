@@ -152,10 +152,10 @@ class TackingAction(object):
 		if success:
 			self._result.success = success
 			if (goal.direction == -1 and self.cur_boat_heading > self.init_target) or\
-					(goal.direction == 1 and self.cur_boat_heading < self.init_target):
-						# Publish and return the accurate current heading for the navigator node to use
-						self.target_pub.publish(Float32(self.cur_boat_heading))
-						self.target_heading = self.cur_boat_heading
+				(goal.direction == 1 and self.cur_boat_heading < self.init_target):
+				# Publish and return the accurate current heading for the navigator node to use
+				self.target_pub.publish(Float32(self.cur_boat_heading))
+				self.target_heading = self.cur_boat_heading
 			self._result.target_heading = self.target_heading
 			rospy.loginfo('Tacking Action: Success')
 			self._as.set_succeeded(self._result)
