@@ -220,6 +220,12 @@ target_point = Point()
 local_bounding_box = PointArray()
 gps_bounding_box = PointArray()
 
+# for search challenge
+local_search_area = PointArray() # in lps, first point is center of cirlce, second is on edge
+gps_search_area = PointArray() # in gps, first point is center of circle, second is on edge
+search_radius = 0 # local radius of circle
+search_target = Point()
+search_target_set = False
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -229,6 +235,7 @@ gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
 orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
 joy_pub = rospy.Publisher('joy', Joy, queue_size = 10)
 square_pub = rospy.Publisher('bounding_box', PointArray, queue_size = 10)
+search_area_pub = rospy.Publisher('search_area', PointArray, queue_size = 10)
 clock_pub = rospy.Publisher('clock', Clock, queue_size = 1)
 vision_pub = rospy.Publisher('vision', PointArray, queue_size = 10)
 to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
@@ -274,14 +281,16 @@ def point_is_in_fov(point):
 
 # publish pixel coordinates for points in vision
 def update_vision():
-	# TODO for obstacles as well
+	# TODO for other objects as well
 	global vision_points_gps
 	
 	vision_points_gps = PointArray()
 	for point in local_points.points:
 		if point_is_in_fov(point):
 			vision_points_gps.points.append(to_gps(point).pt)
-	
+	if point_is_in_fov(search_target):
+		vision_points_gps.points.append(to_gps(search_target).pt)
+
 	vision_pub.publish(vision_points_gps)
 
 def update_wind():
@@ -427,6 +436,24 @@ def bounding_box_callback(box):
 
 	local_bounding_box = temp_points	
 
+def search_area_callback(new_search_area):
+	global gps_search_area
+	global local_search_area
+	global search_radius
+	gps_search_area = new_search_area
+	local_search_area = PointArray()
+	for point in gps_search_area.points:
+		local_search_area.points.append(to_lps(point).pt)
+
+	if len(local_search_area.points) < 2:
+		return
+
+	# first point is center and second defines radius from center
+	# calc readius
+	dx = (local_search_area.points[1].x - local_search_area.points[0].x)
+	dy = (local_search_area.points[1].y - local_search_area.points[0].y)
+	search_radius = math.sqrt(dx*dx+dy*dy)
+
 def target_point_callback(target_pt):
 	global target_point
 	target_point = target_pt
@@ -464,7 +491,11 @@ def mouse_handler(button, mouse_state, x, y):
 	global sim_mode
 	global local_bounding_box
 	global gps_bounding_box
-	
+	global gps_search_area
+	global search_target_set
+	global search_target
+
+	# TODO check if all is ok in replay mode
 	if mouse_state != GLUT_DOWN:
 		cur_slider = ()
 		return
@@ -483,34 +514,50 @@ def mouse_handler(button, mouse_state, x, y):
 			gps_points = PointArray()
 			local_bounding_box = PointArray()
 			gps_bounding_box = PointArray()
+			gps_search_area = PointArray()
+			search_target_set = False
 
-	elif cur_slider is () and sim_mode == 0 and state.challenge is not BoatState.CHA_STATION and button == GLUT_LEFT_BUTTON:
-		newPt = Point()
-		(lps_x,lps_y) = camera.screen_to_lps(x,y)			
-		newPt.x = lps_x
-		newPt.y = lps_y
-		coords = to_gps(newPt).pt
-		gps_points.points.append(coords)
+	elif cur_slider is () and sim_mode == 0 and button == GLUT_LEFT_BUTTON:
+		if state.challenge is BoatState.CHA_STATION:
+			newPt = Point()
+			(lps_x,lps_y) = camera.screen_to_lps(x,y)			
+			newPt.x = lps_x
+			newPt.y = lps_y
+			coords = to_gps(newPt).pt
 
-	elif cur_slider is () and sim_mode == 0 and state.challenge is BoatState.CHA_STATION and button == GLUT_LEFT_BUTTON:
-		newPt = Point()
-		(lps_x,lps_y) = camera.screen_to_lps(x,y)			
-		newPt.x = lps_x
-		newPt.y = lps_y
-		coords = to_gps(newPt).pt
+			for p in local_bounding_box.points:
+				if math.hypot(p.y - newPt.y, p.x-newPt.x) < 15:
+					print "Distance between buoys is too small, must be at least 15m"
+					return
+			# Reset if we were gonna add to a list of 4 points already
+			if len(local_bounding_box.points) == 4:
+				gps_bounding_box = PointArray()
+				local_bounding_box = PointArray()
 
-		for p in local_bounding_box.points:
-			if math.hypot(p.y - newPt.y, p.x-newPt.x) < 15:
-				print "Distance between buoys is too small, must be at least 15m"
-				return
-		# Reset if we were gonna add to a list of 4 points already
-		if len(local_bounding_box.points) == 4:
-			gps_bounding_box = PointArray()
-			local_bounding_box = PointArray()
+			gps_bounding_box.points.append(coords)
+		elif state.challenge is BoatState.CHA_SEARCH:
+			(lps_x,lps_y) = camera.screen_to_lps(x,y)		
+			coords = to_gps(Point(lps_x, lps_y)).pt
 
-		gps_bounding_box.points.append(coords)
-		square_pub.publish(gps_bounding_box)
-
+			if len(gps_search_area.points) == 2:
+				if search_target_set:
+					# Reset if we were gonna add to a list of 2 points and a target already
+					search_target_set = False
+					gps_search_area = PointArray()
+				else:
+					# set search target
+					search_target_set = True
+					search_target = to_lps(coords).pt
+			else:
+				gps_search_area.points.append(coords)
+		else:
+			newPt = Point()
+			(lps_x,lps_y) = camera.screen_to_lps(x,y)			
+			newPt.x = lps_x
+			newPt.y = lps_y
+			coords = to_gps(newPt).pt
+			gps_points.points.append(coords)
+	
 	elif (button == 3 or button == 4) and mouse_state == GLUT_DOWN:
 		
 		if not follow_boat:
@@ -534,6 +581,8 @@ def mouse_handler(button, mouse_state, x, y):
 	
 	if sim_mode == 0:
 		waypoint_pub.publish(gps_points)
+		square_pub.publish(gps_bounding_box)
+		search_area_pub.publish(gps_search_area)
 
 # Handler for mouse position
 def passive_mouse_handler(x,y):
@@ -712,6 +761,8 @@ def redraw():
 	draw_grid()
 	if state.challenge is BoatState.CHA_STATION:
 		draw_bounding_box()	
+	if state.challenge is BoatState.CHA_SEARCH:
+		draw_search_area()	
 	if display_path:
 		draw_path()
 	draw_fov()
@@ -878,7 +929,29 @@ def draw_bounding_box():
 		glEnd()
 		
 	glPopMatrix()
-	
+
+def draw_search_area():
+	glPushMatrix()
+
+	print (local_search_area)
+	glColor3f(0,1,0)
+	for p in local_search_area.points:
+		(x,y) = camera.lps_to_screen(p.x, p.y)
+		draw_circle(0.5 * camera.scale,x,y)
+	if search_target_set:
+		glColor3f(1,1,0)
+		(x,y) = camera.lps_to_screen(search_target.x, search_target.y)
+		draw_circle(0.5 * camera.scale,x,y)
+	if len(local_search_area.points) == 2:
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+		glEnable(GL_BLEND)
+		glColor4f(0, 1, 1, 0.2)
+		search_center = local_search_area.points[0]
+		(center_x,center_y) = camera.lps_to_screen(search_center.x, search_center.y)
+		draw_circle(search_radius*camera.scale, center_x, center_y, 50)
+		glDisable(GL_BLEND)
+		
+	glPopMatrix()
 
 def draw_target_point():	
 	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
@@ -962,7 +1035,6 @@ def draw_waypoints_in_fov():
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
 	glColor4f(245/255.0, 200/255.0, 5/255.0, 0.3)
-	print(vision_points_lps.points)
 	for point in vision_points_lps.points:
 		(x,y) = camera.lps_to_screen(point.x, point.y)
 		draw_circle(0.8 * camera.scale, x, y)
@@ -1673,6 +1745,7 @@ def listener():
 	rospy.Subscriber('obstacles', PointArray, obstacles_callback)
 	rospy.Subscriber('target_point', Point, target_point_callback)
 	rospy.Subscriber('bounding_box', PointArray, bounding_box_callback)
+	rospy.Subscriber('search_area', PointArray, search_area_callback)
 	rospy.Subscriber('vision', PointArray, vision_callback)
 
 

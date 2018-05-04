@@ -186,11 +186,10 @@ def search_reset_flags():
 def search_area_callback(search_area):
 	global search_center
 	global search_radius
-
-	# take first point as center
 	if len(search_area.points) < 2:
-		rospy.loginfo(rospy.get_caller_id() + " Insufficient search_area points for search challenge")
+		return
 	
+	# take first point as center
 	# take second point as point on edge of circle
 	search_center = search_area.points[0]
 	dx = (search_area.points[1].x - search_center.x)
