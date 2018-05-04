@@ -24,6 +24,12 @@ not_within_box = False
 wind_coming = 0
 cur_boat_heading = 0
 
+search_center = Point() # center of search circle
+search_radius = 0 # radius of search circle
+search_target_found = False # have we found the target
+search_moving_to_found_target = False # have we begun moving towards target
+
+
 # Declare the publishers for the node
 boat_state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
 waypoints_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size=10)
@@ -168,7 +174,74 @@ def dist_from_line(start_point, end_point):
 	m = (end_point.y - start_point.y)/(end_point.x - start_point.x)
 	b = start_point.y - m * start_point.x
 	return abs(b + m * cur_pos_gps.x - cur_pos_gps.y)/(math.sqrt(1 + m*m))
+
+
+# === search ===
+
+def search_reset_flags():
+	search_target_found = False
+	search_moving_to_found_target = False
+
+# receives point array from topic, first point is center, second point is on the edge of the circle
+def search_area_callback(search_area):
+	global search_center
+	global search_radius
+
+	# take first point as center
+	if len(search_area.points) < 2:
+		rospy.loginfo(rospy.get_caller_id() + " Insufficient search_area points for search challenge")
 	
+	# take second point as point on edge of circle
+	search_center = search_area.points[0]
+	dx = (search_area.points[1].x - search_center.x)
+	dy = (search_area.points[1].y - search_center.y)
+	search_radius = math.sqrt(dx*dx+dy*dy)
+
+# sets up waypoints for the search routine
+# TODO call this once we are in search mode and search area has been setup
+# TODO call this again if we ran through all the waypoints set without finding anything?
+def search_setup():
+	global waypoints
+	rospy.loginfo(rospy.get_caller_id() + " Setting waypoints for search challenge routine")
+
+	search_reset_flags()
+
+	# Clear previous points
+	waypoints = []
+	waypoints_pub.publish(waypoints)
+	target_pub.publish(Point())
+
+	# stub for now
+	wind_heading = 45
+	sweep_width = search_radius/10
+
+	# set points
+	for i in range(0, radius*2/sweep_width + 1):
+		y = 1-sweep_width*i
+		x = math.sqrt(search_radius*search_radius - y*y)
+	
+		# rotate towards wind heading using 2D vector rotation matrix thingy
+		rotated_x = x * math.cos(math.radians(wind_heading)) - y * math.sin(math.radians(wind_heading))
+		rotated_y = x * math.sin(math.radians(wind_heading)) + y * math.cos(math.radians(wind_heading))
+	
+		# translate to center at search_center
+		final_x = rotated_x + search_center.x
+		final_y = rotated_y + search_center.y
+
+		waypoints.append(Point(final_x,final_y))
+
+	waypoints_pub.publish(waypoints)
+
+# set waypoints to move towards target
+# TODO detemine which topic the target location will come in from, setup that subscriber
+# TODO call this somewhere once we find our target
+def search_move_to_target():
+	search_moving_to_found_target = True
+	# TODO 
+
+# === end search ===
+
+
 def waypoints_callback(new_waypoint):
 	global waypoints
 	
@@ -409,6 +482,7 @@ def initialize():
 	rospy.Subscriber('bounding_box', PointArray, bounding_box_callback)
 	rospy.Subscriber('compass', Float32, compass_callback)
 	rospy.Subscriber('anemometer', Float32, anemometer_callback)
+	rospy.Subscriber('search_area', PointArray, search_area_callback)
 	rospy.spin()
 
 
