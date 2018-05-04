@@ -9,6 +9,7 @@ from boat_msgs.msg import BoatState, GPS, Point, PointArray
 from boat_msgs.srv import ConvertPoint
 from sensor_msgs.msg import Imu, Joy
 from std_msgs.msg import Float32, Int32, Bool
+from rosgraph_msgs.msg import Clock
 from tf.transformations import quaternion_from_euler
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -51,7 +52,7 @@ class Camera:
 		return (lps_x, lps_y)
 
 
-camera = Camera(0,0,1)
+camera = Camera(0,0,10)
 
 class Slider:
 	
@@ -147,10 +148,12 @@ class Slider:
 cur_slider = ()
 sliders = {}
 show_details = False
-gridsize = 100
+gridsize = 10
 # set camera move speed (pixels per second)
 camera_move_speed = 100
 camera_velocity = Point(0, 0)
+# should camera follow boat?
+follow_boat = False
 
 
 # Resources
@@ -174,18 +177,22 @@ sim_mode_str =['default', 'replay everything']
 should_sim_joy = False
 sim_is_running = True
 speed = 10
+pre_pause_speed = 10
 pause = False
 clock = 0
 last_time = -1
 boat_speed = 0 # px/s
-layline = rospy.get_param('/boat/layline')
-winch_min = rospy.get_param('/boat/winch_min')
-winch_max = rospy.get_param('/boat/winch_max')
+layline = rospy.get_param('/boat/nav/layline')
+winch_min = rospy.get_param('/boat/interfaces/winch_min')
+winch_max = rospy.get_param('/boat/interfaces/winch_max')
 wind_speed = 0
 speed_graph = {0 : 0}
 display_path = True
 path = PointArray()
 prev_path_time = 0
+fov_radius = 15
+fov_angle = 60
+points_in_fov = PointArray()
 
 # ROS data
 wind_heading = 270
@@ -209,6 +216,8 @@ rudder_enable = False
 replay_gps_raw = GPS()
 obstacle_points = PointArray()
 target_point = Point()
+local_bounding_box = PointArray()
+gps_bounding_box = PointArray()
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
@@ -218,6 +227,8 @@ wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 10)
 gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
 orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
 joy_pub = rospy.Publisher('joy', Joy, queue_size = 10)
+square_pub = rospy.Publisher('bounding_box', PointArray, queue_size = 10)
+clock_pub = rospy.Publisher('clock', Clock, queue_size = 1)
 to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
 to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 
@@ -243,6 +254,46 @@ def update_gps():
 	
 	orientation_pub.publish(imu)
 
+# check if point (lps) is within fov cone
+def point_is_in_fov(point):
+	dx = point.x - pos.x
+	dy = point.y - pos.y
+	# within range
+	if dx*dx + dy*dy < fov_radius*fov_radius:
+		# within angle
+		angle = math.degrees(math.atan2(dy, dx))
+		if angle < 0:
+			angle += 360
+		if abs(angle-heading) < fov_angle / 2:
+			return True
+	return False
+
+def get_vision_coords(point):
+	dx = point.x - pos.x
+	dy = point.y - pos.y
+	
+	# get angle from boat heading
+	angle = math.degrees(math.atan2(dy, dx))
+	if angle < 0:
+		angle += 360
+	angle = angle - heading
+	
+	# ???
+
+# publish pixel coordinates for points in vision
+def update_vision():
+	# TODO for obstacles as well
+	global points_in_fov
+
+	points_in_fov = PointArray()
+	for point in local_points.points:
+		if point_is_in_fov(point):
+			points_in_fov.points.append(point)
+	for point in points_in_fov.points:
+		# pixel_coord = get_vision_coords(point)
+		pass
+	
+	# visions pixel coord format?
 
 def update_wind():
 	global wind_heading
@@ -260,18 +311,11 @@ def update_wind():
 
 def boat_state_callback(newState):
 	global state
-	# Unpush the tacking button if tacking has completed so we don't tack forever
-	#if state.minor is BoatState.MIN_TACKING and newState.minor is not BoatState.MIN_TACKING:
-	#	joy.buttons[2] = 1
-	#	joy.buttons[0] = 0
-	#joy_pub.publish(joy)
 	
 	state = newState
 	if state.major is not BoatState.MAJ_DISABLED and pause:
 		pause_sim()
 	
-
-
 def rudder_callback(pos):
 	global rudder_pos
 	rudder_pos = pos.data
@@ -352,6 +396,48 @@ def obstacles_callback(obstacles):
 	global obstacle_points
 	obstacle_points = obstacles
 
+def bounding_box_callback(box):
+	global gps_bounding_box
+	global local_bounding_box
+	gps_bounding_box = box
+
+	# Reorganize the local points to create a box when drawn, if there are four
+	if len(gps_bounding_box.points) == 4:
+		x_sum = 0
+		y_sum = 0
+		for p in gps_bounding_box.points:
+			x_sum += p.x
+			y_sum += p.y
+		x_avr = x_sum / 4.0
+		y_avr = y_sum / 4.0
+		
+		temp_points = PointArray()
+		temp_points.points = [None]*4
+		for p in gps_bounding_box.points:
+			if p is None:
+				gps_bounding_box = PointArray()
+				local_bounding_box = PointArray()
+				square_pub.publish(gps_bounding_box)
+				print "Invalid box configuration. Make more square."
+				return
+			if p.x < x_avr:
+				if p.y < y_avr:
+					temp_points.points[0] = to_lps(p).pt
+				else:
+					temp_points.points[1] = to_lps(p).pt
+			else:
+				if p.y < y_avr:
+					temp_points.points[3] = to_lps(p).pt
+				else:
+					temp_points.points[2] = to_lps(p).pt
+	else:
+		temp_points = PointArray()
+		for point in gps_bounding_box.points:
+			local_point = to_lps(point).pt
+			temp_points.points.append(local_point)
+
+	local_bounding_box = temp_points	
+
 def target_point_callback(target_pt):
 	global target_point
 	target_point = target_pt
@@ -373,16 +459,19 @@ def resize(width, height):
 
 
 # Handler for mouse presses
-def mouse_handler(button, state, x, y):
+def mouse_handler(button, mouse_state, x, y):
 	global local_points
 	global gps_points
 	global sliders
 	global cur_slider
 	global sim_mode
+	global local_bounding_box
+	global gps_bounding_box
 	
-	if state != GLUT_DOWN:
+	if mouse_state != GLUT_DOWN:
 		cur_slider = ()
 		return
+
 	# If status panels are being clicked on
 	if (x <= 180 and show_details) or (x >= win_width - 120) and button == GLUT_LEFT_BUTTON:
 		for key in sliders:
@@ -390,27 +479,61 @@ def mouse_handler(button, state, x, y):
 				cur_slider = sliders[key]
 				cur_slider.handle_mouse(x,y)
 		return
-	
+
 	if button == GLUT_RIGHT_BUTTON:
 		if sim_mode == 0:
 			local_points = PointArray()
 			gps_points = PointArray()
-	elif cur_slider is () and sim_mode == 0 and button == GLUT_LEFT_BUTTON:
-			newPt = Point()
-			#print x,y
-			(lps_x,lps_y) = camera.screen_to_lps(x,y)			
-			newPt.x = lps_x
-			newPt.y = lps_y
-			coords = to_gps(newPt).pt
-			gps_points.points.append(coords)
-	elif button == 3 and state == GLUT_DOWN:
-		camera.scale *= 1.04
-		if camera.scale > 10:
-			camera.scale = 10
-	elif button == 4 and state == GLUT_DOWN:
-		camera.scale *= 0.96
-		if camera.scale < 0.1:
-			camera.scale = 0.1
+			local_bounding_box = PointArray()
+			gps_bounding_box = PointArray()
+
+	elif cur_slider is () and sim_mode == 0 and state.challenge is not BoatState.CHA_STATION and button == GLUT_LEFT_BUTTON:
+		newPt = Point()
+		(lps_x,lps_y) = camera.screen_to_lps(x,y)			
+		newPt.x = lps_x
+		newPt.y = lps_y
+		coords = to_gps(newPt).pt
+		gps_points.points.append(coords)
+
+	elif cur_slider is () and sim_mode == 0 and state.challenge is BoatState.CHA_STATION and button == GLUT_LEFT_BUTTON:
+		newPt = Point()
+		(lps_x,lps_y) = camera.screen_to_lps(x,y)			
+		newPt.x = lps_x
+		newPt.y = lps_y
+		coords = to_gps(newPt).pt
+
+		for p in local_bounding_box.points:
+			if math.hypot(p.y - newPt.y, p.x-newPt.x) < 15:
+				print "Distance between buoys is too small, must be at least 15m"
+				return
+		# Reset if we were gonna add to a list of 4 points already
+		if len(local_bounding_box.points) == 4:
+			gps_bounding_box = PointArray()
+			local_bounding_box = PointArray()
+
+		gps_bounding_box.points.append(coords)
+		square_pub.publish(gps_bounding_box)
+
+	elif (button == 3 or button == 4) and mouse_state == GLUT_DOWN:
+		
+		if not follow_boat:
+			# used to keep mouse pointing at same lps position when zooming
+			(mouse_x, mouse_y) = camera.screen_to_lps(x,y)
+		
+		if button == 3:
+			camera.scale *= 1.04
+			if camera.scale > 100:
+				camera.scale = 100
+		else:
+			camera.scale *= 0.96
+			if camera.scale < 0.1:
+				camera.scale = 0.1
+		
+		if not follow_boat:
+			# keep mouse pointing at same lps position when zooming
+			(new_mouse_x, new_mouse_y) = camera.screen_to_lps(x,y)
+			camera.x -= new_mouse_x - mouse_x
+			camera.y -= new_mouse_y - mouse_y
 	
 	if sim_mode == 0:
 		waypoint_pub.publish(gps_points)
@@ -482,6 +605,7 @@ def ASCII_handler(key, mousex, mousey):
 	global show_details
 	global display_path
 	global path
+	global follow_boat
 	
 	# Handle cheat codes
 	cur_input += key;
@@ -510,7 +634,12 @@ def ASCII_handler(key, mousex, mousey):
 		print 'Changed sim mode, is now \'%s\'' % sim_mode_str[sim_mode] 
 	elif key is 'i':
 		show_details = not show_details
-
+	elif key is 'c':
+		path = PointArray()
+		display_path = not display_path
+	elif key is 'y':
+		follow_boat = not follow_boat
+	
 	if sim_mode == 0:	
 		if key is '1' and should_sim_joy:
 			joy.buttons[4] = 1
@@ -526,6 +655,18 @@ def ASCII_handler(key, mousex, mousey):
 			joy.buttons[4] = 0
 			joy.buttons[5] = 0
 			joy.buttons[8] = 1
+			joy_pub.publish(joy)
+		elif key is '4' and should_sim_joy:
+			joy.buttons[1] = 1
+			joy.buttons[3] = 0
+			joy_pub.publish(joy)
+			joy.buttons[1] = 0
+			joy_pub.publish(joy)
+		elif key is '5' and should_sim_joy:
+			joy.buttons[1] = 0
+			joy.buttons[3] = 1
+			joy_pub.publish(joy)
+			joy.buttons[3] = 0
 			joy_pub.publish(joy)
 		elif key is 't' and should_sim_joy:
 			joy.buttons[0] = 1
@@ -545,11 +686,11 @@ def ASCII_handler(key, mousex, mousey):
 			joy_pub.publish(joy)
 		elif key is 'a':
 			wind_heading += 5
+			wind_heading = wind_heading % 360
 		elif key is 'd':
 			wind_heading -= 5
-		elif key is 'c':
-			path = PointArray()
-			display_path = not display_path
+			if wind_heading < 0:
+				wind_heading += 360
 		elif key is '0':
 			sound = not sound
 		elif key is ' ':
@@ -557,7 +698,7 @@ def ASCII_handler(key, mousex, mousey):
 			pos.y = 0
 			camera.x = 0
 			camera.y = 0
-			camera.scale = 1
+			camera.scale = 10
 			path = PointArray()			
 			update_gps()
 			
@@ -572,14 +713,18 @@ def redraw():
 	
 	# Render stuff
 	draw_grid()
+	if state.challenge is BoatState.CHA_STATION:
+		draw_bounding_box()	
+	if display_path:
+		draw_path()
+	draw_fov()
 	draw_target_point()
 	draw_waypoints()
+	draw_waypoints_in_fov()
 	draw_obstacles()
 	draw_boat()
 	draw_target_heading_arrow()
 	draw_status()
-	if display_path:
-		draw_path()
 	if show_details:
 		draw_detailed_status()
 
@@ -713,15 +858,36 @@ def draw_waypoints():
 	glColor3f(1,0,0)
 	for p in local_points.points:
 		(x,y) = camera.lps_to_screen(p.x, p.y)
-		draw_circle(5 * camera.scale,x,y)
+		draw_circle(0.5 * camera.scale,x,y)
 	
 	glPopMatrix()
+
+def draw_bounding_box():
+	glPushMatrix()
+
+	glColor3f(0,1,0)
+	for p in local_bounding_box.points:
+		(x,y) = camera.lps_to_screen(p.x, p.y)
+		draw_circle(0.5 * camera.scale,x,y)
+
+	if len(local_bounding_box.points) == 4:
+		glLineWidth(1.0)
+		glBegin(GL_LINES)
+		for i in range(0, 4):
+			(x,y) = camera.lps_to_screen(local_bounding_box.points[i].x, local_bounding_box.points[i].y)
+			(x_n,y_n) = camera.lps_to_screen(local_bounding_box.points[(i+1) % 4].x, local_bounding_box.points[(i+1) % 4].y)
+			glVertex2f(x, y)
+			glVertex2f(x_n, y_n)
+		glEnd()
+		
+	glPopMatrix()
+	
 
 def draw_target_point():	
 	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
 		glColor3f(1,1,1)
 		(x,y) = camera.lps_to_screen(target_point.x, target_point.y)
-		draw_circle(7 * camera.scale, x, y)
+		draw_circle(0.7 * camera.scale, x, y)
 
 def draw_obstacles():
 	glPushMatrix()
@@ -729,7 +895,7 @@ def draw_obstacles():
 	glColor3f(0.2, 0.2, 0.2)
 	for p in obstacle_points.points:
 		(x,y) = camera.lps_to_screen(p.x, p.y)
-		draw_circle(5 * camera.scale,x,y)
+		draw_circle(0.5 * camera.scale,x,y)
 	
 	glPopMatrix()
 
@@ -757,6 +923,53 @@ def draw_target_heading_arrow():
 	glEnd()
 	
 	glPopMatrix()
+
+def draw_fov():
+	(boat_x, boat_y) = camera.lps_to_screen(pos.x, pos.y)
+	
+	# calculate points for drawing fov cone (facing up)
+	resolution = 5
+	angle_step = float(fov_angle) / resolution
+	cone_points = PointArray()
+	cone_points.points.append(Point(0, 0))
+	for i in range(-resolution, resolution + 1):
+		if i is not 0:
+			angle = i * angle_step
+			x = math.sin(math.radians(angle/2)) * fov_radius * camera.scale
+			y = math.cos(math.radians(angle/2)) * fov_radius * camera.scale
+			cone_points.points.append(Point(x,y))
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+	glEnable(GL_BLEND)
+	glColor4f(245/255.0, 150/255.0, 25/255.0, 0.1)
+	
+	glPushMatrix()
+	glTranslatef(boat_x, boat_y, 0)
+	glRotatef(heading-90, 0, 0, 1)
+
+ 	glBegin(GL_POLYGON)
+	for point in cone_points.points:
+		glVertex2f(point.x,point.y)
+	glEnd()
+
+	glColor4f(245/255.0, 150/255.0, 25/255.0, 0.8)
+	glBegin(GL_LINE_LOOP)
+	for point in cone_points.points:
+		glVertex2f(point.x,point.y)
+	glEnd()
+	glPopMatrix()
+
+	glDisable(GL_BLEND)
+
+
+def draw_waypoints_in_fov():
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+	glEnable(GL_BLEND)
+	glColor4f(245/255.0, 200/255.0, 5/255.0, 0.3)
+	for point in points_in_fov.points:
+		(x,y) = camera.lps_to_screen(point.x, point.y)
+		draw_circle(0.8 * camera.scale, x, y)
+
+	glDisable(GL_BLEND)
 
 
 # Draw the right-hand 'status' panel and all of its data
@@ -793,9 +1006,9 @@ def draw_status():
 	
 	# Draw the boat pos
 	glColor3f(0.0, 0.0, 0.0)
-	draw_text("X: %.1f" % pos.x, win_width-60, pos_offset, 'center')
-	draw_text("Y: %.1f" % pos.y, win_width-60, pos_offset-15, 'center')
-	draw_text("Spd: %.1f" % boat_speed, win_width-60, pos_offset-30, 'center')
+	draw_text("X: %.1f m" % pos.x, win_width-60, pos_offset, 'center')
+	draw_text("Y: %.1f m" % pos.y, win_width-60, pos_offset-15, 'center')
+	draw_text("Spd: %.1f m/s" % boat_speed, win_width-60, pos_offset-30, 'center')
 	draw_text("Head: %.1f" % heading, win_width-60, pos_offset-45, 'center')
 	
 	# Draw the boat state
@@ -806,6 +1019,18 @@ def draw_status():
 		major = "Auto"
 	elif state.major is BoatState.MAJ_DISABLED:
 		major = "Disabled"
+
+	challenge = ""
+	if state.challenge is BoatState.CHA_STATION:
+		challenge = "Station"
+	elif state.challenge is BoatState.CHA_NAV:
+		challenge = "Navigation"
+	elif state.challenge is BoatState.CHA_LONG:
+		challenge = "Long Distance"
+	elif state.challenge is BoatState.CHA_AVOID:
+		challenge = "Avoidance"
+	elif state.challenge is BoatState.CHA_SEARCH:
+		challenge = "Search"
 	
 	minor = ""
 	if state.minor is BoatState.MIN_COMPLETE:
@@ -814,16 +1039,18 @@ def draw_status():
 		minor = "Planning"
 	elif state.minor is BoatState.MIN_TACKING:
 		minor = "Tacking"
+
 	draw_text("State", win_width-60, state_offset, 'center', 24)
 	draw_text("M: " + major, win_width-60, state_offset-20, 'center')
 	draw_text("m: " + minor, win_width-60, state_offset-35, 'center')
+	draw_text("C: " + challenge, win_width-60, state_offset-50, 'center')
 	
 	# Draw the boat diagram
 	draw_status_boat(win_width-60, boat_offset)
 	
 	# Draw the rudder and winch pos
-	draw_text("Winch: %d" % winch_pos, win_width-60, boat_offset-30, 'center')
-	draw_text("Rudder: %.1f" % rudder_pos, win_width-60, boat_offset-45, 'center')
+	draw_text("Winch: %d" % winch_pos, win_width-60, boat_offset-35, 'center')
+	draw_text("Rudder: %.1f" % rudder_pos, win_width-60, boat_offset-50, 'center')
 	
 	# Draw the simulation speed
 	draw_text("Sim speed ", win_width-60, 50, 'center')
@@ -954,7 +1181,7 @@ def draw_boat():
 	glRotatef(heading-90, 0, 0, 1)
 	draw_image(
 		cur_sail_img[0],
-		(1*camera.scale, 5*camera.scale),
+		(0.1*camera.scale, 0.5*camera.scale),
 		sail_angle,
 		(cur_sail_img[1][0]*camera.scale, cur_sail_img[1][1]*camera.scale))
 	glPopMatrix()
@@ -1043,15 +1270,13 @@ def calc_tack(boat_heading, wind_heading):
 	elif diff < -180:
 		diff += 360
 	
+	# Dead run	
 	if diff == 0:
-		return 0
+		return 1.0
 	return diff/abs(diff)
-
 
 # returns heading of vector point from end of boom to mast
 def calc_boom_heading(boat_heading, wind_heading, winch):
-	global winch_min
-	global winch_max
 	winch_range = winch_max - winch_min
 	
 	tack = calc_tack(boat_heading, wind_heading)
@@ -1061,12 +1286,15 @@ def calc_boom_heading(boat_heading, wind_heading, winch):
 def pause_sim():
 	global pause
 	global speed
-	#if state.major is BoatState.MAJ_DISABLED:
+	global pre_pause_speed
+
 	pause = not pause
 	if pause is True:
+		pre_pause_speed = speed
 		speed = 0
 	else:
-		speed = 10
+		speed = pre_pause_speed
+	sliders["Sim speed"].change_val(speed*100)
 
 
 def calc(_):
@@ -1089,12 +1317,20 @@ def calc(_):
 	dt = real_dt * speed
 	last_time = time.time()
 	clock += dt
+	time_msg = Clock()
+	time_msg.clock.secs = clock
+	time_msg.clock.nsecs = (clock % 1) * (10**9)
+	clock_pub.publish(time_msg)
 
-	# Move camera when mouse is near edge of screen
-	# I put this in here so that camera move speed is bound to time and not fps
-	camera.x += camera_velocity.x * real_dt
-	camera.y += camera_velocity.y * real_dt
-
+	if follow_boat:
+		camera.x = pos.x
+		camera.y = pos.y
+	else:	
+		# Move camera when mouse is near edge of screen
+		# I put this in here so that camera move speed is bound to time and not fps
+		camera.x += camera_velocity.x * real_dt
+		camera.y += camera_velocity.y * real_dt
+	
 	if(sim_mode == 0):
 		# Calculate other things
 		tack = calc_tack(heading, wind_heading)
@@ -1103,7 +1339,6 @@ def calc(_):
 		boom_perp_vector = polar_to_rect(1, boom_heading + tack*90)
 		app_wind = calc_apparent_wind(wind_heading, boat_speed, heading)
 		heading_vector = polar_to_rect(1, heading)
-		
 		# components of wind parallel and perpendicular to sail
 		wind_par = -proj(app_wind, boom_vector)
 		wind_perp = proj(app_wind, boom_perp_vector)
@@ -1113,31 +1348,29 @@ def calc(_):
 			acc = 0
 		else:
 			# Calculate drag component (major component when on run)		
-			a_perp = 0.05*wind_perp**2
-			acc = a_perp * proj(boom_perp_vector, heading_vector)	
-			
-			#Calculate lift (major component when on reach)
+			a_perp = 0.03*wind_perp**2
+			acc = a_perp * proj(boom_perp_vector, heading_vector)
+			# Calculate lift (major component when on reach)
 			if wind_par > 0:
 				a_par = 0.03*wind_par**2
 				acc += a_par * proj(boom_perp_vector, heading_vector)
 		
 		# Wind drag on boat (prominent when in irons)
-		acc += 0.005*proj(app_wind, heading_vector)
-		
+		acc += 0.01*proj(app_wind, heading_vector)
+
 		# Water drag
-		drag = 0.07*boat_speed*abs(boat_speed)
+		drag = 0.25*boat_speed*abs(boat_speed)
 		rudder_drag = 0.2*drag*abs(math.cos(math.radians(rudder_pos)))
 		drag += rudder_drag
 		boat_speed += (acc - drag)*dt
 		
 		#old_wind_head = ane_reading
 		
-		if(state.major != BoatState.MAJ_DISABLED):
-			heading -= (rudder_pos-90)*0.05*boat_speed * dt
-			heading %= 360
+		heading -= (rudder_pos-90)*0.4*boat_speed * dt
+		heading %= 360
 			
-			# Update anemometer reading because of new heading and speed
-			update_wind()
+		# Update anemometer reading because of new heading and speed
+		update_wind()
 		
 		
 		speed_graph[int(ane_reading)%360] = boat_speed
@@ -1153,6 +1386,8 @@ def calc(_):
 			camera.y = 0
 			path = PointArray()
 		
+		update_vision()
+
 		update_gps()
 
 		# Don't let drawn path be too long 
@@ -1238,24 +1473,24 @@ def load_image_resources():
 	compass_pointer_img = load_image('../meshes/compass_pointer.png', (23,128))
 	
 	orig=load_image('../meshes/niceboat.png', (64,128))
-	boat_imgs["orig"] = orig, (24,48)
+	boat_imgs["orig"] = orig, (2,4)
 	orig_rudder = load_image('../meshes/rudder.png', (32,64))
-	rudder_imgs["orig"] = orig_rudder, (16,32)
+	rudder_imgs["orig"] = orig_rudder, (1.5,3)
 	orig_sail = load_image('../meshes/sail.png', (32,64))
-	sail_imgs["orig"] = orig_sail, (24,48)
+	sail_imgs["orig"] = orig_sail, (2,4)
 	
 	pirate_id=load_image('../meshes/pirate_boat.png', (39,56))
-	boat_imgs["pirate"] = pirate_id, (36,48)
+	boat_imgs["pirate"] = pirate_id, (3,4)
 	# use orig rudder and sail	
-	rudder_imgs["pirate"] = orig_rudder, (16,32)
-	sail_imgs["pirate"] = orig_sail, (24,48)
+	rudder_imgs["pirate"] = orig_rudder, (1.5,3)
+	sail_imgs["pirate"] = orig_sail, (2,4)
 	
 	SPACE_X = load_image('../meshes/falcon_heavy.png', (1040,5842))
-	boat_imgs["mars"] = SPACE_X, (1040/48,5842/48)
+	boat_imgs["mars"] = SPACE_X, (2,10)
 	# use orig rudder
-	rudder_imgs["mars"] = orig_rudder, (16,32)
+	rudder_imgs["mars"] = orig_rudder, (2,3)
 	roadster = load_image('../meshes/roadster.png', (128,256))
-	sail_imgs["mars"] = roadster, (32,64)
+	sail_imgs["mars"] = roadster, (3,6)
 	
 	# Load stanard/orig boat by default
 	cur_boat_img = boat_imgs["orig"]
@@ -1370,7 +1605,7 @@ def init_sliders():
 	wind_speed_slider.set_color(0,0,0)
 	sliders["Wind speed"] = wind_speed_slider
 
-	sim_speed_slider = Slider(win_width-100,win_height-200,80,25, sim_speed_slider_callback, 0, 1000, 1000)
+	sim_speed_slider = Slider(win_width-100,win_height-200,80,25, sim_speed_slider_callback, 0, 1000, 200)
 	sim_speed_slider.set_color(0,0,0)
 	sliders["Sim speed"] = sim_speed_slider
 
@@ -1438,6 +1673,7 @@ def listener():
 	rospy.Subscriber('gps_raw', GPS, gps_raw_callback)
 	rospy.Subscriber('obstacles', PointArray, obstacles_callback)
 	rospy.Subscriber('target_point', Point, target_point_callback)
+	rospy.Subscriber('bounding_box', PointArray, bounding_box_callback)
 
 
 
@@ -1449,6 +1685,7 @@ if __name__ == '__main__':
 	
 	state.major = BoatState.MAJ_DISABLED
 	state.minor = BoatState.MIN_COMPLETE
+	state.challenge = BoatState.CHA_NAV
 	
 	try:
 		listener()

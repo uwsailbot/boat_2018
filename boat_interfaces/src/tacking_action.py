@@ -14,9 +14,9 @@ class TackingAction(object):
 		self._name = name
 		self._as = actionlib.SimpleActionServer(self._name, boat_msgs.msg.TackingAction, execute_cb=self.tacking_callback, auto_start = False)
 		self._as.start()
-		self.layline = rospy.get_param('/boat/layline')
-		self.rudder_max = rospy.get_param('boat/rudder_max')
-		self.rudder_min = rospy.get_param('boat/rudder_min')
+		self.layline = rospy.get_param('/boat/nav/layline')
+		self.rudder_max = rospy.get_param('boat/interfaces/rudder_max')
+		self.rudder_min = rospy.get_param('boat/interfaces/rudder_min')
 		self.rudder_pos = 90.0
 		self.app_wind_shift = 0
 		self.target_heading = 0
@@ -47,6 +47,34 @@ class TackingAction(object):
 
 	def boat_state_callback(self, state):
 		self.state = state
+	
+	def gtAngle(self, angle1, angle2):
+		comp_angle = (angle2 + 180) % 360
+		if angle2 >= 180:
+			return not self.is_within_bounds(angle1, angle2, comp_angle)
+		else:
+			return self.is_within_bounds(angle1, angle2, comp_angle)
+	
+	def ltAngle(self, angle1, angle2):
+		comp_angle = (angle2 + 180) % 360
+		if angle2 >= 180:
+			return self.is_within_bounds(angle1, angle2, comp_angle)
+		else:
+			return not self.is_within_bounds(angle1, angle2, comp_angle)
+	
+	def is_within_bounds(self, val, boundA, boundB):
+		if boundA < boundB:
+			val -= boundA
+			boundB -= boundA
+			boundA = 0
+		else:
+			val -= boundB
+			boundA -= boundB
+			boundB = 0
+		if val < 0:
+			val += 360
+		val = val % 360
+		return (boundA <= val and val <= boundB) or (boundB <= val and val <= boundA)
 
 	def tacking_callback(self, goal):
 		# helper variables
@@ -69,7 +97,7 @@ class TackingAction(object):
 			# start executing the action
 			if goal.direction == 1:
 				if self.ane_reading < (180 + self.layline):
-					if self.cur_boat_heading < self.init_target:
+					if self.ltAngle(self.cur_boat_heading, self.init_target):
 						# Nothing relevant to publish it for other than debugging and the simulator
 						self.target_pub.publish(Float32(self.cur_boat_heading))
 					if not self.rudder_pos == self.rudder_max:
@@ -83,11 +111,12 @@ class TackingAction(object):
 					self.rudder_pos = 90.0
 					self.rudder_pos_pub.publish(Float32(self.rudder_pos))
 					self.state_pub.publish(self.state)
+					print "Tacking success: ", goal.direction, self.ane_reading
 					success = True
 			
 			elif goal.direction == -1:
 				if self.ane_reading > (180 - self.layline):
-					if self.cur_boat_heading > self.init_target:
+					if self.gtAngle(self.cur_boat_heading,self.init_target):
 						# Nothing relevant to publish it for other than debugging and the simulator
 						self.target_pub.publish(Float32(self.cur_boat_heading)) 
 					if not self.rudder_pos == self.rudder_min:
@@ -101,6 +130,7 @@ class TackingAction(object):
 					self.rudder_pos = 90.0
 					self.rudder_pos_pub.publish(Float32(self.rudder_pos))
 					self.state_pub.publish(self.state)
+					print "Tacking success: ", goal.direction, self.ane_reading
 					success = True
 
 			if self._as.is_preempt_requested():
@@ -122,10 +152,10 @@ class TackingAction(object):
 		if success:
 			self._result.success = success
 			if (goal.direction == -1 and self.cur_boat_heading > self.init_target) or\
-					(goal.direction == 1 and self.cur_boat_heading < self.init_target):
-						# Publish and return the accurate curent heading for the navigator node to use
-						self.target_pub.publish(Float32(self.cur_boat_heading))
-						self.target_heading = self.cur_boat_heading
+				(goal.direction == 1 and self.cur_boat_heading < self.init_target):
+				# Publish and return the accurate current heading for the navigator node to use
+				self.target_pub.publish(Float32(self.cur_boat_heading))
+				self.target_heading = self.cur_boat_heading
 			self._result.target_heading = self.target_heading
 			rospy.loginfo('Tacking Action: Success')
 			self._as.set_succeeded(self._result)
