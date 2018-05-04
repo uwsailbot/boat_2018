@@ -82,7 +82,16 @@ def boat_state_callback(new_state):
 #	
 def anemometer_callback(new_heading):
 	global ane_reading
+	global apparent_wind_heading
+	global new_wind
 	ane_reading = new_heading.data
+	new_wind_heading = (ane_reading + cur_boat_heading) % 360
+	
+	# Tolerance on a wind shift to be determined
+	# Only update wind heading if a significant shift is detected, because it will then replan our upwind path
+	if abs(new_wind_heading - apparent_wind_heading) > 0.1 :
+		new_wind = True
+		apparent_wind_heading = new_wind_heading
 
 
 ##	Callback for setting the boat speed when the `/gps_raw` topic is updated
@@ -105,7 +114,7 @@ def compass_callback(compass):
 	global target_heading
 	
 	cur_boat_heading = compass.data
-	new_wind_heading = (ane_reading + compass.data) % 360
+	new_wind_heading = (ane_reading + cur_boat_heading) % 360
 	
 	# Tolerance on a wind shift to be determined
 	# Only update wind heading if a significant shift is detected, because it will then replan our upwind path
@@ -404,7 +413,7 @@ def awa_algorithm():
 				# If the tack is not worth preforming, set the current heading to be the max vmg of our current tack
 				else:
 					target_heading = cur_tack_vmg_heading
-					print target_heading
+					#print target_heading
 					heading_pub.publish(Float32(target_heading))
 					
 			# Tack is not required to get to vmg_heading, therefore set it

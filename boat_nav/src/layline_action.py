@@ -24,6 +24,7 @@ class LaylineAction(object):
 		self.ane_reading = 0
 		self.apparent_wind_heading = 0
 		self.wind_coming = 0
+		self.compass = 0
 		self.sub_ane = rospy.Subscriber('anemometer', Float32, self.anemometer_callback)
 		self.target_sub = rospy.Subscriber('target_heading', Float32, self.target_heading_callback)
 		self.sub_heading = rospy.Subscriber('compass', Float32, self.compass_callback)
@@ -72,9 +73,11 @@ class LaylineAction(object):
 
 	def anemometer_callback(self, new_heading):
 		self.ane_reading = new_heading.data
+		self.apparent_wind_heading = (self.ane_reading + self.compass) % 360
+		self.wind_coming = (self.apparent_wind_heading + 180) % 360
 
 	def compass_callback(self, compass):
-		self.apparent_wind_heading = (self.ane_reading + compass.data) % 360
+		self.apparent_wind_heading = (self.ane_reading + self.compass) % 360
 		self.wind_coming = (self.apparent_wind_heading + 180) % 360
 
 	def layline_callback(self, goal):

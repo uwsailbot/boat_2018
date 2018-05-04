@@ -419,11 +419,11 @@ def bounding_box_callback(box):
 				local_bounding_box = PointArray()
 				square_pub.publish(gps_bounding_box)
 				print "Invalid box configuration. Make more square."
-				return;
+				return
 			if p.x < x_avr:
 				if p.y < y_avr:
 					temp_points.points[0] = to_lps(p).pt
-				else: 
+				else:
 					temp_points.points[1] = to_lps(p).pt
 			else:
 				if p.y < y_avr:

@@ -3,6 +3,7 @@ import math
 import rospy
 from boat_msgs.msg import BoatState, Point, PointArray
 from boat_msgs.srv import ConvertPoint
+from std_msgs.msg import Float32
 
 # Declare global variables needed for the node
 state = BoatState()
@@ -12,6 +13,7 @@ ane_reading = 0
 buoy_tol = rospy.get_param('/boat/planner/buoy_tol')
 height_to_travel = rospy.get_param('/boat/planner/station/height')
 max_width = rospy.get_param('/boat/planner/station/width')
+inner_box_scale = rospy.get_param('/boat/planner/station/inner_box_scale')
 box = []
 cur_pos = Point()
 start_station = Point()
@@ -19,6 +21,8 @@ end_station = Point()
 final_buoy_station = False
 station_setup = False
 not_within_box = False
+wind_coming = 0
+cur_boat_heading = 0
 
 # Declare the publishers for the node
 boat_state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
@@ -46,7 +50,17 @@ def boat_state_callback(new_state):
 
 def anemometer_callback(anemometer):
 	global ane_reading
+	global wind_coming
 	ane_reading = anemometer.data
+	new_wind_heading = (ane_reading + cur_boat_heading) % 360
+	wind_coming = (new_wind_heading + 180) % 360
+
+def compass_callback(compass):
+	global wind_coming
+	global cur_boat_heading
+	cur_boat_heading = compass.data
+	new_wind_heading = (ane_reading + cur_boat_heading) % 360
+	wind_coming = (new_wind_heading + 180) % 360
 	
 def bounding_box_callback(bounding_box):
 	global box
@@ -63,17 +77,51 @@ def bounding_box_callback(bounding_box):
 		for p in bounding_box.points:
 			if p is None:
 				return
-			if p.x < x_avr:
-				if p.y < y_avr:
-					temp[0] = p
-				else: 
-					temp[1] = p
-			else:
-				if p.y < y_avr:
-					temp[3] = p
+			if wind_coming > 45 and wind_coming <= 135:
+				if p.x < x_avr:
+					if p.y < y_avr:
+						temp[0] = p
+					else: 
+						temp[1] = p
 				else:
-					temp[2] = p
-		box = temp
+					if p.y < y_avr:
+						temp[3] = p
+					else:
+						temp[2] = p
+			elif wind_coming > 135 and wind_coming <= 225:
+				if p.x < x_avr:
+					if p.y < y_avr:
+						temp[1] = p
+					else: 
+						temp[2] = p
+				else:
+					if p.y < y_avr:
+						temp[0] = p
+					else:
+						temp[3] = p
+			elif wind_coming > 225 and wind_coming <= 315:
+				if p.x < x_avr:
+					if p.y < y_avr:
+						temp[2] = p
+					else: 
+						temp[3] = p
+				else:
+					if p.y < y_avr:
+						temp[1] = p
+					else:
+						temp[0] = p
+			else:
+				if p.x < x_avr:
+					if p.y < y_avr:
+						temp[3] = p
+					else: 
+						temp[0] = p
+				else:
+					if p.y < y_avr:
+						temp[2] = p
+					else:
+						temp[1] = p
+			box = temp
 	else:
 		box = bounding_box.points
 
@@ -90,15 +138,15 @@ def station_timer_callback(event):
 	rospy.loginfo(rospy.get_caller_id() + " Reached end of station timer")
 
 	# Determine distance from each side of the box 
-	l_dist = abs(dist_from_line(box[0], box[1]))
-	t_dist = abs(dist_from_line(box[1], box[2]))
-	r_dist = abs(dist_from_line(box[3], box[2]))
-	b_dist = abs(dist_from_line(box[0], box[3]))
+	l_dist = dist_from_line(box[0], box[1])
+	t_dist = dist_from_line(box[1], box[2])
+	r_dist = dist_from_line(box[3], box[2])
+	b_dist = dist_from_line(box[0], box[3])
 
 	dist_list = (l_dist, t_dist, r_dist, b_dist)
 	i = dist_list.index(min(dist_list))
 	
-	# Use service to determine 100m dist in gps
+	# Use service to determine 12m dist in gps
 	# Use this distance on how far to put the buoy outside the box
 	tol_dist = lps_to_gps(Point(20,0)).pt.x
 	cur_pos_gps = lps_to_gps(cur_pos).pt
@@ -120,7 +168,7 @@ def dist_from_line(start_point, end_point):
 		return cur_pos_gps.x - end_point.x
 	m = (end_point.y - start_point.y)/(end_point.x - start_point.x)
 	b = start_point.y - m * start_point.x
-	return (b + m * cur_pos_gps.x - cur_pos_gps.y)/(math.sqrt(1 + m*m))
+	return abs(b + m * cur_pos_gps.x - cur_pos_gps.y)/(math.sqrt(1 + m*m))
 	
 def waypoints_callback(new_waypoint):
 	global waypoints
@@ -160,26 +208,66 @@ def station_setup():
 	waypoints_pub.publish(waypoints)
 	target_pub.publish(Point())
 
-	# Determine wall angles and box widths
-	station_angle = math.atan2(box[3].y - box[0].y, box[3].x - box[0].x) * 180.0 / math.pi
+	# Determine wall angles and box widths, as well as slope of the bottom of the box, as long as it's not vertical
+	m_bottom = 0
+	vert = False
+	if abs(box[3].x - box[0].x) > 0.0001:
+		m_bottom = (box[3].y - box[0].y)/(box[3].x - box[0].x)
+	else:
+		vert = True
 	bottom_box_width = math.hypot(box[3].y - box[0].y, box[3].x - box[0].x)
 	top_box_width = math.hypot(box[2].y - box[1].y, box[2].x - box[1].x)
 	left_box_height = math.hypot(box[1].y - box[0].y, box[1].x - box[0].x)
 	right_box_height = math.hypot(box[3].y - box[2].y, box[3].x - box[2].x)
 
-	# Determine width at the height we will be travelling
+	# Determine width at the height we will be traveling
 	station_width = (bottom_box_width + (top_box_width-bottom_box_width) * height_to_travel) * max_width
 	station_height = (left_box_height + (right_box_height-left_box_height) * ((1 - max_width) / 2.0)) * height_to_travel
 	
-	# Determine the two points that will alternate
-	start_x = ((box[3].x + box[0].x) / 2.0) - station_width / 2.0
-	y_int = box[0].y - math.tan(math.radians(station_angle)) * box[0].x
-	start_y = math.tan(math.radians(station_angle)) * start_x + y_int + station_height
-	start_station = Point(start_x, start_y)
-	end_x = start_x + station_width
-	end_y = math.tan(math.radians(station_angle)) * end_x + y_int + station_height
-	end_station = Point(end_x, end_y)
+	# Determine the two points that will alternate, first find centre point of box
+	y_sum = 0
+	x_sum = 0
+	for p in box:
+		x_sum += p.x
+		y_sum += p.y
+	x_avr = x_sum / 4.0
+	y_avr = y_sum / 4.0
 	
+	y_int = box[0].y - m_bottom * box[0].x
+	start_station = Point()
+	end_station = Point()
+
+	# Depending on if bottom of box (rel to wind) is on right/left/up/down side, find a parallel line to the bottom
+	# Then create two points on that line at the desired height and width, and move them inside the box
+	if box[0].x > x_avr and box[3].x > x_avr:
+		start_station.y = ((box[3].y + box[0].y) / 2.0) - station_width / 2.0
+		end_station.y = start_station.y + station_width
+		if not vert:
+			start_station.x = (start_station.y - y_int)/m_bottom - station_height
+			end_station.x = (end_station.y - y_int)/m_bottom - station_height
+		else:
+			start_station.x = box[3].x - station_height
+			end_station.x = box[3].x - station_height
+	elif box[0].x < x_avr and box[3].x < x_avr:
+		start_station.y = ((box[3].y + box[0].y) / 2.0) - station_width / 2.0
+		end_station.y = start_station.y + station_width
+		if not vert:
+			start_station.x = (start_station.y - y_int)/m_bottom + station_height
+			end_station.x = (end_station.y - y_int)/m_bottom + station_height
+		else:
+			start_station.x = box[3].x + station_height
+			end_station.x = box[3].x + station_height
+	elif box[0].y > y_avr and box[3].y > y_avr:
+		start_station.x = ((box[3].x + box[0].x) / 2.0) - station_width / 2.0
+		start_station.y = m_bottom * start_station.x + y_int - station_height
+		end_station.x = start_station.x + station_width
+		end_station.y = m_bottom * end_station.x + y_int - station_height
+	else:
+		start_station.x = ((box[3].x + box[0].x) / 2.0) - station_width / 2.0
+		start_station.y = m_bottom * start_station.x + y_int + station_height
+		end_station.x = start_station.x + station_width
+		end_station.y = m_bottom * end_station.x + y_int + station_height
+
 	waypoints.append(start_station)
 	waypoints_pub.publish(waypoints)
 	
@@ -198,7 +286,7 @@ def station_waypoint_planner():
 	diff_point = Point()
 	diff_point.x = waypoints[0].x - start_station.x
 	diff_point.y = waypoints[0].y - start_station.y
-	if abs(diff_point.x) < 0.00001 and abs(diff_point.y) < 0.00001:
+	if abs(diff_point.x) < 0.0001 and abs(diff_point.y) < 0.0001:
 		waypoints.append(end_station)
 	else:
 		waypoints.append(start_station)
@@ -245,21 +333,53 @@ def position_callback(position):
 	rate.sleep()
 
 def within_box():
-	l_dist = dist_from_line(box[0], box[1])
-	t_dist = dist_from_line(box[1], box[2])
-	r_dist = dist_from_line(box[3], box[2])
-	b_dist = dist_from_line(box[0], box[3])
+	# Find centre of box
+	y_sum = 0
+	x_sum = 0
+	for p in box:
+		x_sum += p.x
+		y_sum += p.y
+	x_avr = x_sum / 4.0
+	y_avr = y_sum / 4.0
+	inner_box = [None]*4
+	# Construct the inner box, using scale parameter from yaml
+	for i in range(4):
+		pt = Point()
+		pt.y = (box[i].y - y_avr)*inner_box_scale + y_avr
+		pt.x = (box[i].x - x_avr)*inner_box_scale + x_avr
+		inner_box[i] = pt
+
+	# Create horizontal vector from the cur_pos towards +x
+	start_point = lps_to_gps(cur_pos).pt
+	m = 0
+	b = start_point.y
+	intersections = 0
+
+	# Cast the vector out of the box, if the boat is inside the box, the ray will only intersect with a side once.  If outside of the box, it 
+	# will intersect an odd number of times.
+	for i in range(4):
+		# Make sure line is not vertical
+		if abs(inner_box[(i+1)%4].x - inner_box[i].x) > 0.0001:
+			m_box = (inner_box[(i+1)%4].y - inner_box[i].y)/(inner_box[(i+1)%4].x - inner_box[i].x)
+			b_box = inner_box[i].y - m_box * inner_box[i].x
+			
+			# If the slopes are the same they will never intersect
+			if abs(m - m_box) > 0.0001:
+				x_int = (b_box - b)/(m_box - m)
+				y_int = m_box * x_int + b_box
+				# Make sure the intersection occurs within the bounds of the box, since lines continue infinitely and the intersection
+				# might be out of bound
+				if (x_int <= max(inner_box[i].x,inner_box[(i+1)%4].x) and x_int >= min(inner_box[i].x,inner_box[(i+1)%4].x) and x_int >= start_point.x
+					and y_int <= max(inner_box[i].y,inner_box[(i+1)%4].y) and y_int >= min(inner_box[i].y,inner_box[(i+1)%4].y)):
+					intersections += 1
+		# Perfectly vertical line, will intersect as long as it is on the right side of the starting point and in the right y range
+		else:
+			if (inner_box[i].x >= start_point.x and start_point.y <= max(inner_box[i].y,inner_box[(i+1)%4].y) 
+				and start_point.y >= min(inner_box[i].y,inner_box[(i+1)%4].y)):
+				intersections += 1
+			
 	
-	# Determine wall angles and box widths
-	
-	bottom_box_width = math.hypot(box[3].y - box[0].y, box[3].x - box[0].x)
-	top_box_width = math.hypot(box[2].y - box[1].y, box[2].x - box[1].x)
-	left_box_height = math.hypot(box[1].y - box[0].y, box[1].x - box[0].x)
-	right_box_height = math.hypot(box[3].y - box[2].y, box[3].x - box[2].x)
-	width_tol = (bottom_box_width + (top_box_width-bottom_box_width) * height_to_travel) * 0.1
-	height_tol =  (left_box_height + (right_box_height-left_box_height) * (1 - max_width) / 2.0) * 0.1
-	
-	if l_dist >= width_tol and r_dist <= -1 * width_tol and t_dist >= height_tol and b_dist <= -1 * height_tol:
+	if (intersections % 2) is not 0:
 		return True
 	else:
 		print "Not within inner box."
@@ -288,6 +408,8 @@ def initialize():
 	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
 	rospy.Subscriber('bounding_box', PointArray, bounding_box_callback)
+	rospy.Subscriber('compass', Float32, compass_callback)
+	rospy.Subscriber('anemometer', Float32, anemometer_callback)
 	rospy.spin()
 
 
