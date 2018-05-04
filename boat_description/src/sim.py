@@ -192,7 +192,8 @@ path = PointArray()
 prev_path_time = 0
 fov_radius = 15
 fov_angle = 60
-points_in_fov = PointArray()
+vision_points_gps = PointArray()
+vision_points_lps = PointArray()
 
 # ROS data
 wind_heading = 270
@@ -229,6 +230,7 @@ orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
 joy_pub = rospy.Publisher('joy', Joy, queue_size = 10)
 square_pub = rospy.Publisher('bounding_box', PointArray, queue_size = 10)
 clock_pub = rospy.Publisher('clock', Clock, queue_size = 1)
+vision_pub = rospy.Publisher('vision', PointArray, queue_size = 10)
 to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
 to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 
@@ -254,6 +256,8 @@ def update_gps():
 	
 	orientation_pub.publish(imu)
 
+# TODO update replay mode for challenges
+
 # check if point (lps) is within fov cone
 def point_is_in_fov(point):
 	dx = point.x - pos.x
@@ -268,32 +272,17 @@ def point_is_in_fov(point):
 			return True
 	return False
 
-def get_vision_coords(point):
-	dx = point.x - pos.x
-	dy = point.y - pos.y
-	
-	# get angle from boat heading
-	angle = math.degrees(math.atan2(dy, dx))
-	if angle < 0:
-		angle += 360
-	angle = angle - heading
-	
-	# ???
-
 # publish pixel coordinates for points in vision
 def update_vision():
 	# TODO for obstacles as well
-	global points_in_fov
-
-	points_in_fov = PointArray()
+	global vision_points_gps
+	
+	vision_points_gps = PointArray()
 	for point in local_points.points:
 		if point_is_in_fov(point):
-			points_in_fov.points.append(point)
-	for point in points_in_fov.points:
-		# pixel_coord = get_vision_coords(point)
-		pass
+			vision_points_gps.points.append(to_gps(point).pt)
 	
-	# visions pixel coord format?
+	vision_pub.publish(vision_points_gps)
 
 def update_wind():
 	global wind_heading
@@ -441,6 +430,14 @@ def bounding_box_callback(box):
 def target_point_callback(target_pt):
 	global target_point
 	target_point = target_pt
+
+def vision_callback(new_vision_points_gps):
+	global vision_points_gps
+	global vision_points_lps
+	vision_points_gps = new_vision_points_gps
+	vision_points_lps.points = []
+	for point in vision_points_gps.points:
+		vision_points_lps.points.append(to_lps(point).pt)
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -965,7 +962,8 @@ def draw_waypoints_in_fov():
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
 	glColor4f(245/255.0, 200/255.0, 5/255.0, 0.3)
-	for point in points_in_fov.points:
+	print(vision_points_lps.points)
+	for point in vision_points_lps.points:
 		(x,y) = camera.lps_to_screen(point.x, point.y)
 		draw_circle(0.8 * camera.scale, x, y)
 
@@ -1660,6 +1658,7 @@ def listener():
 	rospy.Subscriber('target_heading', Float32, target_heading_callback)
 	
 	# So we can use real wind data in simulation mode
+	# Data from this will override true wind in sim
 	rospy.Subscriber('mock_true_wind', Float32, mock_true_wind_callback)
 	
 	# subscribers for replay mode
@@ -1674,7 +1673,7 @@ def listener():
 	rospy.Subscriber('obstacles', PointArray, obstacles_callback)
 	rospy.Subscriber('target_point', Point, target_point_callback)
 	rospy.Subscriber('bounding_box', PointArray, bounding_box_callback)
-
+	rospy.Subscriber('vision', PointArray, vision_callback)
 
 
 if __name__ == '__main__':
