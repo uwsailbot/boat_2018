@@ -5,7 +5,7 @@ import numpy
 import pygame
 import rospy
 import time
-from boat_msgs.msg import BoatState, GPS, Point, PointArray
+from boat_msgs.msg import BoatState, GPS, Point, PointArray, Waypoint, WaypointArray
 from boat_msgs.srv import ConvertPoint
 from sensor_msgs.msg import Imu, Joy
 from std_msgs.msg import Float32, Int32, Bool
@@ -193,7 +193,6 @@ prev_path_time = 0
 fov_radius = 15
 fov_angle = 60
 vision_points_gps = PointArray()
-vision_points_lps = PointArray()
 
 # ROS data
 wind_heading = 270
@@ -205,8 +204,7 @@ target_heading = 270
 state = BoatState()
 rudder_pos = 90
 winch_pos = 2000
-local_points = PointArray()
-gps_points = PointArray()
+waypoint_gps = WaypointArray()
 joy = Joy()
 joy.axes = [0]*8
 joy.buttons = [0]*11
@@ -216,14 +214,14 @@ rudder_setpoint = 0
 rudder_enable = False
 replay_gps_raw = GPS()
 obstacle_points = PointArray()
-target_point = Point()
+target_point = Waypoint()
 local_bounding_box = PointArray()
 gps_bounding_box = PointArray()
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
-waypoint_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size = 10)
+waypoint_pub = rospy.Publisher('waypoints_raw', WaypointArray, queue_size = 10)
 wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 10)
 gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
 orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
@@ -278,9 +276,10 @@ def update_vision():
 	global vision_points_gps
 	
 	vision_points_gps = PointArray()
-	for point in local_points.points:
-		if point_is_in_fov(point):
-			vision_points_gps.points.append(to_gps(point).pt)
+	for waypoint in waypoint_gps.points:
+		lps = to_lps(waypoint.pt).pt
+		if point_is_in_fov(lps):
+			vision_points_gps.points.append(to_gps(waypoint.pt).pt)
 	
 	vision_pub.publish(vision_points_gps)
 
@@ -317,22 +316,21 @@ def winch_callback(pos):
 
 # Callback to restore local coord waypoints after publishing gps coord
 def waypoints_callback(newPoints):
-	global local_points
-	global gps_points
+	global waypoint_gps
 	global sound
 	
 	# Refresh GPS point list
-	gps_points = newPoints
-	temp_points = PointArray()
+	waypoint_gps = newPoints
+	#temp_points = PointArray()
 	
-	if (len(local_points.points)-1) is len(newPoints.points) and sound and cur_boat_img is boat_imgs[2]:
+	if (len(waypoint_gps.points)-1) is len(newPoints.points) and sound and cur_boat_img is boat_imgs[2]:
 		pygame.mixer.music.play()
 	
 	# Convert all GPS points and store them as local points to draw
-	for point in gps_points.points:
-		local_point = to_lps(point).pt
-		temp_points.points.append(local_point)
-	local_points = temp_points
+	#for point in waypoint_gps.points:
+	#	local_point = to_lps(point).pt
+	#	temp_points.points.append(local_point)
+	#waypoint_lps = temp_points
 
 
 def target_heading_callback(angle):
@@ -431,13 +429,9 @@ def target_point_callback(target_pt):
 	global target_point
 	target_point = target_pt
 
-def vision_callback(new_vision_points_gps):
-	global vision_points_gps
-	global vision_points_lps
-	vision_points_gps = new_vision_points_gps
-	vision_points_lps.points = []
-	for point in vision_points_gps.points:
-		vision_points_lps.points.append(to_lps(point).pt)
+#def vision_callback(new_vision_points_gps):
+#	global vision_points_gps
+#	vision_points_gps = new_vision_points_gps
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -457,8 +451,7 @@ def resize(width, height):
 
 # Handler for mouse presses
 def mouse_handler(button, mouse_state, x, y):
-	global local_points
-	global gps_points
+	global waypoint_gps
 	global sliders
 	global cur_slider
 	global sim_mode
@@ -479,26 +472,31 @@ def mouse_handler(button, mouse_state, x, y):
 
 	if button == GLUT_RIGHT_BUTTON:
 		if sim_mode == 0:
-			local_points = PointArray()
-			gps_points = PointArray()
+			waypoint_gps = WaypointArray()
 			local_bounding_box = PointArray()
 			gps_bounding_box = PointArray()
 
-	elif cur_slider is () and sim_mode == 0 and state.challenge is not BoatState.CHA_STATION and button == GLUT_LEFT_BUTTON:
+	elif cur_slider is () and sim_mode == 0 and state.challenge is not BoatState.CHA_STATION and (button == GLUT_LEFT_BUTTON or button == GLUT_MIDDLE_BUTTON):
 		newPt = Point()
-		(lps_x,lps_y) = camera.screen_to_lps(x,y)			
+		(lps_x,lps_y) = camera.screen_to_lps(x,y)
 		newPt.x = lps_x
 		newPt.y = lps_y
-		coords = to_gps(newPt).pt
-		gps_points.points.append(coords)
+		if button == GLUT_LEFT_BUTTON:
+			coords = Waypoint(to_gps(newPt).pt, Waypoint.TYPE_INTERSECT)
+		elif button == GLUT_MIDDLE_BUTTON:
+			coords = Waypoint(to_gps(newPt).pt, Waypoint.TYPE_ROUND)
+		waypoint_gps.points.append(coords)
+		
+		if sim_mode == 0:
+			waypoint_pub.publish(waypoint_gps)
 
 	elif cur_slider is () and sim_mode == 0 and state.challenge is BoatState.CHA_STATION and button == GLUT_LEFT_BUTTON:
 		newPt = Point()
-		(lps_x,lps_y) = camera.screen_to_lps(x,y)			
+		(lps_x,lps_y) = camera.screen_to_lps(x,y)
 		newPt.x = lps_x
 		newPt.y = lps_y
 		coords = to_gps(newPt).pt
-
+		
 		for p in local_bounding_box.points:
 			if math.hypot(p.y - newPt.y, p.x-newPt.x) < 15:
 				print "Distance between buoys is too small, must be at least 15m"
@@ -507,9 +505,12 @@ def mouse_handler(button, mouse_state, x, y):
 		if len(local_bounding_box.points) == 4:
 			gps_bounding_box = PointArray()
 			local_bounding_box = PointArray()
-
+		
 		gps_bounding_box.points.append(coords)
 		square_pub.publish(gps_bounding_box)
+		
+		if sim_mode == 0:
+			waypoint_pub.publish(waypoint_gps)
 
 	elif (button == 3 or button == 4) and mouse_state == GLUT_DOWN:
 		
@@ -531,9 +532,6 @@ def mouse_handler(button, mouse_state, x, y):
 			(new_mouse_x, new_mouse_y) = camera.screen_to_lps(x,y)
 			camera.x -= new_mouse_x - mouse_x
 			camera.y -= new_mouse_y - mouse_y
-	
-	if sim_mode == 0:
-		waypoint_pub.publish(gps_points)
 
 # Handler for mouse position
 def passive_mouse_handler(x,y):
@@ -853,7 +851,9 @@ def draw_waypoints():
 	glPushMatrix()
 	
 	glColor3f(1,0,0)
-	for p in local_points.points:
+	for gps in waypoint_gps.points:
+		
+		p = to_lps(gps.pt).pt
 		(x,y) = camera.lps_to_screen(p.x, p.y)
 		draw_circle(0.5 * camera.scale,x,y)
 	
@@ -881,9 +881,9 @@ def draw_bounding_box():
 	
 
 def draw_target_point():	
-	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
+	if len(waypoint_gps.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
 		glColor3f(1,1,1)
-		(x,y) = camera.lps_to_screen(target_point.x, target_point.y)
+		(x,y) = camera.lps_to_screen(target_point.pt.x, target_point.pt.y)
 		draw_circle(0.7 * camera.scale, x, y)
 
 def draw_obstacles():
@@ -962,8 +962,9 @@ def draw_waypoints_in_fov():
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
 	glColor4f(245/255.0, 200/255.0, 5/255.0, 0.3)
-	print(vision_points_lps.points)
-	for point in vision_points_lps.points:
+	#print(vision_points_lps.points)
+	for point in vision_points_gps.points:
+		point = to_lps(point).pt
 		(x,y) = camera.lps_to_screen(point.x, point.y)
 		draw_circle(0.8 * camera.scale, x, y)
 
@@ -1299,7 +1300,6 @@ def calc(_):
 	global pos
 	global heading
 	global target_heading
-	global local_points
 	global last_time
 	global clock
 	global rudder_pos
@@ -1654,7 +1654,7 @@ def listener():
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
 	rospy.Subscriber('rudder', Float32, rudder_callback)
 	rospy.Subscriber('winch', Int32, winch_callback)
-	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
+	rospy.Subscriber('waypoints_raw', WaypointArray, waypoints_callback)
 	rospy.Subscriber('target_heading', Float32, target_heading_callback)
 	
 	# So we can use real wind data in simulation mode
@@ -1671,9 +1671,9 @@ def listener():
 	rospy.Subscriber('rudder_pid/enable', Bool, rudder_enable_callback)
 	rospy.Subscriber('gps_raw', GPS, gps_raw_callback)
 	rospy.Subscriber('obstacles', PointArray, obstacles_callback)
-	rospy.Subscriber('target_point', Point, target_point_callback)
+	rospy.Subscriber('target_point', Waypoint, target_point_callback)
 	rospy.Subscriber('bounding_box', PointArray, bounding_box_callback)
-	rospy.Subscriber('vision', PointArray, vision_callback)
+	#rospy.Subscriber('vision', PointArray, vision_callback)
 
 
 if __name__ == '__main__':
@@ -1690,6 +1690,12 @@ if __name__ == '__main__':
 		listener()
 	except rospy.ROSInterruptException:
 		pass
+	
+	# Publish the origin/init pos for the gps->lps conversion
+	gps = GPS()
+	gps.latitude = 0
+	gps.longitude = 0
+	gps_pub.publish(gps)
 	
 	init_GL()
 

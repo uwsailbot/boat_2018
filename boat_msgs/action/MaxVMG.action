@@ -1,6 +1,6 @@
 #goal definition -1, 1
 int32 direction
-Point target
+Waypoint target
 ---
 #result definition
 bool success
