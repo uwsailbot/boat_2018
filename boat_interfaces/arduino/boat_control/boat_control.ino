@@ -13,12 +13,10 @@
 #include <boat_msgs/GPS.h>
 #include <math.h>
 
-// Pins the gps is attached to
-#define GPS_TX_PIN 3
-#define GPS_RX_PIN 2
-
 // The pin the wind vane sensor is connected to
-#define WIND_VANE_PIN (A4)       
+#define WIND_VANE_PIN (A0)  
+// Define serial port for the gps
+#define mySerial Serial1
 
 const int anemometerInterval = 100; //ms between anemometer reads
 
@@ -26,7 +24,6 @@ ros::NodeHandle nh;
 std_msgs::Float32 winddir;
 boat_msgs::GPS gpsData;
 
-SoftwareSerial mySerial(GPS_TX_PIN, GPS_RX_PIN);
 Adafruit_GPS GPS(&mySerial);
 Servo servo_rudder;
 Servo servo_winch;
@@ -109,7 +106,7 @@ void loop(){
     }
 
     GPS.read();
-
+    
     // if a sentence is received, we can check the checksum, parse it...
     if (GPS.newNMEAreceived()) {
         if (!GPS.parse(GPS.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
@@ -136,7 +133,7 @@ void loop(){
       }else{
           gpsData.status = gpsData.STATUS_NO_FIX;
       }
-
+      
      //only publish is readings have changes
      if ((last_lat != gpsData.latitude) ||
           (last_long != gpsData.longitude) ||
