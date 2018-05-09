@@ -436,10 +436,6 @@ def within_box():
 # Determine if the dist between two points is within the specified tolerance
 def is_within_dist(p1, p2, dist):
 	a = math.pow(p1.x - p2.x, 2) + math.pow(p1.y - p2.y, 2)
-	
-	print p1
-	print p2
-	print math.sqrt(a)
 	return math.sqrt(a) < dist
 
 
