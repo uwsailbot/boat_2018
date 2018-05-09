@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-import freetype
 import math
-import numpy
 import pygame
 import rospy
 import time
@@ -11,10 +9,9 @@ from sensor_msgs.msg import Imu, Joy
 from std_msgs.msg import Float32, Int32, Bool
 from rosgraph_msgs.msg import Clock
 from tf.transformations import quaternion_from_euler
-from OpenGL.GL import *
+#from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
-from PIL import Image
 from sys import argv
 from sim_io import *
 from sim_ui import *
@@ -306,11 +303,11 @@ def target_point_callback(target_pt):
 	global target_point
 	target_point = target_pt
 
-#def vision_callback(new_vision_points_gps):
-#	global vision_points_gps
-#	vision_points_gps = new_vision_points_gps
+def vision_callback(new_vision_points_gps):
+	global vision_points_gps
+	vision_points_gps = new_vision_points_gps
 
-# =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
+# =*=*=*=*=*=*=*=*=*=*=*=*= GLUT callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
 # Window resize callback
 def resize(width, height):
@@ -1299,7 +1296,7 @@ def listener():
 	rospy.Subscriber('obstacles', PointArray, obstacles_callback)
 	rospy.Subscriber('target_point', Waypoint, target_point_callback)
 	rospy.Subscriber('bounding_box', PointArray, bounding_box_callback)
-	#rospy.Subscriber('vision', PointArray, vision_callback)
+	rospy.Subscriber('vision', PointArray, vision_callback)
 
 
 if __name__ == '__main__':

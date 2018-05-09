@@ -1,11 +1,6 @@
 #!/usr/bin/env python
-import freetype
 import math
 from OpenGL.GL import *
-from OpenGL.GLU import *
-from OpenGL.GLUT import *
-from PIL import Image
-from sys import argv
 from io import *
 
 loaded_font = []

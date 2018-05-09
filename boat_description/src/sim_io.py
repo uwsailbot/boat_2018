@@ -2,10 +2,8 @@
 import freetype
 import numpy
 from OpenGL.GL import *
-from OpenGL.GLU import *
 from OpenGL.GLUT import *
 from PIL import Image
-from sys import argv
 
 def rel_to_abs_filepath(filepath):
 	abs_filepath = os.path.dirname(os.path.realpath(__file__))
