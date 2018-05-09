@@ -36,6 +36,10 @@ class Camera:
 		lps_y /= self.scale
 		lps_y += self.y
 		return (lps_x, lps_y)
+	
+	def resize(self, win_width, win_height):
+		self.win_width = win_width
+		self.win_height = win_height
 
 class Slider:
 	

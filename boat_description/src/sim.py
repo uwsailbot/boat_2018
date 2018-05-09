@@ -320,6 +320,7 @@ def resize(width, height):
 	glOrtho(0.0, win_width, 0.0, win_height, -1, 1)
 	glMatrixMode(GL_MODELVIEW)
 	glLoadIdentity()
+	camera.resize(win_width, win_height)
 
 
 # Handler for mouse presses
