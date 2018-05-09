@@ -34,7 +34,7 @@ gridsize = 10
 camera_move_speed = 100
 camera_velocity = Point(0, 0)
 # should camera follow boat?
-follow_boat = False
+follow_boat = True
 
 
 # Resources
@@ -158,7 +158,7 @@ def update_vision():
 	for waypoint in waypoint_gps.points:
 		lps = to_lps(waypoint.pt).pt
 		if point_is_in_fov(lps):
-			vision_points_gps.points.append(to_gps(waypoint.pt).pt)
+			vision_points_gps.points.append(waypoint.pt)
 	
 	vision_pub.publish(vision_points_gps)
 
