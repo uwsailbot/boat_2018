@@ -37,7 +37,7 @@ gridsize = 10
 camera_move_speed = 100
 camera_velocity = Point(0, 0)
 # should camera follow boat?
-follow_boat = True
+follow_boat = False
 
 
 # Resources
@@ -352,6 +352,8 @@ def mouse_handler(button, mouse_state, x, y):
 			waypoint_gps = WaypointArray()
 			local_bounding_box = PointArray()
 			gps_bounding_box = PointArray()
+			waypoint_pub.publish(waypoint_gps)
+			square_pub.publish(gps_bounding_box)
 
 	elif cur_slider is () and sim_mode == 0 and state.challenge is not BoatState.CHA_STATION and (button == GLUT_LEFT_BUTTON or button == GLUT_MIDDLE_BUTTON):
 		newPt = Point()
@@ -639,8 +641,8 @@ def draw_bounding_box():
 	glPopMatrix()
 	
 
-def draw_target_point():	
-	if len(waypoint_gps.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
+def draw_target_point():
+	if target_point is not () and state.major is BoatState.MAJ_AUTONOMOUS and state.minor is not BoatState.MIN_COMPLETE:
 		glColor3f(1,1,1)
 		(x,y) = camera.lps_to_screen(target_point.pt.x, target_point.pt.y)
 		draw_circle(0.7 * camera.scale, x, y)
