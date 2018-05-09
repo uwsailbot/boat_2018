@@ -19,8 +19,7 @@ box = []
 cur_pos = Point()
 start_station = Point()
 end_station = Point()
-final_buoy_station = False
-not_within_box = False
+station_timeout = False
 wind_coming = 0
 cur_boat_heading = 0
 
@@ -30,9 +29,39 @@ waypoints_pub = rospy.Publisher('waypoints_raw', WaypointArray, queue_size=10)
 target_pub = rospy.Publisher('target_point', Waypoint, queue_size=10)
 
 def publish_target():
-	target_lps = Waypoint(gps_to_lps(target_waypoint.pt).pt, Waypoint.TYPE_INTERSECT)
+	global target_waypoint
+	
+	if target_waypoint.type is Waypoint.TYPE_ROUND and target_waypoint in waypoints and waypoints.index(target_waypoint) < len(waypoints)-1:
+		
+		r = 5/111319.492188 # meters to coords
+		k = 1.5
+		
+		next = waypoints[waypoints.index(target_waypoint)+1]
+		print "cur  ", target_waypoint.pt
+		print "next ", next.pt
+		print "boat ", lps_to_gps(cur_pos).pt
+		
+		theta_boat = math.atan2(lps_to_gps(cur_pos).pt.y - target_waypoint.pt.y, lps_to_gps(cur_pos).pt.x - target_waypoint.pt.x)
+		theta_next = math.atan2(next.pt.y - target_waypoint.pt.y, next.pt.x - target_waypoint.pt.x)
+		
+		print "theta_boat", theta_boat
+		print "theta_next", theta_next
+		
+		d_theta = (theta_boat - theta_next + 4 * math.pi) % (2 * math.pi)
+		angle = theta_next + k*(d_theta - math.pi) / 2
+		if d_theta < math.pi:
+			angle -= math.pi / 2
+		else:
+			angle += math.pi / 2
+		
+		print angle/math.pi*180
+		roundPt = Point(target_waypoint.pt.x + math.cos(angle)*r, target_waypoint.pt.y + math.sin(angle)*r)
+		target_waypoint = Waypoint(roundPt, Waypoint.TYPE_ROUND)
+	
+	target_lps = Waypoint(gps_to_lps(target_waypoint.pt).pt, target_waypoint.type)
 	target_pub.publish(target_lps)
 	##rospy.loginfo(rospy.get_caller_id() + " New target waypoint: (long: %.2f, lat: %.2f) or (x: %.f, y: %.f)", point.x, point.y, local.x, local.y)
+
 
 def boat_state_callback(new_state):
 	global state
@@ -58,15 +87,16 @@ def boat_state_callback(new_state):
 
 def anemometer_callback(anemometer):
 	global ane_reading
-	global wind_coming
 	ane_reading = anemometer.data
-	new_wind_heading = (ane_reading + cur_boat_heading) % 360
-	wind_coming = (new_wind_heading + 180) % 360
+	calc_wind_coming()
 
 def compass_callback(compass):
-	global wind_coming
 	global cur_boat_heading
 	cur_boat_heading = compass.data
+	calc_wind_coming()
+	
+def calc_wind_coming():
+	global wind_coming
 	new_wind_heading = (ane_reading + cur_boat_heading) % 360
 	wind_coming = (new_wind_heading + 180) % 360
 	
@@ -139,91 +169,52 @@ def bounding_box_callback(bounding_box):
 		rospy.Timer(rospy.Duration(5*60), station_timer_callback, oneshot=True)
 		station_setup()
 
-def station_timer_callback(event):
-	global final_buoy_station
-	global target_waypoint
-	final_buoy_station = True
-	rospy.loginfo(rospy.get_caller_id() + " Reached end of station timer")
-
-	# Determine distance from each side of the box 
-	l_dist = dist_from_line(box[0], box[1])
-	t_dist = dist_from_line(box[1], box[2])
-	r_dist = dist_from_line(box[3], box[2])
-	b_dist = dist_from_line(box[0], box[3])
-
-	dist_list = (l_dist, t_dist, r_dist, b_dist)
-	i = dist_list.index(min(dist_list))
-	
-	# Use service to determine 12m dist in gps
-	# Use this distance on how far to put the buoy outside the box
-	tol_dist = lps_to_gps(Point(20,0)).pt.x
-	cur_pos_gps = lps_to_gps(cur_pos).pt
-	
-	final_point = {0 : Point(box[0].x - tol_dist, cur_pos_gps.y),
-				1 : Point(cur_pos_gps.x, box[1].y + tol_dist),
-				2 : Point(box[3].x + tol_dist, cur_pos_gps.y),
-				3 : Point(cur_pos_gps.x, box[0].y - tol_dist)
-	}
-	final_direction = {0 : "Left", 1: "Top", 2: "Right", 3: "Bottom"}
-	rospy.loginfo(rospy.get_caller_id() + " Exiting bounding box through: " + final_direction[i])
-	
-	target_waypoint = Waypoint(final_point[i], Waypoint.TYPE_INTERSECT)
-	publish_target()
-
 
 def waypoints_callback(new_waypoint):
 	global waypoints
 	global target_waypoint
-	
 	waypoints = new_waypoint.points
 	
 	if state.major is not BoatState.MAJ_AUTONOMOUS:
 		return
 	
-	if state.challenge is BoatState.CHA_STATION:
+	if state.challenge is BoatState.CHA_NAV or state.challenge is BoatState.CHA_LONG:
+		if len(waypoints) > 0:
+			target_waypoint = waypoints[0]
+			publish_target()
+		
+	elif state.challenge is BoatState.CHA_STATION:
 		return
 	
-
-	if len(waypoints) > 0:
-		
-		if waypoints[0].type is Waypoint.TYPE_INTERSECT:
-			target_waypoint = waypoints[0]
-		
-		elif waypoints[0].type is Waypoint.TYPE_ROUND:
-			if len(waypoints) > 1:
-				
-				r = 5/111319.492188 # meters to coords
-				k = 1.5
-				
-				
-				target = waypoints[0]
-				next = waypoints[1]
-				theta_boat = math.atan2(lps_to_gps(cur_pos).pt.y - target.pt.y, lps_to_gps(cur_pos).pt.x - target.pt.x)
-				theta_next = math.atan2(next.pt.y - target.pt.y, next.pt.x - target.pt.x)
-				d_theta = (theta_boat - theta_next + 4 * math.pi) % (2 * math.pi)
-				angle = theta_next + k*(d_theta - math.pi) / 2
-				if angle < math.pi:
-					angle -= math.pi / 2
-				else:
-					angle += math.pi / 2
-				
-				roundPt = Point(target.pt.x + math.cos(angle)*r, target.pt.y + math.sin(angle)*r)
-				target_waypoint = Waypoint(roundPt, Waypoint.TYPE_ROUND)
-			
-			else:
-				target_waypoint = waypoints[0]
-				
-		publish_target()
-		
-	else:
-		print "No more waypoints"
-		state.minor = BoatState.MIN_COMPLETE
-		boat_state_pub.publish(state)
-	
 	# If we are waiting in autonomous-complete, and a new waypoint is added, move to planning state
-	if state.major is BoatState.MAJ_AUTONOMOUS and state.minor is BoatState.MIN_COMPLETE and len(waypoints)>0:
+	if state.minor is BoatState.MIN_COMPLETE and len(waypoints)>0:
 		state.minor = BoatState.MIN_PLANNING
 		boat_state_pub.publish(state)
+		
+def position_callback(position):
+	global waypoints
+	global rate
+	global cur_pos
+	cur_pos = position
+	rate = rospy.Rate(100)
+	
+	# If the boat isn't in the autonomous planning state, exit
+	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
+		return
+	
+	# Navigation and long-distance challenge
+	if state.challenge is BoatState.CHA_NAV or state.challenge is BoatState.CHA_LONG:
+		traverse_waypoints_planner()
+	
+	# Station keeping challenge
+	elif state.challenge is BoatState.CHA_STATION:
+		station_keeper_planner()
+	
+	# Adjust the sleep to suit the node
+	rate.sleep()
+
+
+# =*=*=*=*=*=*=*=*=*=*=*=*= Challenge-Specific Funcs =*=*=*=*=*=*=*=*=*=*=*=*=
 
 def station_setup():
 	global state
@@ -305,16 +296,56 @@ def station_setup():
 	state.minor = BoatState.MIN_PLANNING
 	boat_state_pub.publish(state)
 
-def station_waypoint_planner():
+def station_timer_callback(event):
+	global station_timeout
 	global target_waypoint
-	global final_buoy_station
+	station_timeout = True
+	rospy.loginfo(rospy.get_caller_id() + " Reached end of station timer")
+
+	# Determine distance from each side of the box 
+	l_dist = dist_from_line(box[0], box[1])
+	t_dist = dist_from_line(box[1], box[2])
+	r_dist = dist_from_line(box[3], box[2])
+	b_dist = dist_from_line(box[0], box[3])
+
+	dist_list = (l_dist, t_dist, r_dist, b_dist)
+	i = dist_list.index(min(dist_list))
+	
+	# Use service to determine 12m dist in gps
+	# Use this distance on how far to put the buoy outside the box
+	tol_dist = lps_to_gps(Point(20,0)).pt.x
+	cur_pos_gps = lps_to_gps(cur_pos).pt
+	
+	final_point = {0 : Point(box[0].x - tol_dist, cur_pos_gps.y),
+				1 : Point(cur_pos_gps.x, box[1].y + tol_dist),
+				2 : Point(box[3].x + tol_dist, cur_pos_gps.y),
+				3 : Point(cur_pos_gps.x, box[0].y - tol_dist)
+	}
+	final_direction = {0 : "Left", 1: "Top", 2: "Right", 3: "Bottom"}
+	rospy.loginfo(rospy.get_caller_id() + " Exiting bounding box through: " + final_direction[i])
+	
+	target_waypoint = Waypoint(final_point[i], Waypoint.TYPE_INTERSECT)
+	publish_target()
+
+def station_keeper_planner():
+	global target_waypoint
+	global station_timeout
 	
 	
-	# If we just hit the last station keeping point, the challenge is now complete so reset to default
-	if final_buoy_station:
+		# If time is up and we've fully exited the box, stop
+	if station_timeout:
+		if is_within_dist(cur_pos, gps_to_lps(target_waypoint.pt).pt, buoy_tol):
+			state.minor = BoatState.MIN_COMPLETE
+			boat_state_pub.publish(state)
+			station_timeout = False
+			rospy.loginfo(rospy.get_caller_id() + " Exited box. Boat State = 'Autonomous - Complete'")
+		return
+	
+	# If the box is ever invalid, stop
+	if len(box) is not 4 and state.minor is not BoatState.MIN_COMPLETE:
 		state.minor = BoatState.MIN_COMPLETE
 		boat_state_pub.publish(state)
-		final_buoy_station = False
+		rospy.loginfo(rospy.get_caller_id() + " Box is invalid. Boat State = 'Autonomous - Complete'")
 		return
 	
 	#TODO: Make this not spam (Eg. if we're already headed for the center, don't re-publish
@@ -338,63 +369,27 @@ def station_waypoint_planner():
 		publish_target()
 
 
-def position_callback(position):
+def traverse_waypoints_planner():
 	global waypoints
-	global rate
-	global cur_pos
-	global not_within_box
-	cur_pos = position
-	rate = rospy.Rate(100)
+	global target_waypoint
 	
-	# If the boat isn't in the autonomous planning state, exit
-	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
-		return
+	# If the list of waypoints is not empty 
+	if(len(waypoints) > 0):
 	
+		# If the boat is close enough to the waypoint, start navigating towards the next waypoint in the path
+		if is_within_dist(cur_pos, gps_to_lps(target_waypoint.pt).pt, buoy_tol):
+			rospy.loginfo(rospy.get_caller_id() + " Reached intermediate waypoint (lat: %.2f, long: %.2f)", waypoints[0].pt.y, waypoints[0].pt.x)
+			
+			if state.challenge is BoatState.CHA_LONG:
+				waypoints.append(waypoints[0])
+			del waypoints[0]
+			waypoints_pub.publish(waypoints)
 	
-	# =*=*=*=*= Navigation and long-distance challenge =*=*=*=*=
-	if state.challenge is BoatState.CHA_NAV or state.challenge is BoatState.CHA_LONG:
-	
-		# If the list of waypoints is not empty 
-		if(len(waypoints) > 0):
-		
-			# If the boat is close enough to the waypoint, start navigating towards the next waypoint in the path
-			if is_within_dist(cur_pos, gps_to_lps(target_waypoint.pt).pt, buoy_tol):
-				rospy.loginfo(rospy.get_caller_id() + " Reached intermediate waypoint (lat: %.2f, long: %.2f)", waypoints[0].pt.y, waypoints[0].pt.x)
-				
-				if state.challenge is BoatState.CHA_LONG:
-					waypoints.append(waypoints[0])
-				del waypoints[0]
-				waypoints_pub.publish(waypoints)
-		
-		# If there are no waypoints left to navigate to, exit
-		else:
-			state.minor = BoatState.MIN_COMPLETE
-			boat_state_pub.publish(state)
-			rospy.loginfo(rospy.get_caller_id() + " No waypoints left. Boat State = 'Autonomous - Complete'")
-	
-	
-	# =*=*=*=*= Station keeping challenge =*=*=*=*=
-	elif state.challenge is BoatState.CHA_STATION:
-	
-		# If the box is ever invalid, stop
-		if len(box) is not 4 and state.minor is not BoatState.MIN_COMPLETE:
-			state.minor = BoatState.MIN_COMPLETE
-			boat_state_pub.publish(state)
-			rospy.loginfo(rospy.get_caller_id() + " Box is invalid. Boat State = 'Autonomous - Complete'")
-	
-		# If the time is not yet up, cycle back and forth
-		if not final_buoy_station:
-			station_waypoint_planner()
-		
-		# If the time is up and we've exited the box, stop
-		elif is_within_dist(cur_pos, gps_to_lps(target_waypoint.pt).pt, buoy_tol):
-			state.minor = BoatState.MIN_COMPLETE
-			boat_state_pub.publish(state)
-			rospy.loginfo(rospy.get_caller_id() + " Exited box. Boat State = 'Autonomous - Complete'")
-	
-	
-	# Adjust the sleep to suit the node
-	rate.sleep()
+	# If there are no waypoints left to navigate to, exit
+	else:
+		state.minor = BoatState.MIN_COMPLETE
+		boat_state_pub.publish(state)
+		rospy.loginfo(rospy.get_caller_id() + " No waypoints left. Boat State = 'Autonomous - Complete'")
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Math Helper Funcs =*=*=*=*=*=*=*=*=*=*=*=*=
