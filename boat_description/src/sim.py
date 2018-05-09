@@ -10,7 +10,6 @@ from std_msgs.msg import Float32, Int32, Bool
 from rosgraph_msgs.msg import Clock
 from tf.transformations import quaternion_from_euler
 #from OpenGL.GL import *
-from OpenGL.GLU import *
 from OpenGL.GLUT import *
 from sys import argv
 from sim_io import *
@@ -1242,7 +1241,7 @@ def sim_speed_slider_callback(value):
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
 	glViewport(0, 0, win_width, win_height)
-	gluOrtho2D(0.0, win_width, 0.0, win_height)
+	glOrtho(0.0, win_width, 0.0, win_height, -1, 1)
 
 
 def init_GL():
