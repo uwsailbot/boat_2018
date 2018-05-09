@@ -97,7 +97,6 @@ rudder_enable = False
 replay_gps_raw = GPS()
 obstacle_points = PointArray()
 target_point = Waypoint()
-local_bounding_box = PointArray()
 gps_bounding_box = PointArray()
 
 
@@ -261,7 +260,6 @@ def obstacles_callback(obstacles):
 
 def bounding_box_callback(box):
 	global gps_bounding_box
-	global local_bounding_box
 	gps_bounding_box = box
 
 	# Reorganize the local points to create a box when drawn, if there are four
@@ -279,27 +277,9 @@ def bounding_box_callback(box):
 		for p in gps_bounding_box.points:
 			if p is None:
 				gps_bounding_box = PointArray()
-				local_bounding_box = PointArray()
 				square_pub.publish(gps_bounding_box)
 				print "Invalid box configuration. Make more square."
 				return
-			if p.x < x_avr:
-				if p.y < y_avr:
-					temp_points.points[0] = to_lps(p).pt
-				else:
-					temp_points.points[1] = to_lps(p).pt
-			else:
-				if p.y < y_avr:
-					temp_points.points[3] = to_lps(p).pt
-				else:
-					temp_points.points[2] = to_lps(p).pt
-	else:
-		temp_points = PointArray()
-		for point in gps_bounding_box.points:
-			local_point = to_lps(point).pt
-			temp_points.points.append(local_point)
-
-	local_bounding_box = temp_points	
 
 def target_point_callback(target_pt):
 	global target_point
@@ -332,7 +312,6 @@ def mouse_handler(button, mouse_state, x, y):
 	global sliders
 	global cur_slider
 	global sim_mode
-	global local_bounding_box
 	global gps_bounding_box
 	
 	if mouse_state != GLUT_DOWN:
@@ -350,7 +329,6 @@ def mouse_handler(button, mouse_state, x, y):
 	if button == GLUT_RIGHT_BUTTON:
 		if sim_mode == 0:
 			waypoint_gps = WaypointArray()
-			local_bounding_box = PointArray()
 			gps_bounding_box = PointArray()
 			waypoint_pub.publish(waypoint_gps)
 			square_pub.publish(gps_bounding_box)
@@ -376,14 +354,14 @@ def mouse_handler(button, mouse_state, x, y):
 		newPt.y = lps_y
 		coords = to_gps(newPt).pt
 		
-		for p in local_bounding_box.points:
-			if math.hypot(p.y - newPt.y, p.x-newPt.x) < 15:
+		for p in gps_bounding_box.points:
+			l = to_lps(p).pt
+			if math.hypot(l.y - newPt.y, l.x-newPt.x) < 15:
 				print "Distance between buoys is too small, must be at least 15m"
 				return
 		# Reset if we were gonna add to a list of 4 points already
-		if len(local_bounding_box.points) == 4:
+		if len(gps_bounding_box.points) == 4:
 			gps_bounding_box = PointArray()
-			local_bounding_box = PointArray()
 		
 		gps_bounding_box.points.append(coords)
 		square_pub.publish(gps_bounding_box)
@@ -624,18 +602,21 @@ def draw_bounding_box():
 	glPushMatrix()
 
 	glColor3f(0,1,0)
-	for p in local_bounding_box.points:
-		(x,y) = camera.lps_to_screen(p.x, p.y)
+	for p in gps_bounding_box.points:
+		l = to_lps(p).pt
+		(x,y) = camera.lps_to_screen(l.x, l.y)
 		draw_circle(0.5 * camera.scale,x,y)
 
-	if len(local_bounding_box.points) == 4:
+	if len(gps_bounding_box.points) == 4:
 		glLineWidth(1.0)
 		glBegin(GL_LINES)
 		for i in range(0, 4):
-			(x,y) = camera.lps_to_screen(local_bounding_box.points[i].x, local_bounding_box.points[i].y)
-			(x_n,y_n) = camera.lps_to_screen(local_bounding_box.points[(i+1) % 4].x, local_bounding_box.points[(i+1) % 4].y)
-			glVertex2f(x, y)
-			glVertex2f(x_n, y_n)
+			a = to_lps(gps_bounding_box.points[i]).pt
+			b = to_lps(gps_bounding_box.points[(i+1)%4]).pt
+			(x1, y1) = camera.lps_to_screen(a.x, a.y)
+			(x2, y2) = camera.lps_to_screen(b.x, b.y)
+			glVertex2f(x1, y1)
+			glVertex2f(x2, y2)
 		glEnd()
 		
 	glPopMatrix()
