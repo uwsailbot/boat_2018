@@ -212,25 +212,18 @@ def search_setup():
 
 	# stub for now
 	wind_heading = 45
-	sweep_width = search_radius/10
-
-	# set points
-	for i in range(0, radius*2/sweep_width + 1):
-		y = 1-sweep_width*i
-		x = math.sqrt(search_radius*search_radius - y*y)
-	
-		# rotate towards wind heading using 2D vector rotation matrix thingy
-		rotated_x = x * math.cos(math.radians(wind_heading)) - y * math.sin(math.radians(wind_heading))
-		rotated_y = x * math.sin(math.radians(wind_heading)) + y * math.cos(math.radians(wind_heading))
-	
-		# translate to center at search_center
-		final_x = rotated_x + search_center.x
-		final_y = rotated_y + search_center.y
-
-		waypoints.append(Point(final_x,final_y))
-
+	num_sweeps = 10
+	sweep_width = 2*search_radius/num_sweeps
+	waypoints = [_get_search_pt(i,wind_heading,sweep_width,search_radius) for i in xrange(0,num_sweeps-1)]
 	waypoints_pub.publish(waypoints)
 
+def _get_search_pt(i,angle,width,radius):
+		y = -radius + (i+1)*width
+		x = (1-2*(i%2))*math.sqrt(radius**2 - y**2)
+		c,s = math.cos(angle),math.sin(angle)
+		trans_x = x*c - y*s + search_center.x
+		trans_y = y*c - x*s + search_center.y
+		return Point(trans_x,trans_y)
 # set waypoints to move towards target
 # TODO detemine which topic the target location will come in from, setup that subscriber
 # TODO call this somewhere once we find our target
