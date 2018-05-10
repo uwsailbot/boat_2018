@@ -6,6 +6,7 @@ import math
 import pygame
 import rospy
 import time
+from enum import Enum
 from boat_msgs.msg import BoatState, GPS, Point, PointArray, Waypoint, WaypointArray
 from boat_msgs.srv import ConvertPoint
 from sensor_msgs.msg import Imu, Joy
@@ -52,10 +53,13 @@ cur_sail_img = ()
 open_sans_font = ()
 
 # Modes
-sim_mode = 0
-sim_mode_str =['default', 'replay everything']
+class SimMode(Enum):
+	DEFAULT=0
+	REPLAY=1
 
-# Simulation data and constsf
+sim_mode = SimMode.DEFAULT
+
+# Simulation data and consts
 should_sim_joy = False
 sim_is_running = True
 speed = 10
@@ -180,7 +184,6 @@ def update_wind():
 
 def boat_state_callback(newState):
 	global state
-	
 	state = newState
 	if state.major is not BoatState.MAJ_DISABLED and pause:
 		pause_sim()
@@ -195,17 +198,15 @@ def winch_callback(pos):
 	winch_pos = pos.data
 
 
-# Callback to restore local coord waypoints after publishing gps coord
+# Update the raw waypoints
 def waypoints_callback(newPoints):
 	global waypoint_gps
-	global sound
 	
-	# Refresh GPS point list
-	waypoint_gps = newPoints
-	#temp_points = PointArray()
-	
-	if (len(waypoint_gps.points)-1) is len(newPoints.points) and sound and cur_boat_img is boat_imgs[2]:
+	# Whenever the number of waypoints is decremented by one and we are in maximum meme state, smash becky
+	if (len(waypoint_gps.points)-1) is len(newPoints.points) and sound and cur_boat_img is boat_imgs["mars"]:
 		pygame.mixer.music.play()
+	
+	waypoint_gps = newPoints
 
 
 def target_heading_callback(angle):
@@ -213,17 +214,15 @@ def target_heading_callback(angle):
 	target_heading = angle.data
 
 def lps_callback(lps):
-	global sim_mode	
 	global pos
 	
-	if sim_mode == 1:
+	if sim_mode is SimMode.REPLAY:
 		pos = lps
 
 def compass_callback(compass):
-	global sim_mode
 	global heading
 	
-	if sim_mode == 1:
+	if sim_mode is SimMode.REPLAY:
 		heading = compass.data
 
 def anemometer_callback(anemometer):
@@ -262,25 +261,6 @@ def bounding_box_callback(box):
 	global gps_bounding_box
 	gps_bounding_box = box
 
-	# Reorganize the local points to create a box when drawn, if there are four
-	if len(gps_bounding_box.points) == 4:
-		x_sum = 0
-		y_sum = 0
-		for p in gps_bounding_box.points:
-			x_sum += p.x
-			y_sum += p.y
-		x_avr = x_sum / 4.0
-		y_avr = y_sum / 4.0
-		
-		temp_points = PointArray()
-		temp_points.points = [None]*4
-		for p in gps_bounding_box.points:
-			if p is None:
-				gps_bounding_box = PointArray()
-				square_pub.publish(gps_bounding_box)
-				print "Invalid box configuration. Make more square."
-				return
-
 def target_point_callback(target_pt):
 	global target_point
 	target_point = target_pt
@@ -311,7 +291,6 @@ def mouse_handler(button, mouse_state, x, y):
 	global waypoint_gps
 	global sliders
 	global cur_slider
-	global sim_mode
 	global gps_bounding_box
 	
 	if mouse_state != GLUT_DOWN:
@@ -327,13 +306,13 @@ def mouse_handler(button, mouse_state, x, y):
 		return
 
 	if button == GLUT_RIGHT_BUTTON:
-		if sim_mode == 0:
+		if sim_mode is SimMode.DEFAULT:
 			waypoint_gps = WaypointArray()
 			gps_bounding_box = PointArray()
 			waypoint_pub.publish(waypoint_gps)
 			square_pub.publish(gps_bounding_box)
 
-	elif cur_slider is () and sim_mode == 0 and state.challenge is not BoatState.CHA_STATION and (button == GLUT_LEFT_BUTTON or button == GLUT_MIDDLE_BUTTON):
+	elif cur_slider is () and sim_mode is SimMode.DEFAULT and state.challenge is not BoatState.CHA_STATION and (button == GLUT_LEFT_BUTTON or button == GLUT_MIDDLE_BUTTON):
 		newPt = Point()
 		(lps_x,lps_y) = camera.screen_to_lps(x,y)
 		newPt.x = lps_x
@@ -344,10 +323,10 @@ def mouse_handler(button, mouse_state, x, y):
 			coords = Waypoint(to_gps(newPt).pt, Waypoint.TYPE_ROUND)
 		waypoint_gps.points.append(coords)
 		
-		if sim_mode == 0:
+		if sim_mode is SimMode.DEFAULT:
 			waypoint_pub.publish(waypoint_gps)
 
-	elif cur_slider is () and sim_mode == 0 and state.challenge is BoatState.CHA_STATION and button == GLUT_LEFT_BUTTON:
+	elif cur_slider is () and sim_mode is SimMode.DEFAULT and state.challenge is BoatState.CHA_STATION and button == GLUT_LEFT_BUTTON:
 		newPt = Point()
 		(lps_x,lps_y) = camera.screen_to_lps(x,y)
 		newPt.x = lps_x
@@ -366,7 +345,7 @@ def mouse_handler(button, mouse_state, x, y):
 		gps_bounding_box.points.append(coords)
 		square_pub.publish(gps_bounding_box)
 		
-		if sim_mode == 0:
+		if sim_mode is SimMode.DEFAULT:
 			waypoint_pub.publish(waypoint_gps)
 
 	elif (button == 3 or button == 4) and mouse_state == GLUT_DOWN:
@@ -479,11 +458,11 @@ def ASCII_handler(key, mousex, mousey):
 	elif key is 'p':
 		pause_sim()
 	elif key is 'm':
-		if sim_mode is 1:
-			sim_mode = 0
+		if sim_mode is SimMode.DEFAULT:
+			sim_mode = SimMode.REPLAY
 		else:
-			sim_mode += 1
-		print 'Changed sim mode, is now \'%s\'' % sim_mode_str[sim_mode] 
+			sim_mode = SimMode.DEFAULT
+		print 'Changed sim mode, is now', sim_mode
 	elif key is 'i':
 		show_details = not show_details
 	elif key is 'c':
@@ -492,7 +471,7 @@ def ASCII_handler(key, mousex, mousey):
 	elif key is 'y':
 		follow_boat = not follow_boat
 	
-	if sim_mode == 0:	
+	if sim_mode is SimMode.DEFAULT:
 		if key is '1' and should_sim_joy:
 			joy.buttons[4] = 1
 			joy.buttons[5] = 0
@@ -856,7 +835,7 @@ def draw_detailed_status():
 	
 	# Draw mode
 	draw_text("Sim Mode:", panel_width/2, 40, 'center', 18)
-	draw_text(sim_mode_str[sim_mode], panel_width/2, 20, 'center') 
+	draw_text(str(sim_mode), panel_width/2, 20, 'center') 
 	glPopMatrix()
 
 
@@ -1071,7 +1050,7 @@ def calc(_):
 		camera.x += camera_velocity.x * real_dt
 		camera.y += camera_velocity.y * real_dt
 	
-	if(sim_mode == 0):
+	if sim_mode is SimMode.DEFAULT:
 		# Calculate other things
 		tack = calc_tack(heading, wind_heading)
 		boom_heading = calc_boom_heading(heading, wind_heading, winch_pos)
