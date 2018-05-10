@@ -3,3 +3,6 @@
 boat_vision/
 html/
 latex/
+
+#VS Code config and stuff
+.vscode

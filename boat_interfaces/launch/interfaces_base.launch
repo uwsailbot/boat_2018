@@ -19,6 +19,6 @@
   </node>
   
   <node pkg="boat_interfaces" type="pid.py"
-    name="controller" ns="rudder_pid">
+    name="controller" ns="rudder_pid" output="screen">
   </node> 
 </launch>

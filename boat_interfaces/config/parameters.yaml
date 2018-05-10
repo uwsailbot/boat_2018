@@ -1,7 +1,19 @@
+use_sim_time: true
+
 boat:
-  layline: 30.0
-  winch_max: 2000.0
-  winch_min: 900.0
-  rudder_max: 150
-  rudder_min: 30
-  radius: 6378137.0
+  interfaces:
+    winch_max: 2000.0
+    winch_min: 900.0
+    rudder_max: 150
+    rudder_min: 30
+  nav:
+    layline: 30.0
+    radius: 6378137.0
+    min_tacking_speed: 0.8 # in m/s
+    beating: 100.0 # m
+  planner:
+    buoy_tol: 3 # m Tolerance to consider a waypoint hit
+    station:
+      width: 0.6
+      height: 0.3
+      inner_box_scale: 0.8
