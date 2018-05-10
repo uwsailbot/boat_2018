@@ -31,7 +31,7 @@ def joy_callback(controller):
 	if not controller.buttons[4] and controller.buttons[5] and not controller.buttons[8] and state.major != BoatState.MAJ_AUTONOMOUS:
 		state.major = BoatState.MAJ_AUTONOMOUS
 		state.minor = BoatState.MIN_COMPLETE
-		state.challenge = BoatState.CHA_NAV
+		#state.challenge = BoatState.CHA_NAV
 		pub.publish(state)
 	
 	# If L1 is pushed but R1 and PS aren't, set mode = RC

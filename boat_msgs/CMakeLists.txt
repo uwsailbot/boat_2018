@@ -53,6 +53,8 @@ find_package(catkin REQUIRED COMPONENTS
    FILES
    Point.msg
    PointArray.msg
+   Waypoint.msg
+   WaypointArray.msg
    BoatState.msg
    GPS.msg
    Joy.msg

@@ -1,21 +1,23 @@
 #!/usr/bin/env python
-import freetype
+import sys
+sys.dont_write_bytecode = True
+
 import math
-import numpy
 import pygame
 import rospy
 import time
-from boat_msgs.msg import BoatState, GPS, Point, PointArray
+from enum import Enum
+from boat_msgs.msg import BoatState, GPS, Point, PointArray, Waypoint, WaypointArray
 from boat_msgs.srv import ConvertPoint
 from sensor_msgs.msg import Imu, Joy
 from std_msgs.msg import Float32, Int32, Bool
 from rosgraph_msgs.msg import Clock
 from tf.transformations import quaternion_from_euler
-from OpenGL.GL import *
-from OpenGL.GLU import *
+#from OpenGL.GL import *
 from OpenGL.GLUT import *
-from PIL import Image
 from sys import argv
+from sim_io import *
+from sim_ui import *
 
 # Cheat codes
 cur_input = ""
@@ -27,124 +29,7 @@ win_width = 720
 win_height = 480
 
 # UI objects and UI controls stuff
-class Camera:
-	
-	def __init__(self,x,y,scale):
-		self.x=x
-		self.y=y
-		self.scale=scale
-	
-	def lps_to_screen(self, lps_x, lps_y):
-		scrn_x = (lps_x - self.x) * self.scale
-		scrn_x += win_width/2.0
-		scrn_y = (lps_y - self.y) * self.scale
-		scrn_y += win_height/2.0
-		return (scrn_x, scrn_y)
-	
-	def screen_to_lps(self, scrn_x, scrn_y):
-		lps_x = scrn_x - win_width/2.0
-		lps_x /= self.scale
-		lps_x += self.x
-		# Screen y axis is flipped
-		lps_y = -1 * (scrn_y - win_height/2.0)
-		lps_y /= self.scale
-		lps_y += self.y
-		return (lps_x, lps_y)
-
-
-camera = Camera(0,0,10)
-
-class Slider:
-	
-	def __init__(self,x,y,w,h,callback,min_val,max_val,cur_val):
-		self.x=x
-		self.y=y
-		self.w=w
-		self.h=h
-		self.callback=callback
-		self.min_val=float(min_val)
-		self.max_val=float(max_val)
-		self.cur_val=float(cur_val)
-		self.color=(0,0,0)
-		callback(float(cur_val))
-	
-	def resize(self, x=None, y=None, w=None, h=None):
-		if x is None:
-			x = self.x
-		if y is None:
-			y = self.y
-		if w is None:
-			w = self.w
-		if h is None:
-			h = self.h
-		
-		self.x = x
-		self.y = y
-		self.w = w
-		self.h = h
-	
-	def draw(self):
-		
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-		glEnable(GL_BLEND)
-		glPushMatrix()
-		glTranslatef(self.x, self.y, 0)
-		
-		(r,g,b) = self.color
-		
-		glColor4f(r,g,b,0.4)
-		glBegin(GL_QUADS)
-		glVertex2f(0,self.h)
-		glVertex2f(0,0)
-		glVertex2f(self.w,0)
-		glVertex2f(self.w,self.h)
-		glEnd()
-		
-		handle_x = self.w * self.cur_val / (self.max_val - self.min_val)
-		glColor4f(r,g,b,0.2)
-		glBegin(GL_QUADS)
-		glVertex2f(handle_x-3,self.h)
-		glVertex2f(handle_x-3,0)
-		glVertex2f(handle_x+3,0)
-		glVertex2f(handle_x+3,self.h)
-		glEnd()
-		
-		glPopMatrix()
-		
-		draw_text(
-			str(self.cur_val),
-			self.x+0.5*self.w,
-			self.y+5,
-			'center',
-			self.h-5,
-			2.0,
-			(r,g,b))
-		
-		glDisable(GL_BLEND)
-	
-	def set_color(self, r, g, b):
-		self.color=(r,g,b)
-		
-	def change_val(self, new_val):
-		val = new_val
-		if val < self.min_val:
-			val = self.min_val
-		if val > self.max_val:
-			val = self.max_val
-		self.cur_val = val
-		self.callback(val)
-	
-	def contains(self, x, y):
-		local_x = x-self.x
-		local_y = win_height-y-self.y
-		return local_x > 0 and local_x < self.w and local_y > 0 and local_y < self.h
-	
-	def	handle_mouse(self, x, y):
-		local_x = x-self.x
-		local_x = min(local_x, self.w)
-		local_x = max(local_x, 0)
-		self.change_val(self.max_val * local_x / self.w)
-
+camera = Camera(0,0,10, win_width, win_height)
 cur_slider = ()
 sliders = {}
 show_details = False
@@ -166,14 +51,15 @@ cur_boat_img = ()
 cur_rudder_img = ()
 cur_sail_img = ()
 open_sans_font = ()
-cur_font = ()
 
 # Modes
-sim_mode = 0
-sim_mode_str =['default', 'replay everything']
+class SimMode(Enum):
+	DEFAULT=0
+	REPLAY=1
 
+sim_mode = SimMode.DEFAULT
 
-# Simulation data and constsf
+# Simulation data and consts
 should_sim_joy = False
 sim_is_running = True
 speed = 10
@@ -205,8 +91,7 @@ target_heading = 270
 state = BoatState()
 rudder_pos = 90
 winch_pos = 2000
-local_points = PointArray()
-gps_points = PointArray()
+waypoint_gps = WaypointArray()
 joy = Joy()
 joy.axes = [0]*8
 joy.buttons = [0]*11
@@ -216,11 +101,10 @@ rudder_setpoint = 0
 rudder_enable = False
 replay_gps_raw = GPS()
 obstacle_points = PointArray()
-target_point = Point()
-local_bounding_box = PointArray()
+target_point = Waypoint()
 gps_bounding_box = PointArray()
 
-# for search challenge
+# ROS data -- search
 local_search_area = PointArray() # in lps, first point is center of cirlce, second is on edge
 gps_search_area = PointArray() # in gps, first point is center of circle, second is on edge
 search_radius = 0 # local radius of circle
@@ -229,7 +113,7 @@ search_target_set = False
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
-waypoint_pub = rospy.Publisher('waypoints_raw', PointArray, queue_size = 10)
+waypoint_pub = rospy.Publisher('waypoints_raw', WaypointArray, queue_size = 10)
 wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 10)
 gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
 orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
@@ -281,13 +165,14 @@ def point_is_in_fov(point):
 
 # publish pixel coordinates for points in vision
 def update_vision():
-	# TODO for other objects as well
+	# TODO for obstacles as well
 	global vision_points_gps
 	
 	vision_points_gps = PointArray()
-	for point in local_points.points:
-		if point_is_in_fov(point):
-			vision_points_gps.points.append(to_gps(point).pt)
+	for waypoint in waypoint_gps.points:
+		lps = to_lps(waypoint.pt).pt
+		if point_is_in_fov(lps):
+			vision_points_gps.points.append(waypoint.pt)
 	if point_is_in_fov(search_target):
 		vision_points_gps.points.append(to_gps(search_target).pt)
 
@@ -309,7 +194,6 @@ def update_wind():
 
 def boat_state_callback(newState):
 	global state
-	
 	state = newState
 	if state.major is not BoatState.MAJ_DISABLED and pause:
 		pause_sim()
@@ -324,24 +208,15 @@ def winch_callback(pos):
 	winch_pos = pos.data
 
 
-# Callback to restore local coord waypoints after publishing gps coord
+# Update the raw waypoints
 def waypoints_callback(newPoints):
-	global local_points
-	global gps_points
-	global sound
+	global waypoint_gps
 	
-	# Refresh GPS point list
-	gps_points = newPoints
-	temp_points = PointArray()
-	
-	if (len(local_points.points)-1) is len(newPoints.points) and sound and cur_boat_img is boat_imgs[2]:
+	# Whenever the number of waypoints is decremented by one and we are in maximum meme state, smash becky
+	if (len(waypoint_gps.points)-1) is len(newPoints.points) and sound and cur_boat_img is boat_imgs["mars"]:
 		pygame.mixer.music.play()
 	
-	# Convert all GPS points and store them as local points to draw
-	for point in gps_points.points:
-		local_point = to_lps(point).pt
-		temp_points.points.append(local_point)
-	local_points = temp_points
+	waypoint_gps = newPoints
 
 
 def target_heading_callback(angle):
@@ -349,17 +224,15 @@ def target_heading_callback(angle):
 	target_heading = angle.data
 
 def lps_callback(lps):
-	global sim_mode	
 	global pos
 	
-	if sim_mode == 1:
+	if sim_mode is SimMode.REPLAY:
 		pos = lps
 
 def compass_callback(compass):
-	global sim_mode
 	global heading
 	
-	if sim_mode == 1:
+	if sim_mode is SimMode.REPLAY:
 		heading = compass.data
 
 def anemometer_callback(anemometer):
@@ -396,50 +269,14 @@ def obstacles_callback(obstacles):
 
 def bounding_box_callback(box):
 	global gps_bounding_box
-	global local_bounding_box
 	gps_bounding_box = box
 
-	# Reorganize the local points to create a box when drawn, if there are four
-	if len(gps_bounding_box.points) == 4:
-		x_sum = 0
-		y_sum = 0
-		for p in gps_bounding_box.points:
-			x_sum += p.x
-			y_sum += p.y
-		x_avr = x_sum / 4.0
-		y_avr = y_sum / 4.0
-		
-		temp_points = PointArray()
-		temp_points.points = [None]*4
-		for p in gps_bounding_box.points:
-			if p is None:
-				gps_bounding_box = PointArray()
-				local_bounding_box = PointArray()
-				square_pub.publish(gps_bounding_box)
-				print "Invalid box configuration. Make more square."
-				return
-			if p.x < x_avr:
-				if p.y < y_avr:
-					temp_points.points[0] = to_lps(p).pt
-				else:
-					temp_points.points[1] = to_lps(p).pt
-			else:
-				if p.y < y_avr:
-					temp_points.points[3] = to_lps(p).pt
-				else:
-					temp_points.points[2] = to_lps(p).pt
-	else:
-		temp_points = PointArray()
-		for point in gps_bounding_box.points:
-			local_point = to_lps(point).pt
-			temp_points.points.append(local_point)
-
-	local_bounding_box = temp_points	
 
 def search_area_callback(new_search_area):
 	global gps_search_area
 	global local_search_area
 	global search_radius
+
 	gps_search_area = new_search_area
 	local_search_area = PointArray()
 	for point in gps_search_area.points:
@@ -466,7 +303,7 @@ def vision_callback(new_vision_points_gps):
 	for point in vision_points_gps.points:
 		vision_points_lps.points.append(to_lps(point).pt)
 
-# =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
+# =*=*=*=*=*=*=*=*=*=*=*=*= GLUT callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
 # Window resize callback
 def resize(width, height):
@@ -477,25 +314,22 @@ def resize(width, height):
 	glutInitWindowSize(win_width, win_height)
 	glMatrixMode(GL_PROJECTION)
 	glLoadIdentity()
-	gluOrtho2D(0.0, win_width, 0.0, win_height)
+	glOrtho(0.0, win_width, 0.0, win_height, -1, 1)
 	glMatrixMode(GL_MODELVIEW)
 	glLoadIdentity()
+	camera.resize(win_width, win_height)
 
 
 # Handler for mouse presses
 def mouse_handler(button, mouse_state, x, y):
-	global local_points
-	global gps_points
+	global waypoint_gps
 	global sliders
 	global cur_slider
-	global sim_mode
-	global local_bounding_box
 	global gps_bounding_box
 	global gps_search_area
 	global search_target_set
 	global search_target
-
-	# TODO check if all is ok in replay mode
+	
 	if mouse_state != GLUT_DOWN:
 		cur_slider = ()
 		return
@@ -503,61 +337,74 @@ def mouse_handler(button, mouse_state, x, y):
 	# If status panels are being clicked on
 	if (x <= 180 and show_details) or (x >= win_width - 120) and button == GLUT_LEFT_BUTTON:
 		for key in sliders:
-			if sliders[key].contains(x,y):
+			if sliders[key].contains(x,y, win_height):
 				cur_slider = sliders[key]
 				cur_slider.handle_mouse(x,y)
 		return
 
 	if button == GLUT_RIGHT_BUTTON:
-		if sim_mode == 0:
-			local_points = PointArray()
-			gps_points = PointArray()
-			local_bounding_box = PointArray()
+		if sim_mode is SimMode.DEFAULT:
+			waypoint_gps = WaypointArray()
 			gps_bounding_box = PointArray()
 			gps_search_area = PointArray()
 			search_target_set = False
+			waypoint_pub.publish(waypoint_gps)
+			square_pub.publish(gps_bounding_box)
+			search_area_pub.publish(gps_search_area)
 
-	elif cur_slider is () and sim_mode == 0 and button == GLUT_LEFT_BUTTON:
-		if state.challenge is BoatState.CHA_STATION:
-			newPt = Point()
-			(lps_x,lps_y) = camera.screen_to_lps(x,y)			
-			newPt.x = lps_x
-			newPt.y = lps_y
-			coords = to_gps(newPt).pt
+	elif cur_slider is () and sim_mode is SimMode.DEFAULT and state.challenge is not BoatState.CHA_SEARCH and state.challenge is not BoatState.CHA_STATION and (button == GLUT_LEFT_BUTTON or button == GLUT_MIDDLE_BUTTON):
+		newPt = Point()
+		(lps_x,lps_y) = camera.screen_to_lps(x,y)
+		newPt.x = lps_x
+		newPt.y = lps_y
+		if button == GLUT_LEFT_BUTTON:
+			coords = Waypoint(to_gps(newPt).pt, Waypoint.TYPE_INTERSECT)
+		elif button == GLUT_MIDDLE_BUTTON:
+			coords = Waypoint(to_gps(newPt).pt, Waypoint.TYPE_ROUND)
+		waypoint_gps.points.append(coords)
+		
+		if sim_mode is SimMode.DEFAULT:
+			waypoint_pub.publish(waypoint_gps)
 
-			for p in local_bounding_box.points:
-				if math.hypot(p.y - newPt.y, p.x-newPt.x) < 15:
-					print "Distance between buoys is too small, must be at least 15m"
-					return
-			# Reset if we were gonna add to a list of 4 points already
-			if len(local_bounding_box.points) == 4:
-				gps_bounding_box = PointArray()
-				local_bounding_box = PointArray()
+	elif cur_slider is () and sim_mode is SimMode.DEFAULT and state.challenge is BoatState.CHA_STATION and button == GLUT_LEFT_BUTTON:
+		newPt = Point()
+		(lps_x,lps_y) = camera.screen_to_lps(x,y)
+		newPt.x = lps_x
+		newPt.y = lps_y
+		coords = to_gps(newPt).pt
+		
+		for p in gps_bounding_box.points:
+			l = to_lps(p).pt
+			if math.hypot(l.y - newPt.y, l.x-newPt.x) < 15:
+				print "Distance between buoys is too small, must be at least 15m"
+				return
+		# Reset if we were gonna add to a list of 4 points already
+		if len(gps_bounding_box.points) == 4:
+			gps_bounding_box = PointArray()
+		
+		gps_bounding_box.points.append(coords)
+		square_pub.publish(gps_bounding_box)
+		
+		if sim_mode is SimMode.DEFAULT:
+			waypoint_pub.publish(waypoint_gps)
+	elif cur_slider is () and sim_mode is SimMode.DEFAULT and state.challenge is BoatState.CHA_SEARCH and button == GLUT_LEFT_BUTTON:
+		(lps_x,lps_y) = camera.screen_to_lps(x,y)		
+		new_point = to_gps(Point(lps_x, lps_y)).pt
 
-			gps_bounding_box.points.append(coords)
-		elif state.challenge is BoatState.CHA_SEARCH:
-			(lps_x,lps_y) = camera.screen_to_lps(x,y)		
-			coords = to_gps(Point(lps_x, lps_y)).pt
-
-			if len(gps_search_area.points) == 2:
-				if search_target_set:
-					# Reset if we were gonna add to a list of 2 points and a target already
-					search_target_set = False
-					gps_search_area = PointArray()
-				else:
-					# set search target
-					search_target_set = True
-					search_target = to_lps(coords).pt
+		if len(gps_search_area.points) == 2:
+			if search_target_set:
+				# Reset if we were gonna add to a list of 2 points and a target already
+				search_target_set = False
+				gps_search_area = PointArray()
 			else:
-				gps_search_area.points.append(coords)
+				# set search target
+				search_target_set = True
+				search_target = to_lps(new_point).pt
 		else:
-			newPt = Point()
-			(lps_x,lps_y) = camera.screen_to_lps(x,y)			
-			newPt.x = lps_x
-			newPt.y = lps_y
-			coords = to_gps(newPt).pt
-			gps_points.points.append(coords)
-	
+			gps_search_area.points.append(new_point)
+		if sim_mode is SimMode.DEFAULT:
+			search_area_pub.publish(gps_search_area)
+
 	elif (button == 3 or button == 4) and mouse_state == GLUT_DOWN:
 		
 		if not follow_boat:
@@ -578,11 +425,6 @@ def mouse_handler(button, mouse_state, x, y):
 			(new_mouse_x, new_mouse_y) = camera.screen_to_lps(x,y)
 			camera.x -= new_mouse_x - mouse_x
 			camera.y -= new_mouse_y - mouse_y
-	
-	if sim_mode == 0:
-		waypoint_pub.publish(gps_points)
-		square_pub.publish(gps_bounding_box)
-		search_area_pub.publish(gps_search_area)
 
 # Handler for mouse position
 def passive_mouse_handler(x,y):
@@ -673,11 +515,11 @@ def ASCII_handler(key, mousex, mousey):
 	elif key is 'p':
 		pause_sim()
 	elif key is 'm':
-		if sim_mode is 1:
-			sim_mode = 0
+		if sim_mode is SimMode.DEFAULT:
+			sim_mode = SimMode.REPLAY
 		else:
-			sim_mode += 1
-		print 'Changed sim mode, is now \'%s\'' % sim_mode_str[sim_mode] 
+			sim_mode = SimMode.DEFAULT
+		print 'Changed sim mode, is now', sim_mode
 	elif key is 'i':
 		show_details = not show_details
 	elif key is 'c':
@@ -686,7 +528,7 @@ def ASCII_handler(key, mousex, mousey):
 	elif key is 'y':
 		follow_boat = not follow_boat
 	
-	if sim_mode == 0:	
+	if sim_mode is SimMode.DEFAULT:
 		if key is '1' and should_sim_joy:
 			joy.buttons[4] = 1
 			joy.buttons[5] = 0
@@ -760,9 +602,9 @@ def redraw():
 	# Render stuff
 	draw_grid()
 	if state.challenge is BoatState.CHA_STATION:
-		draw_bounding_box()	
+		draw_bounding_box()
 	if state.challenge is BoatState.CHA_SEARCH:
-		draw_search_area()	
+		draw_search_area() 
 	if display_path:
 		draw_path()
 	draw_fov()
@@ -781,130 +623,14 @@ def redraw():
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= OpenGL Rendering =*=*=*=*=*=*=*=*=*=*=*=*=
 
-def draw_image(texture_id, position, angle, size, tint=(1.0,1.0,1.0)):	
-	glEnable(GL_TEXTURE_2D)
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-	glEnable(GL_BLEND)
-	r,g,b = tint
-	glColor3f(r,g,b)
-	glBindTexture(GL_TEXTURE_2D,texture_id)
-	
-	glPushMatrix()
-	glTranslatef(position[0], position[1], 0)
-	glRotatef(angle, 0, 0, 1)
-	
-	extents_x = size[0]/2.0
-	extents_y = size[1]/2.0
-	
-	glBegin(GL_QUADS)
-	glTexCoord2d(0,1)
-	glVertex2f(-extents_x,extents_y)
-	glTexCoord2d(0,0)
-	glVertex2f(-extents_x,-extents_y)
-	glTexCoord2d(1,0)
-	glVertex2f(extents_x,-extents_y)
-	glTexCoord2d(1,1)
-	glVertex2f(extents_x,extents_y)
-	glEnd()
-	
-	glPopMatrix()
-	glDisable(GL_TEXTURE_2D)
-	glDisable(GL_BLEND)
-
-
-# Render a circle centered at (x,y) with radius r
-def draw_circle(r, x, y, quality=300):
-	glBegin(GL_POLYGON)
-	for i in range(0, quality):
-		angle = 2 * math.pi * i / float(quality)
-		curx = x + math.cos(angle) * r
-		cury = y + math.sin(angle) * r
-		glVertex2f(curx,cury)
-	glEnd()
-
-
-# Render the specified text with bottom left corner at (x,y)
-def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0)):
-	font_texture_id = cur_font[0]
-	font_map =  cur_font[1]
-	
-	scale = h/32.0
-	
-	glEnable(GL_TEXTURE_2D)
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-	glEnable(GL_BLEND)
-	r,g,b = tint
-	glColor3f(r,g,b)
-	glBindTexture(GL_TEXTURE_2D, font_texture_id)
-	
-	glPushMatrix()
-	
-	# add up total width
-	total_width = 0
-	for c in text:
-		if ord(c)<32 or ord(c)>127:
-			print 'invalid character to draw: ord(c)=%i' % ord(c)
-			return
-		elif c is ' ':
-			total_width += (h/2 + spacing) * scale
-		else:			
-			total_width += (font_map[ord(c)-32][1] + spacing) * scale
-	
-	# set alignment
-	if align == 'left':
-		glTranslatef(x, y, 0)
-	elif align == 'center':
-		glTranslatef(x-(total_width/2.0), y, 0)
-	elif align == 'right':
-		glTranslatef(x-total_width, y, 0)
-	else:
-		glTranslatef(x, y, 0)
-		print '%s is not a valid alignment' % align
-	
-	
-	x_offset = 0
-	for c in text:
-		if c is ' ':
-			x_offset += (h/2 + spacing) * scale
-		else:		
-			char_info = font_map[ord(c)-32]
-			start_index = char_info[0]
-			char_width = char_info[1] * scale
-			char_height = char_info[2] * scale
-			char_y_offset = char_info[3] * scale
-			tex_y_start = char_info[4]
-			tex_y_end = char_info[5]
-			tex_x_end = char_info[6]
-		
-			# use x and y as bottom left corner
-			# also flip these textures, since by default everything is upside down
-			glBegin(GL_QUADS)
-			glTexCoord2d(0, tex_y_start)
-			glVertex2f(x_offset, char_y_offset + char_height)
-		
-			glTexCoord2d(0, tex_y_end)
-			glVertex2f(x_offset, char_y_offset)
-		
-			glTexCoord2d(tex_x_end, tex_y_end)
-			glVertex2f(x_offset + char_width, char_y_offset)
-		
-			glTexCoord2d(tex_x_end, tex_y_start)
-			glVertex2f(x_offset + char_width, char_y_offset + char_height)
-			glEnd()
-		
-			x_offset += char_width + (spacing * scale)
-	
-	glPopMatrix()
-	glDisable(GL_TEXTURE_2D)
-	glDisable(GL_BLEND)
-
-
 # Draw all of the waypoint as red dots
 def draw_waypoints():
 	glPushMatrix()
 	
 	glColor3f(1,0,0)
-	for p in local_points.points:
+	for gps in waypoint_gps.points:
+		
+		p = to_lps(gps.pt).pt
 		(x,y) = camera.lps_to_screen(p.x, p.y)
 		draw_circle(0.5 * camera.scale,x,y)
 	
@@ -914,26 +640,28 @@ def draw_bounding_box():
 	glPushMatrix()
 
 	glColor3f(0,1,0)
-	for p in local_bounding_box.points:
-		(x,y) = camera.lps_to_screen(p.x, p.y)
+	for p in gps_bounding_box.points:
+		l = to_lps(p).pt
+		(x,y) = camera.lps_to_screen(l.x, l.y)
 		draw_circle(0.5 * camera.scale,x,y)
 
-	if len(local_bounding_box.points) == 4:
+	if len(gps_bounding_box.points) == 4:
 		glLineWidth(1.0)
 		glBegin(GL_LINES)
 		for i in range(0, 4):
-			(x,y) = camera.lps_to_screen(local_bounding_box.points[i].x, local_bounding_box.points[i].y)
-			(x_n,y_n) = camera.lps_to_screen(local_bounding_box.points[(i+1) % 4].x, local_bounding_box.points[(i+1) % 4].y)
-			glVertex2f(x, y)
-			glVertex2f(x_n, y_n)
+			a = to_lps(gps_bounding_box.points[i]).pt
+			b = to_lps(gps_bounding_box.points[(i+1)%4]).pt
+			(x1, y1) = camera.lps_to_screen(a.x, a.y)
+			(x2, y2) = camera.lps_to_screen(b.x, b.y)
+			glVertex2f(x1, y1)
+			glVertex2f(x2, y2)
 		glEnd()
 		
 	glPopMatrix()
-
+	
 def draw_search_area():
 	glPushMatrix()
 
-	print (local_search_area)
 	glColor3f(0,1,0)
 	for p in local_search_area.points:
 		(x,y) = camera.lps_to_screen(p.x, p.y)
@@ -953,10 +681,10 @@ def draw_search_area():
 		
 	glPopMatrix()
 
-def draw_target_point():	
-	if len(local_points.points) > 0 and state.major is BoatState.MAJ_AUTONOMOUS:
+def draw_target_point():
+	if target_point is not () and state.major is BoatState.MAJ_AUTONOMOUS and state.minor is not BoatState.MIN_COMPLETE:
 		glColor3f(1,1,1)
-		(x,y) = camera.lps_to_screen(target_point.x, target_point.y)
+		(x,y) = camera.lps_to_screen(target_point.pt.x, target_point.pt.y)
 		draw_circle(0.7 * camera.scale, x, y)
 
 def draw_obstacles():
@@ -1035,6 +763,7 @@ def draw_waypoints_in_fov():
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
 	glColor4f(245/255.0, 200/255.0, 5/255.0, 0.3)
+
 	for point in vision_points_lps.points:
 		(x,y) = camera.lps_to_screen(point.x, point.y)
 		draw_circle(0.8 * camera.scale, x, y)
@@ -1062,7 +791,7 @@ def draw_status():
 	glEnd()
 	
 	# Set font
-	cur_font = open_sans_font
+	set_font(open_sans_font)
 	
 	# Draw the wind readout
 	glColor3f(0.0, 0.0, 0.0)
@@ -1160,7 +889,7 @@ def draw_detailed_status():
 	glEnd()
 	
 	# Set font
-	cur_font = open_sans_font
+	set_font(open_sans_font)
 	
 	# Draw anemometer reading
 	draw_text("Anemometer: %.1f" % ane_reading, panel_width/2, win_height-30, 'center')
@@ -1185,7 +914,7 @@ def draw_detailed_status():
 	
 	# Draw mode
 	draw_text("Sim Mode:", panel_width/2, 40, 'center', 18)
-	draw_text(sim_mode_str[sim_mode], panel_width/2, 20, 'center') 
+	draw_text(str(sim_mode), panel_width/2, 20, 'center') 
 	glPopMatrix()
 
 
@@ -1371,7 +1100,6 @@ def calc(_):
 	global pos
 	global heading
 	global target_heading
-	global local_points
 	global last_time
 	global clock
 	global rudder_pos
@@ -1401,7 +1129,7 @@ def calc(_):
 		camera.x += camera_velocity.x * real_dt
 		camera.y += camera_velocity.y * real_dt
 	
-	if(sim_mode == 0):
+	if sim_mode is SimMode.DEFAULT:
 		# Calculate other things
 		tack = calc_tack(heading, wind_heading)
 		boom_heading = calc_boom_heading(heading, wind_heading, winch_pos)
@@ -1478,7 +1206,7 @@ def calc(_):
 		glutTimerFunc(1000/30, calc, 0)
 	else:
 		glutDestroyWindow(win_ID)
-		exit(0)
+		glutLeaveMainLoop()
 
 
 # Returns magnitude of projection of u onto v
@@ -1493,44 +1221,6 @@ def polar_to_rect(rad, ang):
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
-
-def rel_to_abs_filepath(filepath):
-	abs_filepath = os.path.dirname(os.path.realpath(__file__))
-	while filepath.startswith('../'):
-		filepath_arr = filepath.split('/')
-		filepath_arr.pop(0)
-		filepath = ''.join(['/'+str(s) for s in filepath_arr])[1:]
-		abs_filepath_arr = abs_filepath.split('/')
-		abs_filepath_arr = abs_filepath_arr[:-1]
-		abs_filepath =''.join(['/'+str(s) for s in abs_filepath_arr])[1:]
-	return abs_filepath + '/' + filepath
-
-
-def load_image(filepath, resolution):
-	# loads and returns an image
-	abs_filepath = rel_to_abs_filepath(filepath)
-	im = Image.open(abs_filepath)
-	im = im.transpose(Image.FLIP_TOP_BOTTOM)
-	im = im.resize(resolution, Image.NEAREST)
-	
-	texture_id = glGenTextures(1)
-	glBindTexture(GL_TEXTURE_2D,texture_id)
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	pixels = numpy.array(im).flatten()
-	pixels = pixels.astype(numpy.float32)
-	pixels = pixels / 256.0
-	
-	img_mode = GL_RGB
-	if im.mode == 'RGBA':
-		img_mode = GL_RGBA	
-	
-	glTexImage2D(GL_TEXTURE_2D, 0, img_mode, im.width, im.height, 0, img_mode, GL_FLOAT, pixels);
-	
-	return texture_id
-
 
 def load_image_resources():
 	global cur_boat_img
@@ -1568,105 +1258,10 @@ def load_image_resources():
 	cur_sail_img = sail_imgs["orig"]
 
 
-def load_font(filepath, detail):
-	# load font with freetype
-	face = freetype.Face(rel_to_abs_filepath(filepath))
-	face.set_char_size(detail)
-	
-	# we're going to load every character into one texture, placed in order vertically 
-	
-	# this is used to store data about location and size of each char in the texture
-	font_map = []
-	
-	# get bitmaps, including width, height, and top bearing for each char
-	# finds total width and height
-	bitmaps = []
-	max_width = 0
-	total_height = 0
-	for i in range(32,128):
-		face.load_char(chr(i))
-		bitmap = face.glyph.bitmap
-		if bitmap.width>max_width:
-			max_width = bitmap.width
-		total_height += bitmap.rows
-		# can't just append the bitmap object
-		bitmaps.append((bitmap.buffer, bitmap.width, bitmap.rows, face.glyph.bitmap_top))
-	
-	# build a buffer for the texture containing all chars
-	pixels = []	
-	index = 0
-	# for each char
-	for i in range(32,128):
-		bitmap_buffer = bitmaps[i-32][0]
-		bitmap_width = bitmaps[i-32][1]
-		bitmap_height = bitmaps[i-32][2]
-		bitmap_top = bitmaps[i-32][3]
-		
-		#add char info to font_map
-		font_map.append((
-			index,
-			bitmap_width,
-			bitmap_height,
-			bitmap_top - bitmap_height, # y offset
-			index/max_width/1.0/total_height, # texture y start
-			(index/max_width+bitmap_height)/1.0/total_height, # texture y end
-			bitmap_width/1.0/max_width # texture x end
-			))
-		
-		# add buffer to total buffer 
-		buffer_index = 0
-		
-		# for each row
-		for j in range(0,bitmap_height):
-			# for each column
-			for k in range(0, max_width):
-				if k < bitmap_width:
-					# copy
-					pixels.append(bitmap_buffer[buffer_index])
-					buffer_index+=1
-				else:
-					# pading until end of row
-					pixels.append(0)
-				index+=1
-		
-		# padding between each character, to avoid bleeding into each other when interpolating
-		for k in range(0, max_width):
-			pixels.append(0)
-			index+=1
-	
-	# setup the texture
-	texture_id = glGenTextures(1)
-	glBindTexture(GL_TEXTURE_2D,texture_id)
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	
-	# convert buffer to float format
-	pixels = numpy.array(pixels, dtype='float32')
-	for i in range(0, pixels.size):
-		pixels[i]/=256.0
-	
-	# make the texture
-	glTexImage2D(
-		GL_TEXTURE_2D,
-		0,
-		GL_ALPHA,
-		max_width,
-		total_height,
-		0,
-		GL_ALPHA,
-		GL_FLOAT,
-		pixels);
-	
-	return (texture_id, font_map)
-
-
 def load_font_resources():
-	global cur_font
 	global open_sans_font
 	open_sans_font = load_font('../meshes/OpenSans/OpenSans-Light.ttf', 2048)
-	cur_font = open_sans_font
+	set_font(open_sans_font)
 
 
 def init_sliders():
@@ -1691,7 +1286,7 @@ def sim_speed_slider_callback(value):
 def init_2D(r,g,b):
 	glClearColor(r,g,b,0.0)  
 	glViewport(0, 0, win_width, win_height)
-	gluOrtho2D(0.0, win_width, 0.0, win_height)
+	glOrtho(0.0, win_width, 0.0, win_height, -1, 1)
 
 
 def init_GL():
@@ -1726,7 +1321,7 @@ def listener():
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
 	rospy.Subscriber('rudder', Float32, rudder_callback)
 	rospy.Subscriber('winch', Int32, winch_callback)
-	rospy.Subscriber('waypoints_raw', PointArray, waypoints_callback)
+	rospy.Subscriber('waypoints_raw', WaypointArray, waypoints_callback)
 	rospy.Subscriber('target_heading', Float32, target_heading_callback)
 	
 	# So we can use real wind data in simulation mode
@@ -1743,7 +1338,7 @@ def listener():
 	rospy.Subscriber('rudder_pid/enable', Bool, rudder_enable_callback)
 	rospy.Subscriber('gps_raw', GPS, gps_raw_callback)
 	rospy.Subscriber('obstacles', PointArray, obstacles_callback)
-	rospy.Subscriber('target_point', Point, target_point_callback)
+	rospy.Subscriber('target_point', Waypoint, target_point_callback)
 	rospy.Subscriber('bounding_box', PointArray, bounding_box_callback)
 	rospy.Subscriber('search_area', PointArray, search_area_callback)
 	rospy.Subscriber('vision', PointArray, vision_callback)
@@ -1764,5 +1359,10 @@ if __name__ == '__main__':
 	except rospy.ROSInterruptException:
 		pass
 	
+	# Publish the origin/init pos for the gps->lps conversion
+	gps = GPS()
+	gps.latitude = 0
+	gps.longitude = 0
+	gps_pub.publish(gps)
+	
 	init_GL()
-

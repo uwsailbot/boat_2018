@@ -2,7 +2,7 @@
 import actionlib
 import math
 import rospy
-from boat_msgs.msg import BoatState, GPS, MaxVMGAction, MaxVMGGoal, Point, TackingAction, TackingGoal, LaylineAction, LaylineGoal
+from boat_msgs.msg import BoatState, GPS, MaxVMGAction, MaxVMGGoal, Point, Waypoint, TackingAction, TackingGoal, LaylineAction, LaylineGoal
 from std_msgs.msg import Float32
 
 ## Trigger for when the wind shifts significantly
@@ -20,8 +20,8 @@ apparent_wind_heading = 0
 ## The current `boat_msgs.msg.BoatState`
 state = BoatState()
 
-## The `boat_msgs.msg.Point` describing the location to navigate to
-target = Point()
+## The `boat_msgs.msg.Waypoint` describing the location to navigate to
+target = Waypoint()
 
 ## The angle to the target point, in degrees CCW from East
 target_heading = 0
@@ -31,6 +31,7 @@ cur_boat_heading = 0
 
 ## Initial of position of the boat when a new target is added
 start_pos = Point()
+
 ## Current boat position
 cur_pos =  Point()
 
@@ -131,14 +132,15 @@ def compass_callback(compass):
 
 ##	Callback for setting the target point when the `/target_point` topic is updated.
 #	
-#	@param new_target The `boat_msgs.msg.Point` to set
+#	@param new_target The `boat_msgs.msg.Waypoint` to set
 #	
 def target_callback(new_target):
 	global target
 	global is_new_target
 	global start_pos
 
-	if abs(target.x - new_target.x) > 0.01 or abs(target.y - new_target.y) > 0.01:
+	# If the target has changed, save the new target
+	if abs(target.pt.x - new_target.pt.x) > 0.01 or abs(target.pt.y - new_target.pt.y) > 0.01:
 		is_new_target = True
 		target = new_target
 		start_pos = cur_pos
@@ -261,7 +263,7 @@ def calc_vmg(wind_coming):
 #	@return The distance, in meters
 #	
 def dist_to_target(position):
-	return math.sqrt(math.pow((target.y - position.y), 2) +  math.pow((target.x - position.x), 2))
+	return math.sqrt(math.pow((target.pt.y - position.y), 2) +  math.pow((target.pt.x - position.x), 2))
 
 ##	Determine if the dist between two points is within the specified tolerance
 #	
@@ -317,10 +319,10 @@ def is_within_bounds(val, boundA, boundB):
 #
 def remaining_course():
 	cur_angle = math.atan2(cur_pos.y - start_pos.y, cur_pos.x - start_pos.x) * 180 / math.pi
-	start_angle = math.atan2(target.y - start_pos.y, target.x - start_pos.x) * 180 / math.pi
+	start_angle = math.atan2(target.pt.y - start_pos.y, target.pt.x - start_pos.x) * 180 / math.pi
 	cur_angle = (cur_angle + 360) % 360
 	start_angle = (start_angle + 360) % 360
-	tot_dist = math.hypot(target.y - start_pos.y, target.x - start_pos.x)
+	tot_dist = math.hypot(target.pt.y - start_pos.y, target.pt.x - start_pos.x)
 	cur_dist = math.hypot(cur_pos.y - start_pos.y, cur_pos.x - start_pos.x)
 	proj_dist = cur_dist * math.cos(math.radians(cur_angle-start_angle))
 	return 100 - (proj_dist/tot_dist) * 100.0
@@ -358,7 +360,7 @@ def awa_algorithm():
 	
 	# Calculate the direct heading to the next waypoint
 	old_direct_heading = direct_heading
-	direct_heading = math.atan2(target.y - cur_pos.y, target.x - cur_pos.x) * 180 / math.pi
+	direct_heading = math.atan2(target.pt.y - cur_pos.y, target.pt.x - cur_pos.x) * 180 / math.pi
 	direct_heading = (direct_heading + 360) % 360 # Get rid of negative angles
 	wind_coming = (apparent_wind_heading + 180) % 360 # Determine the direction the wind is coming from
 
@@ -448,7 +450,7 @@ def taras_algorithm():
 	
 	# Calculate the direct heading to the next waypoint
 	# This should never be undefined, as the atan2(0,0) case would already be caught by the proximity check above
-	best_heading = math.atan2(target.y - cur_pos.y, target.x - cur_pos.x) * 180 / math.pi
+	best_heading = math.atan2(target.pt.y - cur_pos.y, target.pt.x - cur_pos.x) * 180 / math.pi
 	best_heading = (best_heading + 360) % 360 # Get rid of negative angles
 	wind_coming = (apparent_wind_heading + 180) % 360 # Determine the direction the wind is coming from
 	
@@ -523,7 +525,7 @@ def init():
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
 	rospy.Subscriber('gps_raw', GPS, gps_callback)
 	rospy.Subscriber('anemometer', Float32, anemometer_callback, queue_size=1)
-	rospy.Subscriber('target_point', Point, target_callback)
+	rospy.Subscriber('target_point', Waypoint, target_callback)
 	rospy.Subscriber('compass', Float32, compass_callback, queue_size=1) # Only want it to receive the most recent orientation
 	
 	# If the filters work, change lps to use /odometry/filtered

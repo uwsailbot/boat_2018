@@ -3,7 +3,7 @@ import actionlib
 import boat_msgs.msg
 import rospy
 import math
-from boat_msgs.msg import BoatState, Point, TackingAction, TackingGoal, GPS
+from boat_msgs.msg import BoatState, Point, Waypoint, TackingAction, TackingGoal, GPS
 from std_msgs.msg import Float32
 
 class LaylineAction(object):
@@ -28,7 +28,7 @@ class LaylineAction(object):
 		self.compass = 0
 		self.sub_ane = rospy.Subscriber('anemometer', Float32, self.anemometer_callback)
 		self.target_heading_sub = rospy.Subscriber('target_heading', Float32, self.target_heading_callback)
-		self.target_sub = rospy.Subscriber('target_point', Point, self.target_callback)
+		self.target_sub = rospy.Subscriber('target_point', Waypoint, self.target_callback)
 		self.sub_heading = rospy.Subscriber('compass', Float32, self.compass_callback)
 		self.target_pub = rospy.Publisher('target_heading', Float32, queue_size=10)
 		self.pos_sub = rospy.Subscriber('lps', Point, self.position_callback)
@@ -133,7 +133,7 @@ class LaylineAction(object):
 
 		# Wait until we hit the layline heading
 		while (not hit_layline or self.boat_speed < self.min_speed) and not preempted:
-			direct_heading = math.atan2(goal.target.y - self.cur_pos.y, goal.target.x - self.cur_pos.x) * 180 / math.pi
+			direct_heading = math.atan2(goal.target.pt.y - self.cur_pos.y, goal.target.pt.x - self.cur_pos.x) * 180 / math.pi
 			direct_heading = (direct_heading + 360) % 360
 			if goal.alt_tack_angle - goal.overshoot_angle < 0:
 				lower_bound = goal.alt_tack_angle - goal.overshoot_angle + 360

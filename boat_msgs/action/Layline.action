@@ -1,5 +1,5 @@
 #goal definition
-Point target
+Waypoint target
 float32 alt_tack_angle
 float32 overshoot_angle
 ---
