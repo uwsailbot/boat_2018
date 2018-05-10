@@ -56,6 +56,7 @@ open_sans_font = ()
 class SimMode(Enum):
 	DEFAULT=0
 	REPLAY=1
+	CONTROLLER=2
 
 sim_mode = SimMode.DEFAULT
 
@@ -216,13 +217,13 @@ def target_heading_callback(angle):
 def lps_callback(lps):
 	global pos
 	
-	if sim_mode is SimMode.REPLAY:
+	if sim_mode is SimMode.REPLAY or sim_mode is SimMode.CONTROLLER:
 		pos = lps
 
 def compass_callback(compass):
 	global heading
 	
-	if sim_mode is SimMode.REPLAY:
+	if sim_mode is SimMode.REPLAY or sim_mode is SimMode.CONTROLLER:
 		heading = compass.data
 
 def anemometer_callback(anemometer):
@@ -306,13 +307,13 @@ def mouse_handler(button, mouse_state, x, y):
 		return
 
 	if button == GLUT_RIGHT_BUTTON:
-		if sim_mode is SimMode.DEFAULT:
+		if sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER:
 			waypoint_gps = WaypointArray()
 			gps_bounding_box = PointArray()
 			waypoint_pub.publish(waypoint_gps)
 			square_pub.publish(gps_bounding_box)
 
-	elif cur_slider is () and sim_mode is SimMode.DEFAULT and state.challenge is not BoatState.CHA_STATION and (button == GLUT_LEFT_BUTTON or button == GLUT_MIDDLE_BUTTON):
+	elif cur_slider is () and (sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER) and state.challenge is not BoatState.CHA_STATION and (button == GLUT_LEFT_BUTTON or button == GLUT_MIDDLE_BUTTON):
 		newPt = Point()
 		(lps_x,lps_y) = camera.screen_to_lps(x,y)
 		newPt.x = lps_x
@@ -323,10 +324,9 @@ def mouse_handler(button, mouse_state, x, y):
 			coords = Waypoint(to_gps(newPt).pt, Waypoint.TYPE_ROUND)
 		waypoint_gps.points.append(coords)
 		
-		if sim_mode is SimMode.DEFAULT:
-			waypoint_pub.publish(waypoint_gps)
+		waypoint_pub.publish(waypoint_gps)
 
-	elif cur_slider is () and sim_mode is SimMode.DEFAULT and state.challenge is BoatState.CHA_STATION and button == GLUT_LEFT_BUTTON:
+	elif cur_slider is () and (sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER) and state.challenge is BoatState.CHA_STATION and button == GLUT_LEFT_BUTTON:
 		newPt = Point()
 		(lps_x,lps_y) = camera.screen_to_lps(x,y)
 		newPt.x = lps_x
@@ -345,8 +345,7 @@ def mouse_handler(button, mouse_state, x, y):
 		gps_bounding_box.points.append(coords)
 		square_pub.publish(gps_bounding_box)
 		
-		if sim_mode is SimMode.DEFAULT:
-			waypoint_pub.publish(waypoint_gps)
+		waypoint_pub.publish(waypoint_gps)
 
 	elif (button == 3 or button == 4) and mouse_state == GLUT_DOWN:
 		
@@ -460,6 +459,8 @@ def ASCII_handler(key, mousex, mousey):
 	elif key is 'm':
 		if sim_mode is SimMode.DEFAULT:
 			sim_mode = SimMode.REPLAY
+		elif sim_mode is SimMode.REPLAY:
+			sim_mode = SimMode.CONTROLLER
 		else:
 			sim_mode = SimMode.DEFAULT
 		print 'Changed sim mode, is now', sim_mode
@@ -471,7 +472,7 @@ def ASCII_handler(key, mousex, mousey):
 	elif key is 'y':
 		follow_boat = not follow_boat
 	
-	if sim_mode is SimMode.DEFAULT:
+	if sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER:
 		if key is '1' and should_sim_joy:
 			joy.buttons[4] = 1
 			joy.buttons[5] = 0
