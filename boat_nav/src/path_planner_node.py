@@ -214,8 +214,25 @@ def search_setup():
 	wind_heading = 45
 	num_sweeps = 10
 	sweep_width = 2*search_radius/num_sweeps
-	waypoints = [_get_search_pt(i,wind_heading,sweep_width,search_radius) for i in xrange(0,num_sweeps-1)]
-	waypoints_pub.publish(waypoints)
+	#waypoints = [_get_search_pt(i,wind_heading,sweep_width,search_radius) for i in xrange(0,num_sweeps-1)]
+	waypoints = _get_expaning_square_pts(wind_heading,sweep_width)	waypoints_pub.publish(waypoints)
+
+def _get_expaning_square_pts(angle,width):
+	moves = [[1,0],[0,1],[-1,0],[0,-1]]
+	direction = multiplier = 1
+	x = y = 0
+	out = []
+	c,s = math.cos(angle),math.sin(angle)
+	while(x*x + y*y < search_radius):
+		index = len(out)%4
+		x += moves[index][0]*direction*multiplier*width
+		y += moves[index][1]*direction*multiplier*width
+		trans_x = x*c - y*s + search_center.x
+		trans_y = y*c - x*s + search_center.y
+		out.append(Point(trans_x,trans_y))
+		if not index%2:
+			multiplier += 1
+	return out
 
 def _get_search_pt(i,angle,width,radius):
 		y = -radius + (i+1)*width
