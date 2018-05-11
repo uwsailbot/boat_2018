@@ -13,7 +13,7 @@ from sensor_msgs.msg import Imu, Joy
 from std_msgs.msg import Float32, Int32, Bool
 from rosgraph_msgs.msg import Clock
 from tf.transformations import quaternion_from_euler
-from nav_mgs.msg import Odometry
+from nav_msgs.msg import Odometry
 #from OpenGL.GL import *
 from OpenGL.GLUT import *
 from sys import argv
