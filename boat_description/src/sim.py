@@ -471,6 +471,14 @@ def ASCII_handler(key, mousex, mousey):
 	elif key is 'y':
 		follow_boat = not follow_boat
 	
+	elif key is 'x':
+		(lps_x,lps_y) = camera.screen_to_lps(mousex,mousey)
+		coords = Waypoint(to_gps(Point(lps_x, lps_y)).pt, Waypoint.TYPE_ROUND)
+		waypoint_gps.points.append(coords)
+		
+		if sim_mode is SimMode.DEFAULT:
+			waypoint_pub.publish(waypoint_gps)
+	
 	if sim_mode is SimMode.DEFAULT:
 		if key is '1' and should_sim_joy:
 			joy.buttons[4] = 1
@@ -568,8 +576,13 @@ def redraw():
 def draw_waypoints():
 	glPushMatrix()
 	
-	glColor3f(1,0,0)
 	for gps in waypoint_gps.points:
+		
+		if gps.type is Waypoint.TYPE_ROUND:
+			glColor3f(1,0.5,0)
+		else:
+			glColor3f(1,0,0)
+		
 		
 		p = to_lps(gps.pt).pt
 		(x,y) = camera.lps_to_screen(p.x, p.y)
@@ -1210,13 +1223,13 @@ def init_2D(r,g,b):
 	glOrtho(0.0, win_width, 0.0, win_height, -1, 1)
 
 
-def init_GL():
+def init_GLUT():
 	global win_ID
 	global pos
 	glutInit(sys.argv)
 	glutInitWindowSize(win_width, win_height)
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
-	win_ID = glutCreateWindow('Simulator')
+	win_ID = glutCreateWindow('UW Sailbot Simulator')
 	
 	#Setup the window with blue background
 	init_2D(90/255.0,155/255.0,230/255.0)
@@ -1285,5 +1298,5 @@ if __name__ == '__main__':
 	gps.longitude = 0
 	gps_pub.publish(gps)
 	
-	init_GL()
+	init_GLUT()
 

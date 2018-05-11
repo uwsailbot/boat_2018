@@ -33,7 +33,7 @@ def publish_target():
 	
 	if target_waypoint.type is Waypoint.TYPE_ROUND and target_waypoint in waypoints and waypoints.index(target_waypoint) < len(waypoints)-1:
 		
-		r = 5/111319.492188 # meters to coords
+		r = 3/111319.492188 # meters to coords
 		k = 1.5
 		
 		next = waypoints[waypoints.index(target_waypoint)+1]
