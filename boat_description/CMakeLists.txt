@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   boat_nav
   boat_msgs
   boat_interfaces
+  nav_msgs
 )
 
 ## System dependencies are found with CMake's conventions

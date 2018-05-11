@@ -33,7 +33,7 @@ def publish_target():
 	
 	if target_waypoint.type is Waypoint.TYPE_ROUND and target_waypoint in waypoints and waypoints.index(target_waypoint) < len(waypoints)-1:
 		
-		r = 5/111319.492188 # meters to coords
+		r = 3/111319.492188 # meters to coords
 		k = 1.5
 		
 		next = waypoints[waypoints.index(target_waypoint)+1]
@@ -336,6 +336,7 @@ def station_keeper_planner():
 	if station_timeout:
 		if is_within_dist(cur_pos, gps_to_lps(target_waypoint.pt).pt, buoy_tol):
 			state.minor = BoatState.MIN_COMPLETE
+			state.challenge = BoatState.CHA_NAV
 			boat_state_pub.publish(state)
 			station_timeout = False
 			rospy.loginfo(rospy.get_caller_id() + " Exited box. Boat State = 'Autonomous - Complete'")

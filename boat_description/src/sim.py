@@ -13,6 +13,7 @@ from sensor_msgs.msg import Imu, Joy
 from std_msgs.msg import Float32, Int32, Bool
 from rosgraph_msgs.msg import Clock
 from tf.transformations import quaternion_from_euler
+from nav_msgs.msg import Odometry
 #from OpenGL.GL import *
 from OpenGL.GLUT import *
 from sys import argv
@@ -219,6 +220,12 @@ def lps_callback(lps):
 	
 	if sim_mode is SimMode.REPLAY or sim_mode is SimMode.CONTROLLER:
 		pos = lps
+
+def odom_callback(odom):
+	global pos
+	
+	if sim_mode is SimMode.REPLAY or sim_mode is SimMode.CONTROLLER:
+		pos = Point(odom.pose.pose.position.x, odom.pose.pose.position.y)
 
 def compass_callback(compass):
 	global heading
@@ -471,6 +478,14 @@ def ASCII_handler(key, mousex, mousey):
 		display_path = not display_path
 	elif key is 'y':
 		follow_boat = not follow_boat
+	elif key is '0':
+		sound = not sound
+	
+	elif key is 'x' and (sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER):
+		(lps_x,lps_y) = camera.screen_to_lps(mousex,mousey)
+		coords = Waypoint(to_gps(Point(lps_x, lps_y)).pt, Waypoint.TYPE_ROUND)
+		waypoint_gps.points.append(coords)
+		waypoint_pub.publish(waypoint_gps)
 	
 	if sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER:
 		if key is '1' and should_sim_joy:
@@ -523,22 +538,20 @@ def ASCII_handler(key, mousex, mousey):
 			wind_heading -= 5
 			if wind_heading < 0:
 				wind_heading += 360
-		elif key is '0':
-			sound = not sound
 		elif key is ' ':
 			pos.x = 0
 			pos.y = 0
 			camera.x = 0
 			camera.y = 0
 			camera.scale = 10
-			path = PointArray()			
+			path = PointArray()
 			update_gps()
 			
 
 
 # Main display rendering callback
 def redraw():
-
+	
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 	
 	glViewport(0, 0, win_width, win_height)
@@ -559,7 +572,7 @@ def redraw():
 	draw_status()
 	if show_details:
 		draw_detailed_status()
-
+	
 	glutSwapBuffers()
 
 
@@ -569,8 +582,13 @@ def redraw():
 def draw_waypoints():
 	glPushMatrix()
 	
-	glColor3f(1,0,0)
 	for gps in waypoint_gps.points:
+		
+		if gps.type is Waypoint.TYPE_ROUND:
+			glColor3f(1,0.5,0)
+		else:
+			glColor3f(1,0,0)
+		
 		
 		p = to_lps(gps.pt).pt
 		(x,y) = camera.lps_to_screen(p.x, p.y)
@@ -1211,13 +1229,13 @@ def init_2D(r,g,b):
 	glOrtho(0.0, win_width, 0.0, win_height, -1, 1)
 
 
-def init_GL():
+def init_GLUT():
 	global win_ID
 	global pos
 	glutInit(sys.argv)
 	glutInitWindowSize(win_width, win_height)
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
-	win_ID = glutCreateWindow('Simulator')
+	win_ID = glutCreateWindow('UW Sailbot Simulator')
 	
 	#Setup the window with blue background
 	init_2D(90/255.0,155/255.0,230/255.0)
@@ -1251,7 +1269,8 @@ def listener():
 	rospy.Subscriber('mock_true_wind', Float32, mock_true_wind_callback)
 	
 	# subscribers for replay mode
-	rospy.Subscriber('lps', Point, lps_callback)
+	#rospy.Subscriber('lps', Point, lps_callback)
+	rospy.Subscriber('odometry/filtered', Odometry, odom_callback)
 	rospy.Subscriber('compass', Float32, compass_callback)
 	rospy.Subscriber('anemometer', Float32, anemometer_callback)
 	rospy.Subscriber('rudder_pid/output', Float32, rudder_output_callback)
@@ -1286,5 +1305,5 @@ if __name__ == '__main__':
 	gps.longitude = 0
 	gps_pub.publish(gps)
 	
-	init_GL()
+	init_GLUT()
 

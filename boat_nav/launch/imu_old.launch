@@ -21,19 +21,19 @@
 
     # compass correction params (see http://www.phidgets.com/docs/1044_User_Guide)
 	# run compass calibration script in boat_interfaces/tools/calibration to populate these
-     <param name="cc_mag_field" value="0.342726"/>
-         <param name="cc_offset0" value="-0.285073"/>
-         <param name="cc_offset1" value="0.070436"/>
-         <param name="cc_offset2" value="0.322663"/>
-         <param name="cc_gain0" value="2.427614"/>
-         <param name="cc_gain1" value="2.588687"/>
-         <param name="cc_gain2" value="3.737056"/>
-         <param name="cc_t0" value="-0.076606"/>
-         <param name="cc_t1" value="-0.391771"/>
-         <param name="cc_t2" value="-0.071881"/>
-         <param name="cc_t3" value="0.113333"/>
-         <param name="cc_t4" value="-0.665949"/>
-         <param name="cc_t5" value="0.167904"/> 
+     <param name="cc_mag_field" value="0.537587"/>
+         <param name="cc_offset0" value="-0.084616"/>
+         <param name="cc_offset1" value="-10.312320"/>
+         <param name="cc_offset2" value="1.407356"/>
+         <param name="cc_gain0" value="-0.683332"/>
+         <param name="cc_gain1" value="0.096466"/>
+         <param name="cc_gain2" value="6.167360"/>
+         <param name="cc_t0" value="-0.002602"/>
+         <param name="cc_t1" value="-0.084012"/>
+         <param name="cc_t2" value="-0.002645"/>
+         <param name="cc_t3" value="0.001530"/>
+         <param name="cc_t4" value="-0.205282"/>
+         <param name="cc_t5" value="0.441726"/> 
   </node>
 
   #### IMU Orientation Filter ###############################################
@@ -47,6 +47,5 @@
   </node>
 
 </launch>
-
 
 
