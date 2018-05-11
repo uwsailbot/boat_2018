@@ -13,6 +13,7 @@ from sensor_msgs.msg import Imu, Joy
 from std_msgs.msg import Float32, Int32, Bool
 from rosgraph_msgs.msg import Clock
 from tf.transformations import quaternion_from_euler
+from nav_mgs.msg import Odometry
 #from OpenGL.GL import *
 from OpenGL.GLUT import *
 from sys import argv
@@ -219,6 +220,12 @@ def lps_callback(lps):
 	
 	if sim_mode is SimMode.REPLAY or sim_mode is SimMode.CONTROLLER:
 		pos = lps
+
+def odom_callback(odom):
+	global pos
+	
+	if sim_mode is SimMode.REPLAY or sim_mode is SimMode.CONTROLLER:
+		pos = Point(odom.pose.pose.position.x, odom.pose.pose.position.y)
 
 def compass_callback(compass):
 	global heading
@@ -1262,7 +1269,8 @@ def listener():
 	rospy.Subscriber('mock_true_wind', Float32, mock_true_wind_callback)
 	
 	# subscribers for replay mode
-	rospy.Subscriber('lps', Point, lps_callback)
+	#rospy.Subscriber('lps', Point, lps_callback)
+	rospy.Subscriber('odometry/filtered', Odometry, odom_callback)
 	rospy.Subscriber('compass', Float32, compass_callback)
 	rospy.Subscriber('anemometer', Float32, anemometer_callback)
 	rospy.Subscriber('rudder_pid/output', Float32, rudder_output_callback)
