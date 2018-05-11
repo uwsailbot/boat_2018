@@ -92,6 +92,7 @@ class TackingAction(object):
 		self.pid_enable_pub.publish(Bool(False))
 		
 		self.init_target = self.target_heading
+		self.rudder_pos = 0
 		
 		while not success and not preempted:
 			# start executing the action

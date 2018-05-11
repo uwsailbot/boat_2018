@@ -336,6 +336,7 @@ def station_keeper_planner():
 	if station_timeout:
 		if is_within_dist(cur_pos, gps_to_lps(target_waypoint.pt).pt, buoy_tol):
 			state.minor = BoatState.MIN_COMPLETE
+			state.challenge = BoatState.CHA_NAV
 			boat_state_pub.publish(state)
 			station_timeout = False
 			rospy.loginfo(rospy.get_caller_id() + " Exited box. Boat State = 'Autonomous - Complete'")
