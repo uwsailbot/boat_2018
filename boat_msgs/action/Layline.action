@@ -1,5 +1,7 @@
-#goal definition -1, 1
-int32 direction
+#goal definition
+Waypoint target
+float32 alt_tack_angle
+float32 overshoot_angle
 ---
 #result definition
 bool success

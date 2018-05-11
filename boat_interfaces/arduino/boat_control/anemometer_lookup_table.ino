@@ -1,16 +1,14 @@
-const int LookupTableLength = 6;
+const int LookupTableLength = 5;
 float lookupTable[LookupTableLength][2] = {
-  // format: {apparent direction, true direction}
+  // each entry has format: {apparent direction, true direction}
   // have at least 2 entries here!
-  // max of 180 degrees between the apparent directions of one entry and the next
-
-  //these are test values please don't go into competition with these
-  {0, 5},
-  {189.9, 60},
-  {270.5, 190.8},
-  {350, 42},
-  {300, 40.4},
-  {10.2, 20},
+  // max of 180 degrees between the apparent directions of one entry and the next.
+  // ensure that the LookupTableLength constants above matches that amount of entries here.
+  {0, 0},
+  {60, 60},
+  {120, 120},
+  {180, 180},
+  {240, 240}
 };
 
 //call this in setup if you don't want to manually sort the lookup table

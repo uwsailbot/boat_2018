@@ -31,18 +31,31 @@ def joy_callback(controller):
 	if not controller.buttons[4] and controller.buttons[5] and not controller.buttons[8] and state.major != BoatState.MAJ_AUTONOMOUS:
 		state.major = BoatState.MAJ_AUTONOMOUS
 		state.minor = BoatState.MIN_COMPLETE
+		#state.challenge = BoatState.CHA_NAV
 		pub.publish(state)
 	
 	# If L1 is pushed but R1 and PS aren't, set mode = RC
 	elif controller.buttons[4] and not controller.buttons[5] and not controller.buttons[8] and state.major != BoatState.MAJ_RC:
 		state.major = BoatState.MAJ_RC
 		state.minor = BoatState.MIN_COMPLETE
+		state.challenge = BoatState.CHA_NAV
 		pub.publish(state)
 	
 	# If PS is pushed but L1 and R1 aren't, set mode = disabled
 	elif not controller.buttons[4] and not controller.buttons[5] and controller.buttons[8] and state.major != BoatState.MAJ_DISABLED:
 		state.major = BoatState.MAJ_DISABLED
 		state.minor = BoatState.MIN_COMPLETE
+		state.challenge = BoatState.CHA_NAV
+		pub.publish(state)
+
+	# If PS is pushed but L1 and R1 aren't, set mode = disabled
+	elif controller.buttons[1] and not controller.buttons[3]:
+		state.challenge = (state.challenge - 1) % 5
+		pub.publish(state)
+
+	# If PS is pushed but L1 and R1 aren't, set mode = disabled
+	elif not controller.buttons[1] and controller.buttons[3]:
+		state.challenge = (state.challenge + 1) % 5
 		pub.publish(state)
 
 	# x is pressed then request a tack
@@ -51,10 +64,10 @@ def joy_callback(controller):
 		# If a tack is requested, figure out which side we are tacking and set the rudder accordingly
 		if ane_reading > 180:
 			tacking_direction = -1
-			goal = TackingGoal(direction = tacking_direction, boat_state = state)
+			goal = TackingGoal(direction = tacking_direction)
 		else:
 			tacking_direction = 1
-			goal = TackingGoal(direction = tacking_direction, boat_state = state)
+			goal = TackingGoal(direction = tacking_direction)
 		client.send_goal(goal)
 
 	

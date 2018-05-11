@@ -5,9 +5,9 @@ from sensor_msgs.msg import Joy
 from std_msgs.msg import Bool, Float32, Int32
 
 ane_reading = 0
-layline = rospy.get_param('/boat/layline')  # Closest angle we can sail to the wind
-winch_min = rospy.get_param('/boat/winch_min')
-winch_max = rospy.get_param('/boat/winch_max')
+layline = rospy.get_param('/boat/nav/layline')  # Closest angle we can sail to the wind
+winch_min = rospy.get_param('/boat/interfaces/winch_min')
+winch_max = rospy.get_param('/boat/interfaces/winch_max')
 winch_pub = rospy.Publisher('winch', Int32, queue_size=10)
 state = BoatState()
 winch_pos = winch_max

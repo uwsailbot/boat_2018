@@ -9,7 +9,7 @@ from tf.transformations import euler_from_quaternion
 
 # Declare global variables needed for the node
 origin_lps = Point()
-RADIUS = rospy.get_param('/boat/radius')
+RADIUS = rospy.get_param('/boat/nav/radius')
 
 # Declare the publishers for the node
 gps_pub = rospy.Publisher('odometry_navsatfix', NavSatFix, queue_size=10)
@@ -123,6 +123,7 @@ def listener():
 	
 	# Setup first so that simulator can send the origin point
 	srv1 = rospy.Service('lps_to_gps', ConvertPoint, lps_to_gps_srv)
+
 	
 	# setup the origin
 	origin_coords = rospy.wait_for_message('gps_raw', GPS)

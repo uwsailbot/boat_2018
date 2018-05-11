@@ -12,7 +12,7 @@ setpoint = 0
 pid_input = 0
 
 # TODO: Modify this to make the PID node generalizable and usable for multiple controllers
-max_range = (rospy.get_param('/boat/rudder_max') - rospy.get_param('/boat/rudder_min')) / 2.0
+max_range = (rospy.get_param('/boat/interfaces/rudder_max') - rospy.get_param('/boat/interfaces/rudder_min')) / 2.0
 
 
 # If the boat state topic changes, update local boat state
