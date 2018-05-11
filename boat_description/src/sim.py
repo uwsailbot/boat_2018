@@ -1055,10 +1055,12 @@ def calc(_):
 	dt = real_dt * speed
 	last_time = time.time()
 	clock += dt
-	time_msg = Clock()
-	time_msg.clock.secs = clock
-	time_msg.clock.nsecs = (clock % 1) * (10**9)
-	clock_pub.publish(time_msg)
+
+	if sim_mode is SimMode.DEFAULT:
+		time_msg = Clock()
+		time_msg.clock.secs = clock
+		time_msg.clock.nsecs = (clock % 1) * (10**9)
+		clock_pub.publish(time_msg)
 
 	if follow_boat:
 		camera.x = pos.x
