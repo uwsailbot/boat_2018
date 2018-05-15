@@ -81,6 +81,8 @@ fov_radius = 15
 fov_angle = 60
 vision_points_gps = PointArray()
 vision_points_lps = PointArray()
+reset_origin_on_next_gps=False
+
 
 # ROS data
 wind_heading = 270
@@ -119,13 +121,13 @@ wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 10)
 gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
 orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
 joy_pub = rospy.Publisher('joy', Joy, queue_size = 10)
+origin_override_pub = rospy.Publisher('origin_override', Point, queue_size = 10)
 square_pub = rospy.Publisher('bounding_box', PointArray, queue_size = 10)
 search_area_pub = rospy.Publisher('search_area', PointArray, queue_size = 10)
 clock_pub = rospy.Publisher('clock', Clock, queue_size = 1)
 vision_pub = rospy.Publisher('vision', PointArray, queue_size = 10)
 to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
 to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
-
 
 def update_gps():
 	gps = GPS()
@@ -136,7 +138,7 @@ def update_gps():
 	gps.track = (450-heading)%360
 	gps.speed = boat_speed * 1.94384 # m/s to KNOTS
 	gps_pub.publish(gps)
-	
+
 	orientation = quaternion_from_euler(0,0,math.radians(heading))
 	imu = Imu()
 	
@@ -260,9 +262,17 @@ def rudder_enable_callback(enabled):
 	global rudder_enable
 	rudder_enable = enabled.data
 
-def gps_raw_callback(gps_raw):
+def gps_raw_callback(gps):
 	global replay_gps_raw
-	replay_gps_raw = gps_raw
+	global reset_origin_on_next_gps
+	replay_gps_raw = gps
+	
+	if reset_origin_on_next_gps:
+		reset_origin_on_next_gps = False
+		new_origin = Point()
+		new_origin.x = gps.longitude
+		new_origin.y = gps.latitude
+		origin_override_pub.publish(new_origin)
 	
 def obstacles_callback(obstacles):
 	global obstacle_points
@@ -494,7 +504,8 @@ def ASCII_handler(key, mousex, mousey):
 	global display_path
 	global path
 	global follow_boat
-	
+	global reset_origin_on_next_gps
+
 	# Handle cheat codes
 	cur_input += key;
 	valid = False
@@ -517,10 +528,13 @@ def ASCII_handler(key, mousex, mousey):
 	elif key is 'm':
 		if sim_mode is SimMode.DEFAULT:
 			sim_mode = SimMode.REPLAY
+			reset_origin_on_next_gps = True
 		elif sim_mode is SimMode.REPLAY:
 			sim_mode = SimMode.CONTROLLER
+			reset_origin_on_next_gps = True
 		else:
 			sim_mode = SimMode.DEFAULT
+			reset_origin_on_next_gps = False
 		print 'Changed sim mode, is now', sim_mode
 	elif key is 'i':
 		show_details = not show_details
@@ -907,8 +921,8 @@ def draw_detailed_status():
 	draw_text("GPS Raw:", panel_width/2, win_height*gps_offset, 'center', 18)
 	draw_text("status: %f" % replay_gps_raw.status, panel_width/2, win_height*gps_offset-20, 'center')
 	draw_text("satellites_used: %.1f" % replay_gps_raw.satellites_used, panel_width/2, win_height*gps_offset-35, 'center')
-	draw_text("lat: %.0000001f" % replay_gps_raw.latitude, panel_width/2, win_height*gps_offset-50, 'center')
-	draw_text("long: %.0000001f" % replay_gps_raw.longitude, panel_width/2, win_height*gps_offset-65, 'center')
+	draw_text("lat: %.000000001f" % replay_gps_raw.latitude, panel_width/2, win_height*gps_offset-50, 'center')
+	draw_text("long: %.000000001f" % replay_gps_raw.longitude, panel_width/2, win_height*gps_offset-65, 'center')
 	draw_text("alt: %.0000001f" % replay_gps_raw.altitude, panel_width/2, win_height*gps_offset-80, 'center')
 	draw_text("track: %.0000001f" % replay_gps_raw.track, panel_width/2, win_height*gps_offset-95, 'center')
 	draw_text("speed: %.001f" % replay_gps_raw.speed, panel_width/2, win_height*gps_offset-110, 'center')
