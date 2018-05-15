@@ -2,8 +2,7 @@
 import actionlib
 import rospy
 import time
-from boat_msgs.msg import BoatState, TackingAction, TackingGoal
-from sensor_msgs.msg import Joy
+from boat_msgs.msg import BoatState, TackingAction, TackingGoal, Joy
 from std_msgs.msg import Float32
 
 state = BoatState()
@@ -26,58 +25,44 @@ def joy_callback(controller):
 	global state
 	global tacking_direction
 	rate = rospy.Rate(100)
-	
-	# If R1 is pushed but L1 and PS aren't, set mode = autonomous
-	if not controller.buttons[4] and controller.buttons[5] and not controller.buttons[8] and state.major != BoatState.MAJ_AUTONOMOUS:
+	# If switch A is in the up position, set auto
+	if controller.switch_a == Joy.SWITCH_UP and state.major is not BoatState.MAJ_AUTONOMOUS:
 		state.major = BoatState.MAJ_AUTONOMOUS
 		state.minor = BoatState.MIN_COMPLETE
 		#state.challenge = BoatState.CHA_NAV
 		pub.publish(state)
 	
-	# If L1 is pushed but R1 and PS aren't, set mode = RC
-	elif controller.buttons[4] and not controller.buttons[5] and not controller.buttons[8] and state.major != BoatState.MAJ_RC:
+	# If switch A is in the neutral position, set rc
+	elif controller.switch_a == Joy.SWITCH_MIDDLE and state.major is not BoatState.MAJ_RC:
 		state.major = BoatState.MAJ_RC
 		state.minor = BoatState.MIN_COMPLETE
 		state.challenge = BoatState.CHA_NAV
 		pub.publish(state)
 	
-	# If PS is pushed but L1 and R1 aren't, set mode = disabled
-	elif not controller.buttons[4] and not controller.buttons[5] and controller.buttons[8] and state.major != BoatState.MAJ_DISABLED:
+	# If switch A is in the down position, set disabled
+	elif controller.switch_a == Joy.SWITCH_DOWN and state.major is not BoatState.MAJ_DISABLED:
 		state.major = BoatState.MAJ_DISABLED
 		state.minor = BoatState.MIN_COMPLETE
 		state.challenge = BoatState.CHA_NAV
 		pub.publish(state)
 
-	# If PS is pushed but L1 and R1 aren't, set mode = disabled
-	elif controller.buttons[1] and not controller.buttons[3]:
-		state.challenge = (state.challenge - 1) % 5
+	# Use VR nob to switch challenge modes
+	if controller.vr < 200 and state.challenge is not BoatState.CHA_STATION:
+		state.challenge = BoatState.CHA_STATION
+		pub.publish(state)
+	elif controller.vr >= 200 and controller.vr < 400 and state.challenge is not BoatState.CHA_LONG:
+		state.challenge = BoatState.CHA_LONG
+		pub.publish(state)
+	elif controller.vr >= 400 and controller.vr < 600 and state.challenge is not BoatState.CHA_NAV:
+		state.challenge = BoatState.CHA_NAV
+		pub.publish(state)
+	elif controller.vr >= 600 and controller.vr < 800 and state.challenge is not BoatState.CHA_SEARCH:
+		state.challenge = BoatState.CHA_SEARCH
+		pub.publish(state)
+	elif controller.vr >= 800 and state.challenge is not BoatState.CHA_AVOID:
+		state.challenge = BoatState.CHA_AVOID
 		pub.publish(state)
 
-	# If PS is pushed but L1 and R1 aren't, set mode = disabled
-	elif not controller.buttons[1] and controller.buttons[3]:
-		state.challenge = (state.challenge + 1) % 5
-		pub.publish(state)
-
-	# x is pressed then request a tack
-	if controller.buttons[0] and state.major is BoatState.MAJ_RC:
-		rospy.loginfo(rospy.get_caller_id() + "Tack requested.")
-		# If a tack is requested, figure out which side we are tacking and set the rudder accordingly
-		if ane_reading > 180:
-			tacking_direction = -1
-			goal = TackingGoal(direction = tacking_direction)
-		else:
-			tacking_direction = 1
-			goal = TackingGoal(direction = tacking_direction)
-		client.send_goal(goal)
-
-	
-	# o is pressed, therefore cancelling a previously requested tack
-	elif controller.buttons[2] and state.major is BoatState.MAJ_RC:
-		# Reset rudder and change tacking state
-		tacking_direction = 0
-		rospy.loginfo(rospy.get_caller_id() + "Tack cancelled")
-		client.cancel_goal()
-	
 	rate.sleep()
 
 def listener():

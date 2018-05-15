@@ -7,9 +7,9 @@ import pygame
 import rospy
 import time
 from enum import Enum
-from boat_msgs.msg import BoatState, GPS, Point, PointArray, Waypoint, WaypointArray
+from boat_msgs.msg import BoatState, GPS, Point, PointArray, Waypoint, WaypointArray, Joy
 from boat_msgs.srv import ConvertPoint
-from sensor_msgs.msg import Imu, Joy
+from sensor_msgs.msg import Imu
 from std_msgs.msg import Float32, Int32, Bool
 from rosgraph_msgs.msg import Clock
 from tf.transformations import quaternion_from_euler
@@ -93,8 +93,8 @@ rudder_pos = 90
 winch_pos = 2000
 waypoint_gps = WaypointArray()
 joy = Joy()
-joy.axes = [0]*8
-joy.buttons = [0]*11
+joy.vr = 545 # Init to midway point
+joy.right_stick_x = Joy.JOY_RANGE/2.0
 rudder_output = 0
 rudder_input = 0
 rudder_setpoint = 0
@@ -403,20 +403,24 @@ def motion_handler(x,y):
 def keyboard_handler(key, mousex, mousey):
 	global joy
 	if key == GLUT_KEY_LEFT and should_sim_joy:
-		joy.axes[0] = max(joy.axes[0]-0.1, -1)
+		joy.right_stick_x -= 20
+		if joy.right_stick_x < 0:
+			joy.right_stick_x = 0
 		joy_pub.publish(joy)
 	elif key == GLUT_KEY_RIGHT and should_sim_joy:
-		joy.axes[0] = min(joy.axes[0]+0.1, 1)
+		joy.right_stick_x += 20
+		if joy.right_stick_x > Joy.JOY_RANGE:
+			joy.right_stick_x = Joy.JOY_RANGE
 		joy_pub.publish(joy)
 	elif key == GLUT_KEY_UP and should_sim_joy:
-		joy.axes[4] = 1
-		joy_pub.publish(joy)
-		joy.axes[4] = 0
+		joy.left_stick_y += 50
+		if joy.left_stick_y > Joy.JOY_RANGE:
+			joy.left_stick_y = Joy.JOY_RANGE
 		joy_pub.publish(joy)
 	elif key == GLUT_KEY_DOWN and should_sim_joy:
-		joy.axes[4] = -1
-		joy_pub.publish(joy)
-		joy.axes[4] = 0
+		joy.left_stick_y -= 50
+		if joy.left_stick_y < 0:
+			joy.left_stick_y = 0
 		joy_pub.publish(joy)
 
 
@@ -482,47 +486,22 @@ def ASCII_handler(key, mousex, mousey):
 	
 	if sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER:
 		if key is '1' and should_sim_joy:
-			joy.buttons[4] = 1
-			joy.buttons[5] = 0
-			joy.buttons[8] = 0
+			joy.switch_a = Joy.SWITCH_MIDDLE
 			joy_pub.publish(joy)
 		elif key is '2' and should_sim_joy:
-			joy.buttons[4] = 0
-			joy.buttons[5] = 1
-			joy.buttons[8] = 0
+			joy.switch_a = Joy.SWITCH_UP
 			joy_pub.publish(joy)
 		elif key is '3' and should_sim_joy:
-			joy.buttons[4] = 0
-			joy.buttons[5] = 0
-			joy.buttons[8] = 1
+			joy.switch_a = Joy.SWITCH_DOWN
 			joy_pub.publish(joy)
 		elif key is '4' and should_sim_joy:
-			joy.buttons[1] = 1
-			joy.buttons[3] = 0
-			joy_pub.publish(joy)
-			joy.buttons[1] = 0
+			joy.vr = max(joy.vr - 200, 0)
 			joy_pub.publish(joy)
 		elif key is '5' and should_sim_joy:
-			joy.buttons[1] = 0
-			joy.buttons[3] = 1
-			joy_pub.publish(joy)
-			joy.buttons[3] = 0
-			joy_pub.publish(joy)
-		elif key is 't' and should_sim_joy:
-			joy.buttons[0] = 1
-			joy.buttons[2] = 0
-			joy.axes[0] = 0
-			joy_pub.publish(joy)
-			joy.buttons[0] = 0
-			joy_pub.publish(joy)
-		elif key is 'g' and should_sim_joy:
-			joy.buttons[2] = 1
-			joy.buttons[0] = 0
-			joy_pub.publish(joy)
-			joy.buttons[2] = 0
+			joy.vr = min(joy.vr + 200, 200 -1)
 			joy_pub.publish(joy)
 		elif key is 'q':
-			joy.axes[0] = 0
+			joy.right_stick_x = Joy.JOY_RANGE/2.0
 			joy_pub.publish(joy)
 		elif key is 'a':
 			wind_heading += 5
