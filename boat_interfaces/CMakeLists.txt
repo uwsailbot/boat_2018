@@ -107,7 +107,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES boat_interfaces
-  CATKIN_DEPENDS boat_msgs roscpp rospy std_msgs
+#  CATKIN_DEPENDS boat_msgs roscpp rospy std_msgs
 #  DEPENDS system_lib
 )
 
@@ -167,7 +167,6 @@ include_directories(
    src/tacking_action.py
    src/pid.py
    src/boat_state_controller_node.py
-   src/receiver_reader.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 ## Mark executables and/or libraries for installation

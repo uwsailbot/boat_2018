@@ -45,8 +45,7 @@ void rudder_cb( const std_msgs::Float32& cmd_msg){
 }
 
 void winch_cb( const std_msgs::Int32& pos_msg){
-    //map the rotation (0-2160 degrees) to a motor value between 1000 and 2000
-    int position_msg = map(pos_msg.data, 0, 2160, 1000, 2000);
+    //Write the received data in microseconds
     servo_winch.writeMicroseconds(position_msg);
 }
 
