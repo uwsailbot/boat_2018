@@ -498,7 +498,7 @@ def ASCII_handler(key, mousex, mousey):
 			joy.vr = max(joy.vr - 200, 0)
 			joy_pub.publish(joy)
 		elif key is '5' and should_sim_joy:
-			joy.vr = min(joy.vr + 200, 200 -1)
+			joy.vr = min(joy.vr + 200, 1000-1)
 			joy_pub.publish(joy)
 		elif key is 'q':
 			joy.right_stick_x = Joy.JOY_RANGE/2.0

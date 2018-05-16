@@ -37,16 +37,8 @@ def publish_target():
 		k = 1.5
 		
 		next = waypoints[waypoints.index(target_waypoint)+1]
-		print "cur  ", target_waypoint.pt
-		print "next ", next.pt
-		print "boat ", lps_to_gps(cur_pos).pt
-		
 		theta_boat = math.atan2(lps_to_gps(cur_pos).pt.y - target_waypoint.pt.y, lps_to_gps(cur_pos).pt.x - target_waypoint.pt.x)
 		theta_next = math.atan2(next.pt.y - target_waypoint.pt.y, next.pt.x - target_waypoint.pt.x)
-		
-		print "theta_boat", theta_boat
-		print "theta_next", theta_next
-		
 		d_theta = (theta_boat - theta_next + 4 * math.pi) % (2 * math.pi)
 		angle = theta_next + k*(d_theta - math.pi) / 2
 		if d_theta < math.pi:
@@ -54,7 +46,6 @@ def publish_target():
 		else:
 			angle += math.pi / 2
 		
-		print angle/math.pi*180
 		roundPt = Point(target_waypoint.pt.x + math.cos(angle)*r, target_waypoint.pt.y + math.sin(angle)*r)
 		target_waypoint = Waypoint(roundPt, Waypoint.TYPE_ROUND)
 	
