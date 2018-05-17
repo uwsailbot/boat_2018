@@ -690,7 +690,8 @@ def draw_search_area():
 def draw_target_point():
 	if target_point is not () and state.major is BoatState.MAJ_AUTONOMOUS and state.minor is not BoatState.MIN_COMPLETE:
 		glColor3f(1,1,1)
-		(x,y) = camera.lps_to_screen(target_point.pt.x, target_point.pt.y)
+		lps_point = to_lps(target_point.pt).pt
+		(x,y) = camera.lps_to_screen(lps_point.x, lps_point.y)
 		draw_circle(0.7 * camera.scale, x, y)
 
 def draw_obstacles():

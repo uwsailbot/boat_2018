@@ -55,8 +55,7 @@ def publish_target():
 		roundPt = Point(target_waypoint.pt.x + math.cos(angle)*r, target_waypoint.pt.y + math.sin(angle)*r)
 		target_waypoint = Waypoint(roundPt, Waypoint.TYPE_ROUND)
 	
-	target_lps = Waypoint(gps_to_lps(target_waypoint.pt).pt, target_waypoint.type)
-	target_pub.publish(target_lps)
+	target_pub.publish(target_waypoint)
 	##rospy.loginfo(rospy.get_caller_id() + " New target waypoint: (long: %.2f, lat: %.2f) or (x: %.f, y: %.f)", point.x, point.y, local.x, local.y)
 
 
