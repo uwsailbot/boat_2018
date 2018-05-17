@@ -1,0 +1,19 @@
+# Box is a list of boat_msgs/Point-like maps. It should contain 4 maps.
+# The x and y fields describe the point's location
+# The lps field describes whether the x and y should be treated as meters from origin or coordinates
+Box:
+  - x: 20
+    y: 20
+    lps: true
+    
+  - x: 20
+    y: -20
+    lps: true
+    
+  - x: -20
+    y: -20
+    lps: true
+    
+  - x: -20
+    y: 20
+    lps: true

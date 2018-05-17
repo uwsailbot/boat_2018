@@ -1,0 +1,20 @@
+# Path is a list of boat_msgs/Waypoint-like maps
+# The x and y fields describe the point's location
+# The lps field describes whether the x and y should be treated as meters from origin or coordinates
+# The round field describes whether the waypoint should be TYPE_ROUND or TYPE_INTERSECT
+# TODO: Make the round field more versatile for more waypoint types
+Path:
+  - x: -25
+    y: -43
+    round: true
+    lps: true
+    
+  - x: 25
+    y: -43
+    round: true
+    lps: true
+    
+  - x: 0
+    y: 0
+    round: false
+    lps: false

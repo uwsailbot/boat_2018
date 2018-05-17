@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from boat_msgs.msg import BoatState
-from sensor_msgs.msg import Joy
+from boat_msgs.msg import BoatState, Joy
 from std_msgs.msg import Bool, Float32, Int32
 
 ane_reading = 0
@@ -38,25 +37,21 @@ def joy_callback(controller):
 
 	# If we are not in autonomous mode, then use controller to set the sail
 	if state.major is BoatState.MAJ_RC:
-		# Use D-Pad
-		if controller.axes[6] < 0:
-			winch_pos = winch_min + winch_range / 2.0 # 50% in, Beam Reach
-		elif controller.axes[6] > 0:
-			winch_pos = winch_min + winch_range * 3.0 / 2 # 75% in, Broad Reach
-		elif controller.axes[7] < 0:
-			winch_pos = winch_min # 0% in, Run
-		elif controller.axes[7] > 0:
-			winch_pos = winch_max # 100% in, Close Hauled
-		# Use Right Joystick, up to pull in, down to let out
-		# TODO: Increase the sleep on decrease the request value depending how fast the actual winch can pull in
-		elif abs(controller.axes[4]) >= 0.1: 
-			winch_pos += 50 * controller.axes[4]
-			if winch_pos > winch_max:
-				winch_pos = winch_max
-			elif winch_pos < winch_min:
-				winch_pos = winch_min
+		# Use Left Joystick, down to pull in, up to let out
+		scale = winch_range/float(Joy.JOY_RANGE)
+		new_winch_pos = winch_max - controller.left_stick_y * scale 
 
-		winch_pub.publish(Int32(winch_pos))
+		if new_winch_pos > winch_max:
+			new_winch_pos = winch_max
+		elif new_winch_pos < winch_min:
+			new_winch_pos = winch_min
+
+		# Only step in 20, or write if at the endpoints
+		if abs(new_winch_pos - winch_pos) > 20 or (abs(winch_pos - new_winch_pos) > 0.1 and \
+			(abs(new_winch_pos - winch_max) < 0.1 or abs(new_winch_pos - winch_min) < 0.1)):
+			winch_pos = new_winch_pos
+			rospy.loginfo(rospy.get_caller_id() + " Read value: %f", controller.left_stick_y)
+			winch_pub.publish(Int32(winch_pos))
 	rate.sleep()
 
 

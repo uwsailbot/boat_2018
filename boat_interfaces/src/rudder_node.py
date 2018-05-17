@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from boat_msgs.msg import BoatState, GPS
-from sensor_msgs.msg import Joy
+from boat_msgs.msg import BoatState, GPS, Joy
 from std_msgs.msg import Bool, Float32
 
 
@@ -108,7 +107,6 @@ def joy_callback(controller):
 	# Make sure we're in RC control mode
 	if state.major is not BoatState.MAJ_RC or state.minor is BoatState.MIN_TACKING:
 		return
-
 		
 	# Make sure the PID is off
 	if pid_is_enabled:
@@ -116,18 +114,28 @@ def joy_callback(controller):
 		pid_enable_pub.publish(Bool(False))
 		rospy.loginfo(rospy.get_caller_id() + " Disabling rudder PID")
 	
-	
 	# If the boat is not currently tacking, then setup a message to send to the /rudder topic
 	rudder_pos_old = rudder_pos
 	position_msg = Float32()
 	
-	# Set the rudder position
-	position_msg.data = (90 - ((rudder_max-rudder_min)/2.0* controller.axes[0]))
-	
-	# Only publish if the change in rudder angle is greater than 5
-	if abs(position_msg.data - rudder_pos_old) > 5:
+	# Set the rudder position with the right joystick, if close to 90 set dead straight
+	if abs(controller.right_stick_x - (Joy.JOY_RANGE/2.0)) <= 5:
+		position_msg.data = 90.0
+		
+	else:
+		position_msg.data = 90 - (rudder_max-rudder_min)/2.0 * ((controller.right_stick_x-(Joy.JOY_RANGE/2.0))/(Joy.JOY_RANGE/2.0))
+
+	if position_msg.data > rudder_max:
+		position_msg.data = rudder_max
+	elif position_msg.data < rudder_min:
+		position_msg.data = rudder_min
+
+	# Only publish if the change in rudder angle is greater than 2 degrees, or if at the endpoints, or close to the center point publish
+	if abs(position_msg.data - rudder_pos_old) > 2 or (abs(rudder_pos_old - position_msg.data) > 0.1 and \
+		(abs(position_msg.data - rudder_min) < 0.1 or abs(position_msg.data - rudder_max) < 0.1)) or \
+		(abs(controller.right_stick_x - (Joy.JOY_RANGE/2.0)) <= 5 and rudder_pos is not 90.0):
 		rudder_pos_pub.publish(position_msg)
-		rospy.loginfo(rospy.get_caller_id() + " Read value: %f", controller.axes[0])
+		rospy.loginfo(rospy.get_caller_id() + " Read value: %f", controller.right_stick_x)
 		rudder_pos = position_msg.data
 
 # Conform an input angle to range (-180, 180)

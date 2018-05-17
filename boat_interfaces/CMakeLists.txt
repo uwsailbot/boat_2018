@@ -13,7 +13,6 @@ find_package(catkin REQUIRED COMPONENTS
   roslaunch
   roscpp
   rospy
-  sensor_msgs
   std_msgs
 )
 ## System dependencies are found with CMake's conventions
@@ -108,7 +107,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES boat_interfaces
-  CATKIN_DEPENDS boat_msgs roscpp rospy sensor_msgs std_msgs
+#  CATKIN_DEPENDS boat_msgs roscpp rospy std_msgs
 #  DEPENDS system_lib
 )
 
@@ -168,7 +167,6 @@ include_directories(
    src/tacking_action.py
    src/pid.py
    src/boat_state_controller_node.py
-   src/receiver_reader.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 ## Mark executables and/or libraries for installation
@@ -188,7 +186,6 @@ include_directories(
 ## Mark other files for installation (e.g. launch and bag files, etc.)
  install(FILES
    launch/interfaces_base.launch
-   launch/interfaces_ps4.launch
    # myfile2
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
  )

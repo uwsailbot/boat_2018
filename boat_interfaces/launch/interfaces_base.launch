@@ -3,15 +3,15 @@
   <!-- Boat Interface nodes -->
   <rosparam file ="$(find boat_interfaces)/config/parameters.yaml" command="load" />
   <node pkg="boat_interfaces" type="boat_state_controller_node.py"
-    name="boat_state_controller">
+    name="boat_state_controller" output="screen">
   </node>
 
   <node pkg="boat_interfaces" type="rudder_node.py"
-    name="rudder">
+    name="rudder" output="screen">
   </node> 
 
   <node pkg="boat_interfaces" type="winch_node.py"
-    name="winch" >
+    name="winch" output="screen" >
   </node>
 
   <node pkg="boat_interfaces" type="tacking_action.py"

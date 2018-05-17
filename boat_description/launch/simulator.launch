@@ -12,7 +12,7 @@
     </node>
     <!-- Launches usb_joy node for the ps4 controller -->
     <node pkg="boat_description" type="usb_joy.py" 
-      name="usb_joy" output="screen" >
+      name="usb_joy" output="screen" > 
     </node>
   </group>
 

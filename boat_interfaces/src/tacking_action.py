@@ -92,6 +92,7 @@ class TackingAction(object):
 		self.pid_enable_pub.publish(Bool(False))
 		
 		self.init_target = self.target_heading
+		self.rudder_pos = 0
 		
 		while not success and not preempted:
 			# start executing the action
@@ -108,8 +109,6 @@ class TackingAction(object):
 						self.state.minor = BoatState.MIN_COMPLETE
 					else:
 						self.state.minor = BoatState.MIN_PLANNING
-					self.rudder_pos = 90.0
-					self.rudder_pos_pub.publish(Float32(self.rudder_pos))
 					self.state_pub.publish(self.state)
 					print "Tacking success: ", goal.direction, self.ane_reading
 					success = True
@@ -127,16 +126,12 @@ class TackingAction(object):
 						self.state.minor = BoatState.MIN_COMPLETE
 					else:
 						self.state.minor = BoatState.MIN_PLANNING
-					self.rudder_pos = 90.0
-					self.rudder_pos_pub.publish(Float32(self.rudder_pos))
 					self.state_pub.publish(self.state)
 					print "Tacking success: ", goal.direction, self.ane_reading
 					success = True
 
 			if self._as.is_preempt_requested():
 				rospy.loginfo('Tacking Action: Preempted')
-				self.rudder_pos = 90.0
-				self.rudder_pos_pub.publish(Float32(self.rudder_pos))
 				if self.state.major is not BoatState.MAJ_AUTONOMOUS:
 					self.state.minor = BoatState.MIN_COMPLETE
 				else:
