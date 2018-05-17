@@ -802,7 +802,7 @@ def draw_status():
 	
 	# Draw the wind readout
 	glColor3f(0.0, 0.0, 0.0)
-	draw_text("Wind: " + str(wind_heading), win_width-60, win_height-20, 'center')
+	draw_text("Wind: %.1f" % wind_heading, win_width-60, win_height-20, 'center')
 	draw_wind_arrow(win_width-60,win_height-65)
 	
 	# Draw wind speed text
