@@ -39,7 +39,8 @@ camera_move_speed = 100
 camera_velocity = Point(0, 0)
 # should camera follow boat?
 follow_boat = False
-
+#raw mouse records
+mouse_pos = Point()
 
 # Resources
 compass_img = ()
@@ -108,11 +109,17 @@ target_point = Waypoint()
 gps_bounding_box = PointArray()
 
 # ROS data -- search
-local_search_area = PointArray() # in lps, first point is center of cirlce, second is on edge
-gps_search_area = PointArray() # in gps, first point is center of circle, second is on edge
-search_radius = 0 # local radius of circle
-search_target = Point()
-search_target_set = False
+class SearchArea:
+
+	def __init__(self, center, radius, target):
+		self.center = center
+		self.radius = radius
+		self.target = target
+
+gps_search_area = PointArray() # in gps, first point is center of circle, second is on edge, record of ros data
+search_area = SearchArea(None, 0, None) # for use in simulator only
+
+	
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -176,9 +183,10 @@ def update_vision():
 		lps = to_lps(waypoint.pt).pt
 		if point_is_in_fov(lps):
 			vision_points_gps.points.append(waypoint.pt)
-	if point_is_in_fov(search_target):
-		vision_points_gps.points.append(to_gps(search_target).pt)
-
+	
+	if search_area.target is not None and point_is_in_fov(search_area.target):
+		vision_points_gps.points.append(to_gps(search_area.target).pt)
+			
 	vision_pub.publish(vision_points_gps)
 
 def update_wind():
@@ -285,22 +293,21 @@ def bounding_box_callback(box):
 
 def search_area_callback(new_search_area):
 	global gps_search_area
-	global local_search_area
-	global search_radius
 
 	gps_search_area = new_search_area
-	local_search_area = PointArray()
-	for point in gps_search_area.points:
-		local_search_area.points.append(to_lps(point).pt)
-
-	if len(local_search_area.points) < 2:
-		return
-
-	# first point is center and second defines radius from center
-	# calc readius
-	dx = (local_search_area.points[1].x - local_search_area.points[0].x)
-	dy = (local_search_area.points[1].y - local_search_area.points[0].y)
-	search_radius = math.sqrt(dx*dx+dy*dy)
+	if len(gps_search_area.points) >= 1:
+		search_area.center = to_lps(gps_search_area.points[0]).pt
+		if len(gps_search_area.points) >= 2:
+			edge_point = to_lps(gps_search_area.points[1]).pt
+			# first point is center and second defines radius from center
+			# calc radius
+			dx = (search_area.center.x - edge_point.x)
+			dy = (search_area.center.y - edge_point.y)
+			search_area.radius = math.sqrt(dx*dx+dy*dy)
+		else:
+			search_area.radius = 0
+	else:
+		search_area.center = None
 
 def target_point_callback(target_pt):
 	global target_point
@@ -338,8 +345,7 @@ def mouse_handler(button, mouse_state, x, y):
 	global cur_slider
 	global gps_bounding_box
 	global gps_search_area
-	global search_target_set
-	global search_target
+	global search_area
 	
 	if mouse_state != GLUT_DOWN:
 		cur_slider = ()
@@ -358,7 +364,7 @@ def mouse_handler(button, mouse_state, x, y):
 			waypoint_gps = WaypointArray()
 			gps_bounding_box = PointArray()
 			gps_search_area = PointArray()
-			search_target_set = False
+			search_area.target = None
 			waypoint_pub.publish(waypoint_gps)
 			square_pub.publish(gps_bounding_box)
 			search_area_pub.publish(gps_search_area)
@@ -402,14 +408,16 @@ def mouse_handler(button, mouse_state, x, y):
 		new_point = to_gps(Point(lps_x, lps_y)).pt
 
 		if len(gps_search_area.points) == 2:
-			if search_target_set:
-				# Reset if we were gonna add to a list of 2 points and a target already
-				search_target_set = False
-				gps_search_area = PointArray()
-			else:
+			if search_area.target is None:
 				# set search target
-				search_target_set = True
-				search_target = to_lps(new_point).pt
+				# no other nodes need to know this since this is for testing only,
+				# so we can just do it here and not publish anything 
+				search_area.target = to_lps(new_point).pt #TODO fix this when lps origin is shifted.
+			else:
+				# Reset if we were gonna add to a list of 2 points and a target already
+				search_area.target = None
+				gps_search_area = PointArray()
+				gps_search_area.points.append(new_point)
 		else:
 			gps_search_area.points.append(new_point)
 		
@@ -438,8 +446,12 @@ def mouse_handler(button, mouse_state, x, y):
 
 # Handler for mouse position
 def passive_mouse_handler(x,y):
+	global mouse_pos
 	global camera_velocity
-	
+
+	#save mouse pos
+	mouse_pos = Point(x,y)
+
 	# if mouse is on right info panel, don't move camera
 	if x > win_width-120:
 		camera_velocity.x = 0
@@ -668,23 +680,35 @@ def draw_bounding_box():
 def draw_search_area():
 	glPushMatrix()
 
-	glColor3f(0,1,0)
-	for p in local_search_area.points:
-		(x,y) = camera.lps_to_screen(p.x, p.y)
-		draw_circle(0.5 * camera.scale,x,y)
-	if search_target_set:
-		glColor3f(1,1,0)
-		(x,y) = camera.lps_to_screen(search_target.x, search_target.y)
-		draw_circle(0.5 * camera.scale,x,y)
-	if len(local_search_area.points) == 2:
+	if search_area.center is not None:
+		# draw center point
+		(center_x,center_y) = camera.lps_to_screen(search_area.center.x, search_area.center.y)
+		glColor3f(0,1,0)
+		draw_circle(0.5 * camera.scale,center_x,center_y)
+
+		# draw circle around center
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 		glEnable(GL_BLEND)
-		glColor4f(0, 1, 1, 0.2)
-		search_center = local_search_area.points[0]
-		(center_x,center_y) = camera.lps_to_screen(search_center.x, search_center.y)
-		draw_circle(search_radius*camera.scale, center_x, center_y, 50)
+		if search_area.radius > 0:
+			# draw actual circle
+			glColor4f(0, 1, 1, 0.2)
+			draw_circle(search_area.radius*camera.scale, center_x, center_y, 50)
+			glDisable(GL_BLEND)
+		else:
+			# preview the circle based on mouse pos
+			(mouse_x, mouse_y) = camera.screen_to_lps(mouse_pos.x, mouse_pos.y)
+			dx = (search_area.center.x - mouse_x)
+			dy = (search_area.center.y - mouse_y)
+			radius = math.sqrt(dx*dx+dy*dy)
+			glColor4f(0, 1, 1, 0.1)
+			draw_circle(radius*camera.scale, center_x, center_y, 50)
 		glDisable(GL_BLEND)
-		
+	
+	if search_area.target is not None:
+		(target_x,target_y) = camera.lps_to_screen(search_area.target.x, search_area.target.y)
+		glColor3f(1,1,0)
+		draw_circle(0.5 * camera.scale,target_x,target_y)
+
 	glPopMatrix()
 
 def draw_target_point():
