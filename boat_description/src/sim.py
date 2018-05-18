@@ -115,11 +115,73 @@ class SearchArea:
 		self.center = center
 		self.radius = radius
 		self.target = target
+		self.sections = None
+
+	def setup_coverage(self, resolution=4):
+		if self.center is None or self.radius is 0 or self.target is None:
+			print("Tried to setup coverage check for search but search area was not completely setup (c:%s r:%s t:%s)" % (self.center, self.radius, self.target))
+			return
+		self.resolution = int(resolution)
+		self.grid_size = float(fov_radius)/self.resolution
+		sections = []
+		sections_per_half_row = int(float(self.radius)/fov_radius)+1
+		self.sections_per_row = sections_per_half_row*2
+
+		for i in range(-sections_per_half_row, sections_per_half_row):
+			section_x = self.center.x + fov_radius*i
+			for j in range(-sections_per_half_row, sections_per_half_row):
+				section_y = self.center.y + fov_radius*j
+				section = []
+				for k in range(0, self.resolution):
+					x = section_x + (k+0.5)*self.grid_size
+					for l in range(0, self.resolution):
+						y = section_y + (l+0.5)*self.grid_size
+						if (self.center.x-x)**2+(self.center.y-y)**2 < self.radius**2:
+							section.append(Point(x,y))
+				sections.append(section)
+		self.sections = sections
+	
+	def update_coverage_section(self, x_section, y_section):
+		section_index = x_section*self.sections_per_row + y_section
+		to_remove = []
+		try:
+			for point in self.sections[section_index]:
+				if point_is_in_fov(point):
+					to_remove.append(point)
+			for point in to_remove:
+				self.sections[section_index].remove(point)
+		except IndexError:
+			pass
+		
+	def update_coverage(self):
+		if self.center is None or self.radius is 0 or self.target is None:
+			return
+		dx = pos.x-self.center.x
+		dy = pos.y-self.center.y
+		if dx**2 + dy**2 < (self.radius+fov_radius)**2:
+			if dx<0:
+				dx-=fov_radius # account for int trunction of neg numbers in next line
+			x_section = int(dx/fov_radius)+self.sections_per_row/2
+			if dy<0:
+				dy-=fov_radius # account for int trunction of neg numbers in next line
+			y_section = int(dy/fov_radius)+self.sections_per_row/2
+
+			# update current section and 8 adjacent sections
+			self.update_coverage_section(x_section, y_section)
+			self.update_coverage_section(x_section, y_section-1)
+			self.update_coverage_section(x_section, y_section+1)
+			self.update_coverage_section(x_section-1, y_section)
+			self.update_coverage_section(x_section-1, y_section-1)
+			self.update_coverage_section(x_section-1, y_section+1)
+			self.update_coverage_section(x_section+1, y_section)
+			self.update_coverage_section(x_section+1, y_section-1)
+			self.update_coverage_section(x_section+1, y_section+1)
+			
 
 gps_search_area = PointArray() # in gps, first point is center of circle, second is on edge, record of ros data
 search_area = SearchArea(None, 0, None) # for use in simulator only
 
-	
+
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -167,9 +229,11 @@ def point_is_in_fov(point):
 	if dx*dx + dy*dy < fov_radius*fov_radius:
 		# within angle
 		angle = math.degrees(math.atan2(dy, dx))
-		if angle < 0:
-			angle += 360
 		if abs(angle-heading) < fov_angle / 2:
+			return True
+		if abs(angle+360-heading) < fov_angle / 2:
+			return True
+		if abs(angle-360-heading) < fov_angle / 2:
 			return True
 	return False
 
@@ -186,7 +250,12 @@ def update_vision():
 	
 	if search_area.target is not None and point_is_in_fov(search_area.target):
 		vision_points_gps.points.append(to_gps(search_area.target).pt)
-			
+
+	# TODO place this somewhere better
+	# update search_area coverage, need to call this often
+	if state.challenge is BoatState.CHA_SEARCH:
+		search_area.update_coverage()
+	
 	vision_pub.publish(vision_points_gps)
 
 def update_wind():
@@ -413,6 +482,7 @@ def mouse_handler(button, mouse_state, x, y):
 				# no other nodes need to know this since this is for testing only,
 				# so we can just do it here and not publish anything 
 				search_area.target = to_lps(new_point).pt #TODO fix this when lps origin is shifted.
+				search_area.setup_coverage()
 			else:
 				# Reset if we were gonna add to a list of 2 points and a target already
 				search_area.target = None
@@ -704,10 +774,33 @@ def draw_search_area():
 			draw_circle(radius*camera.scale, center_x, center_y, 50)
 		glDisable(GL_BLEND)
 	
-	if search_area.target is not None:
-		(target_x,target_y) = camera.lps_to_screen(search_area.target.x, search_area.target.y)
-		glColor3f(1,1,0)
-		draw_circle(0.5 * camera.scale,target_x,target_y)
+		if search_area.target is not None:
+			# draw target
+			(target_x,target_y) = camera.lps_to_screen(search_area.target.x, search_area.target.y)
+			glColor3f(1,1,0)
+			draw_circle(0.5 * camera.scale,target_x,target_y)
+
+			# draw coverage
+			if search_area.sections is not None:
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+				glEnable(GL_BLEND)
+				glColor4f(1, 1, 0, 0.1)
+
+				glPushMatrix()
+				
+				glBegin(GL_QUADS)
+				grid_extent = search_area.grid_size/2*camera.scale
+				for section in search_area.sections:
+					for point in section:
+						(x, y) = camera.lps_to_screen(point.x, point.y)
+						glVertex2f(x+grid_extent, y-grid_extent)
+						glVertex2f(x-grid_extent, y-grid_extent)
+						glVertex2f(x-grid_extent, y+grid_extent)
+						glVertex2f(x+grid_extent, y+grid_extent)
+				glEnd()
+
+				glPopMatrix()
+				glDisable(GL_BLEND)
 
 	glPopMatrix()
 
