@@ -52,6 +52,17 @@ int ch_3_buf [BUFFER_SIZE] = {0};
 int ch_6_buf [BUFFER_SIZE] = {0};
 int counter = 0;
 
+int average(int buffer[]){
+  int sum = 0;
+  int valid_data_counter = 0;
+  for(int i = 0; i < BUFFER_SIZE; i++){
+    sum += buffer[i];
+    if (buffer[i] != 0){
+      valid_data_counter ++;
+    }
+  }
+  return sum/valid_data_counter;
+}
 
 float mapf(float value, float fromLow, float fromHigh, float toLow, float toHigh){
     return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow;
