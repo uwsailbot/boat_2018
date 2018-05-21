@@ -66,20 +66,26 @@ def boat_state_callback(new_state):
 	prev_state = state
 	state = new_state
 	
+	if state.major is not BoatState.MAJ_AUTONOMOUS:
+		return
+	
+	new_cha = state.challenge is not prev_state.challenge
+	new_maj = state.major is not prev_state.major
+	
+	# For if search area is already present when we switch to search mode
+	if state.challenge is BoatState.CHA_SEARCH and (new_cha or new_maj)  and search_radius > 0:
+		search_setup()
+	
 	# For if bounding box is already present when we switch to station mode
-	if ((state.challenge is BoatState.CHA_STATION and prev_state.challenge is not BoatState.CHA_STATION) or\
-		(state.major is BoatState.MAJ_AUTONOMOUS and prev_state.major is not BoatState.MAJ_AUTONOMOUS)) and len(box) is 4:
+	if state.challenge is BoatState.CHA_STATION and (new_cha or new_maj) and len(box) is 4:
 		rospy.Timer(rospy.Duration(5*60), station_timer_callback, oneshot=True)
 		station_setup()
 	
-	# Move to planning state if there is a pending waypoint
-	if state.major is BoatState.MAJ_AUTONOMOUS and state.minor is BoatState.MIN_COMPLETE and len(waypoints)>0:
+	# Whenever we switch into nav or distance, startup the waypoints callback to load the first waypoint, and switch from INITIALIZE to PLANNING
+	if (state.challenge is BoatState.CHA_NAV or state.challenge is BoatState.CHA_LONG) and (new_cha or new_maj)and  len(waypoints)>0:
 		waypoints_callback(WaypointArray(waypoints))
 		state.minor = BoatState.MIN_PLANNING
 		boat_state_pub.publish(state)
-		
-	
-	#TODO: if station, load points from list and publish them
 
 def anemometer_callback(anemometer):
 	global ane_reading
@@ -164,22 +170,9 @@ def bounding_box_callback(bounding_box):
 	if state.challenge is BoatState.CHA_STATION and len(box) is 4:
 		rospy.Timer(rospy.Duration(5*60), station_timer_callback, oneshot=True)
 		station_setup()
-				
-	
-def dist_from_line(start_point, end_point):
-	cur_pos_gps = lps_to_gps(cur_pos).pt
-	if (end_point.x - start_point.x) <= 0.0001:
-		return cur_pos_gps.x - end_point.x
-	m = (end_point.y - start_point.y)/(end_point.x - start_point.x)
-	b = start_point.y - m * start_point.x
-	return abs(b + m * cur_pos_gps.x - cur_pos_gps.y)/(math.sqrt(1 + m*m))
 
 
 # === search ===
-
-def search_reset_flags():
-	search_target_found = False
-	search_moving_to_found_target = False
 
 # receives point array from topic, first point is center, second point is on the edge of the circle
 def search_area_callback(search_area):
@@ -194,59 +187,77 @@ def search_area_callback(search_area):
 	dx = (search_area.points[1].x - search_center.x)
 	dy = (search_area.points[1].y - search_center.y)
 	search_radius = math.sqrt(dx*dx+dy*dy)
+	
+	# Start seach routine
+	if state.challenge is BoatState.CHA_SEARCH:
+		search_setup()
 
 # sets up waypoints for the search routine
 # TODO call this once we are in search mode and search area has been setup
 # TODO call this again if we ran through all the waypoints set without finding anything?
 def search_setup():
+	global state
 	global waypoints
+	global search_target_found
+	global search_moving_to_found_target
 	rospy.loginfo(rospy.get_caller_id() + " Setting waypoints for search challenge routine")
 
-	search_reset_flags()
+	search_target_found = False
+	search_moving_to_found_target = False
 
 	# Clear previous points
 	waypoints = []
 	waypoints_pub.publish(waypoints)
-	target_pub.publish(Point())
+	#target_pub.publish(Waypoint())
 
 	# stub for now
 	wind_heading = 45
 	num_sweeps = 10
 	sweep_width = 2*search_radius/num_sweeps
 	#waypoints = [_get_search_pt(i,wind_heading,sweep_width,search_radius) for i in xrange(0,num_sweeps-1)]
-	waypoints = _get_expaning_square_pts(wind_heading,sweep_width)
+	waypoints = _get_expaning_square_pts(wind_heading, sweep_width)
 	waypoints_pub.publish(waypoints)
+	
+	state.minor = BoatState.MIN_PLANNING
+	boat_state_pub.publish(state)
 
-def _get_expaning_square_pts(angle,width):
+def _get_expaning_square_pts(angle, width):
 	moves = [[1,0],[0,1],[-1,0],[0,-1]]
 	direction = multiplier = 1
 	x = y = 0
 	out = []
-	c,s = math.cos(angle),math.sin(angle)
-	while(x*x + y*y < search_radius):
+	c,s = math.cos(math.radians(angle)),math.sin(math.radians(angle))
+	while(math.sqrt(x*x + y*y) < search_radius):
+		print len(out), x, y
 		index = len(out)%4
 		x += moves[index][0]*direction*multiplier*width
 		y += moves[index][1]*direction*multiplier*width
 		trans_x = x*c - y*s + search_center.x
-		trans_y = y*c - x*s + search_center.y
-		out.append(Point(trans_x,trans_y))
+		trans_y = y*c + x*s + search_center.y
+		out.append(Waypoint(Point(trans_x,trans_y), Waypoint.TYPE_INTERSECT))
 		if not index%2:
 			multiplier += 1
 	return out
 
-def _get_search_pt(i,angle,width,radius):
-		y = -radius + (i+1)*width
-		x = (1-2*(i%2))*math.sqrt(radius**2 - y**2)
-		c,s = math.cos(angle),math.sin(angle)
-		trans_x = x*c - y*s + search_center.x
-		trans_y = y*c - x*s + search_center.y
-		return Point(trans_x,trans_y)
-# set waypoints to move towards target
-# TODO detemine which topic the target location will come in from, setup that subscriber
-# TODO call this somewhere once we find our target
-def search_move_to_target():
-	search_moving_to_found_target = True
-	# TODO 
+#def _get_search_pt(i,angle,width,radius):
+#		y = -radius + (i+1)*width
+#		x = (1-2*(i%2))*math.sqrt(radius**2 - y**2)
+#		c,s = math.cos(angle),math.sin(angle)
+#		trans_x = x*c - y*s + search_center.x
+#		trans_y = y*c - x*s + search_center.y
+#		return Point(trans_x,trans_y)
+
+def search_planner():
+	global search_moving_to_found_target
+	
+	if search_target_found:
+		# TODO: Read from vision topic and republish it as target
+		search_moving_to_found_target = True
+		pass
+	
+	else:
+		traverse_waypoints_planner()
+	
 
 # === end search ===
 
@@ -259,7 +270,7 @@ def waypoints_callback(new_waypoint):
 	if state.major is not BoatState.MAJ_AUTONOMOUS:
 		return
 	
-	if state.challenge is BoatState.CHA_NAV or state.challenge is BoatState.CHA_LONG:
+	if state.challenge is BoatState.CHA_NAV or state.challenge is BoatState.CHA_LONG or state.challenge is BoatState.CHA_SEARCH:
 		if len(waypoints) > 0:
 			target_waypoint = waypoints[0]
 			publish_target()
@@ -282,6 +293,9 @@ def position_callback(position):
 	# If the boat isn't in the autonomous planning state, exit
 	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
 		return
+	
+	if state.challenge is BoatState.CHA_SEARCH:
+		search_planner()
 	
 	# Navigation and long-distance challenge
 	if state.challenge is BoatState.CHA_NAV or state.challenge is BoatState.CHA_LONG:

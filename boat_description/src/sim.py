@@ -958,6 +958,8 @@ def draw_status():
 	minor = ""
 	if state.minor is BoatState.MIN_COMPLETE:
 		minor = "Complete"
+	elif state.minor is BoatState.MIN_INITIALIZE:
+		minor = "Initilize"
 	elif state.minor is BoatState.MIN_PLANNING:
 		minor = "Planning"
 	elif state.minor is BoatState.MIN_TACKING:
