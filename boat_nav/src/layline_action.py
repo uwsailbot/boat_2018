@@ -5,6 +5,7 @@ import rospy
 import math
 from boat_msgs.msg import BoatState, Point, Waypoint, TackingAction, TackingGoal, GPS
 from std_msgs.msg import Float32
+from actionlib_msgs.msg import GoalStatus
 
 class LaylineAction(object):
 	# create messages that are used to publish feedback/result
@@ -91,11 +92,26 @@ class LaylineAction(object):
 		# helper variables
 		success = False
 		preempted = False
+		did_hit_midpoint = False
 		self.new_target = False
 		
 		# publish info to the console for the user
 		self._feedback.status = " Entered Layline Action Callback. "
 		rospy.loginfo(rospy.get_caller_id() + self._feedback.status)
+		
+		
+		pos = self.cur_pos
+		tar = goal.target.pt
+		
+		a = math.tan(math.radians(self.compass))
+		b = -1
+		c = tar.y - a*tar.x
+		dx = pos.x-tar.x
+		dy = pos.y-tar.y
+		
+		d_perp = abs(a*pos.x + b*pos.y + c)/math.sqrt(a*a+b*b)
+		d_par = math.sqrt(dx*dx+dy*dy-d_perp*d_perp)
+		
 		if self.gtAngle(goal.alt_tack_angle, self.wind_coming):
 			tacking_direction = 1
 		else:
@@ -109,12 +125,47 @@ class LaylineAction(object):
 		new_target = new_target % 360
 		self.target_heading = new_target
 		self.target_pub.publish(Float32(self.target_heading))
-
+		
 		tacking_goal = TackingGoal(direction = tacking_direction)
 		self.tacking_client.send_goal(tacking_goal)
+		
+		endtime = rospy.Time.now() + rospy.Duration(10)
+		
+		while (self.tacking_client.get_state() is GoalStatus.ACTIVE or\
+			   self.tacking_client.get_state() is GoalStatus.PENDING) and rospy.Time.now() < endtime and not did_hit_midpoint:
 			
-		# Adjust time delay until the tack is considered failed, and we return to planning
-		if not self.tacking_client.wait_for_result(rospy.Duration(10)):
+			pos = self.cur_pos
+			cur_d_perp = abs(a*pos.x + b*pos.y + c)/math.sqrt(a*a+b*b)
+			if cur_d_perp < d_perp*0.48:
+				did_hit_midpoint = True
+		
+		# If we hit the midpoint, cancel the current tack and return to the original heading
+		if did_hit_midpoint:
+			self.tacking_client.cancel_goal()
+			
+			self._feedback.status = " Reached 48% perpendicular distance, returning to original heading."
+			rospy.loginfo(rospy.get_caller_id() + self._feedback.status)
+			
+			tacking_goal.direction = tacking_goal.direction * -1
+			self.tacking_client.send_goal(tacking_goal)
+			if not self.tacking_client.wait_for_result(rospy.Duration(10)):
+				self.tacking_client.cancel_goal()
+				self._result.success = False
+				self._result.target_heading = self.target_heading
+				self._feedback.status = " Second tacking goal expired"
+				rospy.loginfo(rospy.get_caller_id() + self._feedback.status)
+				self._as.set_succeeded(self._result)
+				return
+			
+			self._result.success = True
+			self._result.target_heading = self.target_heading
+			self._feedback.status = " Completed shortened layline action"
+			rospy.loginfo(rospy.get_caller_id() + self._feedback.status)
+			self._as.set_succeeded(self._result)
+			return
+		
+		# If we hit this state, the tack failed. Attempt to return to the original heading
+		if not self.tacking_client.get_result() or not self.tacking_client.get_result().success:
 			self.tacking_client.cancel_goal()
 			tacking_goal.direction = tacking_goal.direction * -1
 			self.tacking_client.send_goal(tacking_goal)
@@ -124,6 +175,7 @@ class LaylineAction(object):
 			self._result.target_heading = self.target_heading
 			self._feedback.status = " Tacking goal expired"
 			rospy.loginfo(rospy.get_caller_id() + self._feedback.status)
+			self._as.set_succeeded(self._result)
 			return
 		
 		self.target_heading = self.tacking_client.get_result().target_heading
