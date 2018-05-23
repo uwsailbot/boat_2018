@@ -83,7 +83,6 @@ def lps_to_gps_srv(req):
 
 # Convert from gps to lps
 def to_lps(gps):
-	global origin_lps
 	local = Point()
 	local.x = RADIUS * cosd(gps.y) * math.radians(gps.x) - origin_lps.x
 	local.y = RADIUS * math.radians(gps.y) - origin_lps.y
@@ -92,7 +91,6 @@ def to_lps(gps):
 
 # Convert from gps to lps
 def to_gps(local):
-	global origin_lps
 	gps = Point()
 	
 	gps.y = math.degrees((local.y + origin_lps.y)/RADIUS)
