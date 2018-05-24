@@ -908,14 +908,8 @@ def draw_waypoints_in_fov():
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
 	glColor4f(245/255.0, 200/255.0, 5/255.0, 0.3)
-<<<<<<< HEAD
 
 	for point in vision_points_lps.points:
-=======
-	#print(vision_points_lps.points)
-	for point in vision_points_gps.points:
-		point = to_lps(point)
->>>>>>> master
 		(x,y) = camera.lps_to_screen(point.x, point.y)
 		draw_circle(0.8 * camera.scale, x, y)
 
