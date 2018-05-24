@@ -20,6 +20,12 @@ from sys import argv
 from sim_io import *
 from sim_ui import *
 
+calc_count = 0
+calc_time = 0
+gl_count = 0
+gl_time = 0
+start = 0
+
 # Cheat codes
 cur_input = ""
 sound = False
@@ -118,7 +124,7 @@ class SearchArea:
 		self.target = target
 		self.sections = None
 
-	def setup_coverage(self, resolution=4):
+	def setup_coverage(self, resolution=16):
 		if self.center is None or self.radius is 0 or self.target is None:
 			print("Tried to setup coverage check for search but search area was not completely setup (c:%s r:%s t:%s)" % (self.center, self.radius, self.target))
 			return
@@ -155,6 +161,12 @@ class SearchArea:
 			pass
 		
 	def update_coverage(self):
+		
+		global calc_time
+		global calc_count
+
+		start = time.time()
+
 		if self.center is None or self.radius is 0 or self.target is None:
 			return
 		dx = pos.x-self.center.x
@@ -177,7 +189,13 @@ class SearchArea:
 			self.update_coverage_section(x_section+1, y_section)
 			self.update_coverage_section(x_section+1, y_section-1)
 			self.update_coverage_section(x_section+1, y_section+1)
-			
+		
+		end = time.time()
+		calc_time = calc_time*0.8 + (end-start)*0.2
+		calc_count += 1
+
+		if calc_count % 10 == 0:
+			print("C: %f" % (calc_time))
 
 gps_search_area = PointArray() # in gps, first point is center of circle, second is on edge, record of ros data
 search_area = SearchArea(None, 0, None) # for use in simulator only
@@ -794,7 +812,7 @@ def draw_search_area():
 			glColor4f(0, 1, 1, 0.1)
 			draw_circle(radius*camera.scale, center_x, center_y, 50)
 		glDisable(GL_BLEND)
-	
+
 		if search_area.target is not None:
 			# draw target
 			(target_x,target_y) = camera.lps_to_screen(search_area.target.x, search_area.target.y)
@@ -803,6 +821,12 @@ def draw_search_area():
 
 			# draw coverage
 			if search_area.sections is not None:
+
+				global gl_time
+				global gl_count
+
+				start = time.time()
+
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 				glEnable(GL_BLEND)
 				glColor4f(1, 1, 0, 0.1)
@@ -822,6 +846,14 @@ def draw_search_area():
 
 				glPopMatrix()
 				glDisable(GL_BLEND)
+				
+				end = time.time()
+
+				gl_time = gl_time*0.8 + (end-start) * 0.2
+				gl_count += 1
+
+				if gl_count % 10 == 0:
+					print("G: %f" % (gl_time))
 
 	glPopMatrix()
 
