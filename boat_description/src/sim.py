@@ -20,12 +20,6 @@ from sys import argv
 from sim_io import *
 from sim_ui import *
 
-calc_count = 0
-calc_time = 0
-gl_count = 0
-gl_time = 0
-start = 0
-
 # Cheat codes
 cur_input = ""
 sound = False
@@ -192,7 +186,9 @@ class SearchArea:
 		self.target = target
 		self.sections = None
 
-	def setup_coverage(self, resolution=4):
+	# cpu/mem will scale exponentially with resolution
+	# use ~4 for good computers, less for poorer computers
+	def setup_coverage(self, resolution=3):
 		if self.center is None or self.radius is 0 or self.target is None:
 			print("Tried to setup coverage check for search but search area was not completely setup (c:%s r:%s t:%s)" % (self.center, self.radius, self.target))
 			return
@@ -205,14 +201,6 @@ class SearchArea:
 			section_x = self.center.x + fov_radius*i + fov_radius/2.0
 			for j in range(-sections_per_half_row, sections_per_half_row):
 				section_y = self.center.y + fov_radius*j + fov_radius/2.0
-				# section = []
-				# for k in range(0, self.resolution):
-				# 	x = section_x + (k+0.5)*self.grid_size
-				# 	for l in range(0, self.resolution):
-				# 		y = section_y + (l+0.5)*self.grid_size
-				# 		if (self.center.x-x)**2+(self.center.y-y)**2 < self.radius**2:
-				# 			section.append(Point(x,y))
-				# sections.append(section)
 				section = SearchAreaSection(Point(section_x, section_y), fov_radius, self.resolution, self)
 				section.update() # update once to finish setting up
 				sections.append(section)
@@ -220,24 +208,12 @@ class SearchArea:
 	
 	def update_coverage_section(self, x_section, y_section):
 		section_index = x_section*self.sections_per_row + y_section
-		# to_remove = []
 		try:
-			# for point in self.sections[section_index]:
-			# 	if point_is_in_fov(point):
-			# 		to_remove.append(point)
-			# for point in to_remove:
-			# 	self.sections[section_index].remove(point)
 			self.sections[section_index].update()
 		except IndexError:
 			pass
 		
 	def update_coverage(self):
-		
-		global calc_time
-		global calc_count
-
-		start = time.time()
-
 		if self.center is None or self.radius is 0 or self.target is None:
 			return
 		dx = pos.x-self.center.x
@@ -260,13 +236,6 @@ class SearchArea:
 			self.update_coverage_section(x_section+1, y_section)
 			self.update_coverage_section(x_section+1, y_section-1)
 			self.update_coverage_section(x_section+1, y_section+1)
-		
-		end = time.time()
-		calc_time = calc_time*0.8 + (end-start)*0.2
-		calc_count += 1
-
-		if calc_count % 10 == 0:
-			print("C: %f" % (calc_time))
 
 gps_search_area = PointArray() # in gps, first point is center of circle, second is on edge, record of ros data
 search_area = SearchArea(None, 0, None) # for use in simulator only
@@ -892,12 +861,6 @@ def draw_search_area():
 
 			# draw coverage
 			if search_area.sections is not None:
-
-				global gl_time
-				global gl_count
-
-				start = time.time()
-
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 				glEnable(GL_BLEND)
 				glColor4f(1, 1, 0, 0.1)
@@ -909,14 +872,6 @@ def draw_search_area():
 					
 				glPopMatrix()
 				glDisable(GL_BLEND)
-
-				end = time.time()
-
-				gl_time = gl_time*0.8 + (end-start) * 0.2
-				gl_count += 1
-
-				if gl_count % 10 == 0:
-					print("G: %f" % (gl_time))
 
 	glPopMatrix()
 
