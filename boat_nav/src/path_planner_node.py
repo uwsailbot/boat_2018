@@ -279,7 +279,7 @@ def waypoints_callback(new_waypoint):
 		return
 	
 	# If we are waiting in autonomous-complete, and a new waypoint is added, move to planning state
-	if state.minor is BoatState.MIN_COMPLETE and len(waypoints)>0:
+	if state.minor is BoatState.MIN_COMPLETE or state.minor is BoatState.MIN_INITIALIZE and len(waypoints)>0:
 		state.minor = BoatState.MIN_PLANNING
 		boat_state_pub.publish(state)
 		

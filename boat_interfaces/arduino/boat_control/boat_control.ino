@@ -14,6 +14,8 @@
 #include <math.h>
 #include <boat_msgs/Joy.h>
 
+#define DEBUG_SERIAL (false) //Output GPS data to Serial2 if true
+
 // Defines for Futaba receiver
 #define CH_1_PIN 5 // RUDDER
 #define CH_3_PIN 6 // SAIL 
@@ -22,9 +24,7 @@
 #define BUFFER_SIZE 5
 
 // The pin the wind vane sensor is connected to
-#define WIND_VANE_PIN (A0)  
-// Define serial port for the gps
-#define mySerial Serial1
+#define WIND_VANE_PIN (A0)
 
 // Define servo pins
 #define RUDDER_PIN1 2
@@ -37,7 +37,7 @@ std_msgs::Float32 winddir;
 boat_msgs::GPS gpsData;
 boat_msgs::Joy joy;
 
-Adafruit_GPS GPS(&mySerial);
+Adafruit_GPS GPS(&Serial1);
 Servo servo_rudder1;
 Servo servo_rudder2;
 Servo servo_winch;
@@ -45,13 +45,24 @@ float calWindDirection;
 float lastWindDirection = 0;
 uint32_t GPS_timer = millis();
 float last_lat = 0, last_long = 0;
-int last_status = 0;
+float last_track = 0, last_speed = 0;
 unsigned long previousMillis = 0;
 int ch_1_buf [BUFFER_SIZE] = {0};
 int ch_3_buf [BUFFER_SIZE] = {0};
 int ch_6_buf [BUFFER_SIZE] = {0};
 int counter = 0;
 
+int average(int buffer[]){
+    int sum = 0;
+    int valid_data_counter = 0;
+    for(int i = 0; i < BUFFER_SIZE; i++){
+        sum += buffer[i];
+        if (buffer[i] != 0){
+            valid_data_counter ++;
+        }
+    }
+    return sum/valid_data_counter;
+}
 
 float mapf(float value, float fromLow, float fromHigh, float toLow, float toHigh){
     return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow;
@@ -76,6 +87,10 @@ ros::Publisher joy_pub("joy", &joy);
 
 void setup(){
     // setup subscribers 
+    if(DEBUG_SERIAL){
+        Serial2.begin(115200);
+    }
+    
     nh.initNode();
     nh.subscribe(sub_rudder);
     nh.subscribe(sub_winch);
@@ -99,9 +114,28 @@ void setup(){
     GPS.sendCommand("$PMTK313,1*2E");
     GPS.sendCommand("$PMTK301,2*2E");
     // Set the update rate
-    GPS.sendCommand(PMTK_SET_NMEA_UPDATE_10HZ);   // 1 Hz update rate
+    GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);   // 1 Hz update rate
+    useInterrupt(true);
+
 
     bubbleSortlookupTable();
+}
+
+// Interrupt is called once a millisecond, looks for any new GPS data, and stores it
+SIGNAL(TIMER0_COMPA_vect) {
+  char c = GPS.read();
+}
+
+void useInterrupt(boolean v) {
+  if (v) {
+    // Timer0 is already used for millis() - we'll just interrupt somewhere
+    // in the middle and call the "Compare A" function above
+    OCR0A = 0xAF;
+    TIMSK0 |= _BV(OCIE0A);
+  } else {
+    // do not call the interrupt function COMPA anymore
+    TIMSK0 &= ~_BV(OCIE0A);
+  }
 }
 
 void loop(){
@@ -129,20 +163,45 @@ void loop(){
              anemometer.publish(&winddir);       
         }
     }
-    
-    // Read GPS
-    GPS.read();
-    
     // if a sentence is received, we can check the checksum, parse it...
     if (GPS.newNMEAreceived()) {
         if (!GPS.parse(GPS.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
             return;  // we can fail to parse a sentence in which case we should just wait for another
-    }
-
-    // approximately every second publish the current stats
-    if (millis() - GPS_timer > 1000) { 
+    }  
+    // approximately publish at 1 HZ the current stats
+    if (millis() - GPS_timer > 1000) {
       GPS_timer = millis(); // reset the timer
-    
+      
+      if (DEBUG_SERIAL){
+          Serial2.print("\nTime: ");
+          Serial2.print(GPS.hour, DEC); Serial2.print(':');
+          Serial2.print(GPS.minute, DEC); Serial2.print(':');
+          Serial2.print(GPS.seconds, DEC); Serial2.print('.');
+          Serial2.println(GPS.milliseconds);
+          Serial2.print("Date: ");
+          Serial2.print(GPS.day, DEC); Serial2.print('/');
+          Serial2.print(GPS.month, DEC); Serial2.print("/20");
+          Serial2.println(GPS.year, DEC);
+          Serial2.print("Fix: "); Serial2.print((int)GPS.fix);
+          Serial2.print(" quality: "); Serial2.println((int)GPS.fixquality); 
+          
+          if (GPS.fix) {
+              Serial2.print("Location: ");
+              Serial2.print(GPS.latitude, 4); Serial2.print(GPS.lat);
+              Serial2.print(", "); 
+              Serial2.print(GPS.longitude, 4); Serial2.println(GPS.lon);
+              Serial2.print("Location (in degrees, works with Google Maps): ");
+              Serial2.print(GPS.latitudeDegrees, 4);
+              Serial2.print(", "); 
+              Serial2.println(GPS.longitudeDegrees, 4);
+          
+              Serial2.print("Speed (knots): "); Serial2.println(GPS.speed);
+              Serial2.print("Angle: "); Serial2.println(GPS.angle);
+              Serial2.print("Altitude: "); Serial2.println(GPS.altitude);
+              Serial2.print("Satellites: "); Serial2.println((int)GPS.satellites);
+          }
+      }
+      
       if (GPS.fix) {
           if (GPS.fixquality == 1){
               gpsData.status = gpsData.STATUS_FIX;
@@ -159,23 +218,24 @@ void loop(){
       }else{
           gpsData.status = gpsData.STATUS_NO_FIX;
       }
-      
+    }
      //only publish is readings have changes
-     if ((last_lat != gpsData.latitude) ||
-          (last_long != gpsData.longitude) ||
-          (last_status != gpsData.status)){
+    if (((last_lat != gpsData.latitude) ||
+          (last_long != gpsData.longitude) || 
+          (last_track != gpsData.track) || 
+          (last_speed != gpsData.speed)) &&
+          gpsData.status != gpsData.STATUS_NO_FIX){
           gps.publish(&gpsData);
       
           last_lat = gpsData.latitude;
           last_long = gpsData.longitude;
-          last_status = gpsData.status;
-      }
       
+    }  
     // Read PWM pins on receiver for controller state  
-    ch_1_buf[counter] = pulseIn(CH_1_PIN, HIGH);
-    ch_3_buf[counter] = pulseIn(CH_3_PIN, HIGH);
-    int ch_5_val = pulseIn(CH_5_PIN, HIGH);
-    ch_6_buf[counter] = pulseIn(CH_6_PIN, HIGH);
+    ch_1_buf[counter] = pulseIn(CH_1_PIN, HIGH, 10000);
+    ch_3_buf[counter] = pulseIn(CH_3_PIN, HIGH, 10000);
+    int ch_5_val = pulseIn(CH_5_PIN, HIGH, 10000);
+    ch_6_buf[counter] = pulseIn(CH_6_PIN, HIGH, 10000);
   
     // Lookup table for switch position
     int switch_state = 0;

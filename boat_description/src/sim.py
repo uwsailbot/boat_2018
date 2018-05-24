@@ -2,6 +2,7 @@
 import sys
 sys.dont_write_bytecode = True
 
+import threading
 import math
 import pygame
 import rospy
@@ -195,15 +196,35 @@ square_pub = rospy.Publisher('bounding_box', PointArray, queue_size = 10)
 search_area_pub = rospy.Publisher('search_area', PointArray, queue_size = 10)
 clock_pub = rospy.Publisher('clock', Clock, queue_size = 1)
 vision_pub = rospy.Publisher('vision', PointArray, queue_size = 10)
-to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
-to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
+to_gps_srv = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
+to_lps_srv = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
+to_gps_lock = threading.Lock()
+to_lps_lock = threading.Lock()
+
+def to_gps(p):
+	with to_gps_lock:
+		if type(p) is Point:
+			return to_gps_srv(p).pt
+		elif type(p) is Waypoint:
+			return to_gps_srv(p.pt).pt
+		else:
+			raise ValueError("p is of invalid type " + str(type(p)) +", must be either Point or Waypoint")
+
+def to_lps(p):
+	with to_lps_lock:
+		if type(p) is Point:
+			return to_lps_srv(p).pt
+		elif type(p) is Waypoint:
+			return to_lps_srv(p.pt).pt
+		else:
+			raise ValueError("p is of invalid type " + str(type(p)) +", must be either Point or Waypoint")
 
 def update_gps():
 	gps = GPS()
 	gps.status = GPS.STATUS_FIX
 	coords = to_gps(pos)
-	gps.latitude = coords.pt.y
-	gps.longitude = coords.pt.x
+	gps.latitude = coords.y
+	gps.longitude = coords.x
 	gps.track = (450-heading)%360
 	gps.speed = boat_speed * 1.94384 # m/s to KNOTS
 	gps_pub.publish(gps)
@@ -244,7 +265,7 @@ def update_vision():
 	
 	vision_points_gps = PointArray()
 	for waypoint in waypoint_gps.points:
-		lps = to_lps(waypoint.pt).pt
+		lps = to_lps(waypoint)
 		if point_is_in_fov(lps):
 			vision_points_gps.points.append(waypoint.pt)
 	
@@ -444,9 +465,9 @@ def mouse_handler(button, mouse_state, x, y):
 		newPt.x = lps_x
 		newPt.y = lps_y
 		if button == GLUT_LEFT_BUTTON:
-			coords = Waypoint(to_gps(newPt).pt, Waypoint.TYPE_INTERSECT)
+			coords = Waypoint(to_gps(newPt), Waypoint.TYPE_INTERSECT)
 		elif button == GLUT_MIDDLE_BUTTON:
-			coords = Waypoint(to_gps(newPt).pt, Waypoint.TYPE_ROUND)
+			coords = Waypoint(to_gps(newPt), Waypoint.TYPE_ROUND)
 		waypoint_gps.points.append(coords)
 		
 		waypoint_pub.publish(waypoint_gps)
@@ -456,10 +477,10 @@ def mouse_handler(button, mouse_state, x, y):
 		(lps_x,lps_y) = camera.screen_to_lps(x,y)
 		newPt.x = lps_x
 		newPt.y = lps_y
-		coords = to_gps(newPt).pt
+		coords = to_gps(newPt)
 		
 		for p in gps_bounding_box.points:
-			l = to_lps(p).pt
+			l = to_lps(p)
 			if math.hypot(l.y - newPt.y, l.x-newPt.x) < 15:
 				print "Distance between buoys is too small, must be at least 15m"
 				return
@@ -634,7 +655,7 @@ def ASCII_handler(key, mousex, mousey):
 	
 	elif key is 'x' and (sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER):
 		(lps_x,lps_y) = camera.screen_to_lps(mousex,mousey)
-		coords = Waypoint(to_gps(Point(lps_x, lps_y)).pt, Waypoint.TYPE_ROUND)
+		coords = Waypoint(to_gps(Point(lps_x, lps_y)), Waypoint.TYPE_ROUND)
 		waypoint_gps.points.append(coords)
 		waypoint_pub.publish(waypoint_gps)
 	
@@ -718,7 +739,7 @@ def draw_waypoints():
 			glColor3f(1,0,0)
 		
 		
-		p = to_lps(gps.pt).pt
+		p = to_lps(gps)
 		(x,y) = camera.lps_to_screen(p.x, p.y)
 		draw_circle(0.5 * camera.scale,x,y)
 	
@@ -729,7 +750,7 @@ def draw_bounding_box():
 
 	glColor3f(0,1,0)
 	for p in gps_bounding_box.points:
-		l = to_lps(p).pt
+		l = to_lps(p)
 		(x,y) = camera.lps_to_screen(l.x, l.y)
 		draw_circle(0.5 * camera.scale,x,y)
 
@@ -737,8 +758,8 @@ def draw_bounding_box():
 		glLineWidth(1.0)
 		glBegin(GL_LINES)
 		for i in range(0, 4):
-			a = to_lps(gps_bounding_box.points[i]).pt
-			b = to_lps(gps_bounding_box.points[(i+1)%4]).pt
+			a = to_lps(gps_bounding_box.points[i])
+			b = to_lps(gps_bounding_box.points[(i+1)%4])
 			(x1, y1) = camera.lps_to_screen(a.x, a.y)
 			(x2, y2) = camera.lps_to_screen(b.x, b.y)
 			glVertex2f(x1, y1)
@@ -887,8 +908,14 @@ def draw_waypoints_in_fov():
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
 	glColor4f(245/255.0, 200/255.0, 5/255.0, 0.3)
+<<<<<<< HEAD
 
 	for point in vision_points_lps.points:
+=======
+	#print(vision_points_lps.points)
+	for point in vision_points_gps.points:
+		point = to_lps(point)
+>>>>>>> master
 		(x,y) = camera.lps_to_screen(point.x, point.y)
 		draw_circle(0.8 * camera.scale, x, y)
 
