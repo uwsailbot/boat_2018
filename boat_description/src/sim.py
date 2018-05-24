@@ -270,7 +270,7 @@ def update_vision():
 			vision_points_gps.points.append(waypoint.pt)
 	
 	if search_area.target is not None and point_is_in_fov(search_area.target):
-		vision_points_gps.points.append(to_gps(search_area.target).pt)
+		vision_points_gps.points.append(to_gps(search_area.target))
 
 	# TODO place this somewhere better
 	# update search_area coverage, need to call this often
@@ -386,9 +386,9 @@ def search_area_callback(new_search_area):
 
 	gps_search_area = new_search_area
 	if len(gps_search_area.points) >= 1:
-		search_area.center = to_lps(gps_search_area.points[0]).pt
+		search_area.center = to_lps(gps_search_area.points[0])
 		if len(gps_search_area.points) >= 2:
-			edge_point = to_lps(gps_search_area.points[1]).pt
+			edge_point = to_lps(gps_search_area.points[1])
 			# first point is center and second defines radius from center
 			# calc radius
 			dx = (search_area.center.x - edge_point.x)
@@ -409,7 +409,7 @@ def vision_callback(new_vision_points_gps):
 	vision_points_gps = new_vision_points_gps
 	vision_points_lps.points = []
 	for point in vision_points_gps.points:
-		vision_points_lps.points.append(to_lps(point).pt)
+		vision_points_lps.points.append(to_lps(point))
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= GLUT callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -495,14 +495,14 @@ def mouse_handler(button, mouse_state, x, y):
 
 	elif cur_slider is () and (sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER) and state.challenge is BoatState.CHA_SEARCH and button == GLUT_LEFT_BUTTON:
 		(lps_x,lps_y) = camera.screen_to_lps(x,y)		
-		new_point = to_gps(Point(lps_x, lps_y)).pt
+		new_point = to_gps(Point(lps_x, lps_y))
 
 		if len(gps_search_area.points) == 2:
 			if search_area.target is None:
 				# set search target
 				# no other nodes need to know this since this is for testing only,
 				# so we can just do it here and not publish anything 
-				search_area.target = to_lps(new_point).pt #TODO fix this when lps origin is shifted.
+				search_area.target = to_lps(new_point) #TODO fix this when lps origin is shifted.
 				search_area.setup_coverage()
 			else:
 				# Reset if we were gonna add to a list of 2 points and a target already
@@ -828,7 +828,7 @@ def draw_search_area():
 def draw_target_point():
 	if target_point is not () and state.major is BoatState.MAJ_AUTONOMOUS and state.minor is not BoatState.MIN_COMPLETE:
 		glColor3f(1,1,1)
-		lps_point = to_lps(target_point.pt).pt
+		lps_point = to_lps(target_point.pt)
 		(x,y) = camera.lps_to_screen(lps_point.x, lps_point.y)
 		draw_circle(0.7 * camera.scale, x, y)
 
