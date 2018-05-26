@@ -10,6 +10,8 @@ from tf.transformations import euler_from_quaternion
 # Declare global variables needed for the node
 origin_lps = Point()
 RADIUS = rospy.get_param('/boat/nav/radius')
+heading = 0
+POS_OFFSET = rospy.get_param('/boat/nav/pos_offset')
 
 # Declare the publishers for the node
 gps_pub = rospy.Publisher('odometry_navsatfix', NavSatFix, queue_size=10)
@@ -38,7 +40,11 @@ def gps_callback(gps):
 	# TODO: Add covariance?
 	gps_pub.publish(gps_parsed)
 	local = to_lps(get_coords(gps))
-	
+	# offset lps in direction of heading
+	# because gps is not in center of boat, but we want lps to be.
+	local.x += POS_OFFSET*cosd(heading)
+	local.y += POS_OFFSET*sind(heading)
+
 	# Commenting this out so that we don't spam the output
 	#rospy.loginfo(rospy.get_caller_id() + " Long: %f, Lat: %f --- X: %f, Y: %f", get_coords(gps).x, get_coords(gps).y, local.x, local.y)
 	lps_pub.publish(local)
@@ -46,15 +52,15 @@ def gps_callback(gps):
 
 def orientation_callback(imu):
 	global compass_pub
-	
+	global heading
+
 	explicit_quat = [imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w]
 	roll, pitch, yaw = euler_from_quaternion(explicit_quat)
 	
 	yaw = math.degrees(yaw) % 360
 	
-	heading = Float32()
-	heading.data = yaw
-	compass_pub.publish(heading)
+	heading = yaw
+	compass_pub.publish(Float32(heading))
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Services =*=*=*=*=*=*=*=*=*=*=*=*=
