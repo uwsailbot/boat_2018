@@ -3,11 +3,13 @@ import threading
 import math
 import rospy
 from abc import ABCMeta, abstractmethod
-from boat_msgs.msg import BoatState, Point, PointArray, Waypoint, WaypointArray
+from boat_msgs.msg import BoatState, Point, Waypoint, WaypointArray
 from boat_msgs.srv import ConvertPoint
 from std_msgs.msg import Float32
 
 BUOY_TOL = rospy.get_param('/boat/planner/buoy_tol')
+ROUND_DIST = rospy.get_param('/boat/planner/round_dist')
+ROUND_FACTOR = rospy.get_param('/boat/planner/round_factor')
 
 _boat_state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
 _waypoints_pub = rospy.Publisher('waypoints_raw', WaypointArray, queue_size=10)
@@ -150,8 +152,8 @@ class Planner:
 		# Perform the neccessary computation to allow rounding of buoys
 		if target_waypoint.type is Waypoint.TYPE_ROUND and target_waypoint in waypoints and waypoints.index(target_waypoint) < len(waypoints)-1:
 			
-			r = 3/111319.492188 # meters to coords
-			k = 1.5 #TODO: Use rosparam
+			r = ROUND_DIST/111319.492188 # meters to coords
+			k = ROUND_FACTOR
 			
 			# Use the heading from the boat to the buoy and from the buoy to the next to calculate where around the target to place the waypoint.
 			next = waypoints[waypoints.index(target_waypoint)+1]
