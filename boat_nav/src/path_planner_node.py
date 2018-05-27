@@ -5,18 +5,22 @@ sys.dont_write_bytecode = True
 import math
 import rospy
 from boat_msgs.msg import BoatState, Point, WaypointArray
-from path_planners.config import Data, Globals as g, initialize
+from path_planners.planner_base import Planner, initialize
 from path_planners.search import SearchPlanner
 from path_planners.station import StationPlanner
-from path_planners.nav import traverse_waypoints_planner
+from path_planners.nav import NavPlanner
+from path_planners.long import LongPlanner
 
 search_planner = SearchPlanner()
 station_planner = StationPlanner()
+nav_planner = NavPlanner()
+long_planner = LongPlanner()
 
 def boat_state_callback(new_state):
 	
-	prev_state = g.state
-	state = g.state = new_state
+	prev_state = Planner.state
+	state = Planner.state = new_state
+	waypoints = Planner.waypoints
 	
 	if state.major is not BoatState.MAJ_AUTONOMOUS:
 		return
@@ -33,45 +37,52 @@ def boat_state_callback(new_state):
 		station_planner.setup()
 	
 	# Whenever we switch into nav or distance, startup the waypoints callback to load the first waypoint, and switch from INITIALIZE to PLANNING
-	if (state.challenge is BoatState.CHA_NAV or state.challenge is BoatState.CHA_LONG) and (new_cha or new_maj) and len(g.waypoints)>0:
-		waypoints_callback(WaypointArray(g.waypoints))
-		g.set_minor_state(BoatState.MIN_PLANNING)
+	if (state.challenge is BoatState.CHA_NAV or state.challenge is BoatState.CHA_LONG) and (new_cha or new_maj) and len(waypoints)>0:
+		waypoints_callback(WaypointArray(waypoints))
+		Planner.set_minor_state(BoatState.MIN_PLANNING)
 
 
 def waypoints_callback(new_waypoint):
-	g.waypoints = new_waypoint.points
-	state = g.state
+	waypoints = Planner.waypoints = new_waypoint.points
+	state = Planner.state
 	
 	if state.major is not BoatState.MAJ_AUTONOMOUS:
 		return
 	
 	if state.challenge is BoatState.CHA_NAV or state.challenge is BoatState.CHA_LONG or state.challenge is BoatState.CHA_SEARCH:
-		if len(g.waypoints) > 0:
-			g.target_waypoint = g.waypoints[0]
-			g.publish_target()
+		if len(waypoints) > 0:
+			Planner.target_waypoint = waypoints[0]
+			Planner.publish_target()
 		
 	elif state.challenge is BoatState.CHA_STATION:
 		return
 	
 	# If we are waiting in autonomous-complete, and a new waypoint is added, move to planning state
-	if state.minor is BoatState.MIN_COMPLETE or state.minor is BoatState.MIN_INITIALIZE and len(g.waypoints)>0:
-		g.set_minor_state(BoatState.MIN_PLANNING)
+	if state.minor is BoatState.MIN_COMPLETE or state.minor is BoatState.MIN_INITIALIZE and len(waypoints)>0:
+		Planner.set_minor_state(BoatState.MIN_PLANNING)
 
 
 def position_callback(position):
-	Data.cur_pos = position
-	state = g.state
+	Planner.cur_pos = position
+	state = Planner.state
 	
 	# If the boat isn't in the autonomous planning state, exit
 	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
 		return
 	
+	# Call the appropriate path planner
+	
+	# Search challenge
 	if state.challenge is BoatState.CHA_SEARCH:
 		search_planner.planner()
 	
-	# Navigation and long-distance challenge
-	if state.challenge is BoatState.CHA_NAV or state.challenge is BoatState.CHA_LONG:
-		traverse_waypoints_planner()
+	# Navigation challenge
+	if state.challenge is BoatState.CHA_NAV:
+		nav_planner.planner()
+	
+	# Long distance challenge
+	if state.challenge is BoatState.CHA_LONG:
+		long_planner.planner()
 	
 	# Station keeping challenge
 	elif state.challenge is BoatState.CHA_STATION:

@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 import math
 import rospy
+from overrides import overrides
 from boat_msgs.msg import BoatState, Point, PointArray, Waypoint
-from path_planners.config import Globals
-from path_planners.nav import traverse_waypoints_planner
+from path_planners.planner_base import Planner
 
-class SearchPlanner:
+class SearchPlanner(Planner):
 	
 	def __init__(self):
 		self.search_center = Point() # center of search circle
@@ -13,11 +13,11 @@ class SearchPlanner:
 		self.search_target_found = False # have we found the target
 		self.search_moving_to_found_target = False # have we begun moving towards target
 		
-		rospy.Subscriber('search_area', PointArray, self.search_area_callback)
+		rospy.Subscriber('search_area', PointArray, self._search_area_callback)
 	
 	
 	# receives point array from topic, first point is center, second point is on the edge of the circle
-	def search_area_callback(self, search_area):
+	def _search_area_callback(self, search_area):
 		if len(search_area.points) < 2:
 			return
 		
@@ -29,13 +29,14 @@ class SearchPlanner:
 		self.search_radius = math.sqrt(dx*dx+dy*dy)
 		
 		# Start seach routine
-		if Globals.state.challenge is BoatState.CHA_SEARCH:
+		if self.state.challenge is BoatState.CHA_SEARCH:
 			self.setup()
 	
 	
 	# sets up waypoints for the search routine
 	# TODO call this once we are in search mode and search area has been setup
 	# TODO call this again if we ran through all the waypoints set without finding anything?
+	@overrides
 	def setup(self):
 		rospy.loginfo(rospy.get_caller_id() + " Setting waypoints for search challenge routine")
 	
@@ -43,17 +44,18 @@ class SearchPlanner:
 		self.search_moving_to_found_target = False
 	
 		# Clear previous points
-		#Globals.clear_waypoints()
+		#self.clear_waypoints()
 	
 		# stub for now
 		wind_heading = 45
 		num_sweeps = 10
 		sweep_width = 2*self.search_radius/num_sweeps
 		#waypoints = [_get_search_pt(i,wind_heading,sweep_width,search_radius) for i in xrange(0,num_sweeps-1)]
-		Globals.update_waypoints(self._get_expaning_square_pts(wind_heading, sweep_width))
+		self.update_waypoints(self._get_expaning_square_pts(wind_heading, sweep_width))
 		
-		Globals.set_minor_state(BoatState.MIN_PLANNING)
+		self.set_minor_state(BoatState.MIN_PLANNING)
 	
+	@overrides
 	def planner(self):
 		
 		if self.search_target_found:
@@ -62,7 +64,7 @@ class SearchPlanner:
 			pass
 		
 		else:
-			traverse_waypoints_planner()
+			self.traverse_waypoints_planner()
 	
 	
 	def _get_expaning_square_pts(self, angle, width):

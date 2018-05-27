@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 import math
 import rospy
-from config import *
 from boat_msgs.msg import BoatState, Point, PointArray, Waypoint
-from path_planners.config import Data, Globals, Services, boat_reached_target, is_within_dist
+from path_planners.planner_base import Planner, Services
 
 HEIGHT_TO_TRAVEL = rospy.get_param('/boat/planner/station/height')
 MAX_WIDTH = rospy.get_param('/boat/planner/station/width')
 INNER_BOX_SCALE = rospy.get_param('/boat/planner/station/inner_box_scale')
 
-class StationPlanner:
+class StationPlanner(Planner):
 	
 	def __init__(self):
 		self.box = []
@@ -18,12 +17,11 @@ class StationPlanner:
 		self.end_station = Point()
 		self.station_timeout = False
 		
-		rospy.Subscriber('bounding_box', PointArray, self.bounding_box_callback)
+		rospy.Subscriber('bounding_box', PointArray, self._bounding_box_callback)
 	
 	
-	def bounding_box_callback(self, bounding_box):
-		
-		wind_coming = Data.wind_coming
+	def _bounding_box_callback(self, bounding_box):
+		wind_coming = self.wind_coming
 		
 		# Reorganize the local points to create a box when drawn, if there are four
 		if len(bounding_box.points) == 4:
@@ -87,17 +85,18 @@ class StationPlanner:
 			self.box = bounding_box.points
 		
 		# For if bounding box is added after we are in station mode
-		if Globals.state.challenge is BoatState.CHA_STATION and len(self.box) is 4:
+		if self.state.challenge is BoatState.CHA_STATION and len(self.box) is 4:
 			self.setup()
 	
 	
+	@overrides
 	def setup(self):
 		rospy.loginfo(rospy.get_caller_id() + " Beginning station challenge path planner routine")
 		
 		rospy.Timer(rospy.Duration(5*60), self.timer_callback, oneshot=True)
 		
 		# Clear previous points
-		Globals.clear_waypoints()
+		self.clear_waypoints()
 		
 		# Determine wall angles and box widths, as well as slope of the bottom of the box, as long as it's not vertical
 		m_bottom = 0
@@ -162,24 +161,24 @@ class StationPlanner:
 			end_station.x = start_station.x + station_width
 			end_station.y = m_bottom * end_station.x + y_int + station_height
 		
-		Globals.target_waypoint = Waypoint(start_station, Waypoint.TYPE_INTERSECT)
-		Globals.publish_target()
+		self.publish_target(Waypoint(start_station, Waypoint.TYPE_INTERSECT))
 	
-		Globals.set_minor_state(BoatState.MIN_PLANNING)
+		self.set_minor_state(BoatState.MIN_PLANNING)
 	
+	@overrides
 	def planner(self):
 		
 		# If time is up and we've fully exited the box, stop
 		if self.station_timeout:
-			if boat_reached_target():
-				Globals.set_minor_state(BoatState.MIN_COMPLETE)
+			if self.boat_reached_target():
+				self.set_minor_state(BoatState.MIN_COMPLETE)
 				self.station_timeout = False
 				rospy.loginfo(rospy.get_caller_id() + " Exited box. Boat State = 'Autonomous - Complete'")
 			return
 		
 		# If the box is ever invalid, stop
-		if len(self.box) is not 4 and Globals.state.minor is not BoatState.MIN_COMPLETE:
-			Globals.set_minor_state(BoatState.MIN_COMPLETE)
+		if len(self.box) is not 4 and self.state.minor is not BoatState.MIN_COMPLETE:
+			self.set_minor_state(BoatState.MIN_COMPLETE)
 			rospy.loginfo(rospy.get_caller_id() + " Box is invalid. Boat State = 'Autonomous - Complete'")
 			return
 		
@@ -190,17 +189,15 @@ class StationPlanner:
 			for p in self.box:
 				x_avr += p.x / float(len(self.box))
 				y_avr += p.y / float(len(self.box))
-			Globals.target_waypoint = Waypoint(Point(x_avr, y_avr), Waypoint.TYPE_INTERSECT)
-			Globals.publish_target()
+			self.publish_target(Waypoint(Point(x_avr, y_avr), Waypoint.TYPE_INTERSECT))
 			return
 		
 		# If we've reached the set waypoint, flip around
-		if boat_reached_target():
-			if is_within_dist(Globals.target_waypoint.pt, self.start_station, 0.0001):
-				Globals.target_waypoint = Waypoint(self.end_station, Waypoint.TYPE_INTERSECT)
+		if self.boat_reached_target():
+			if self.is_within_dist(self.target_waypoint.pt, self.start_station, 0.0001):
+				self.publish_target(Waypoint(self.end_station, Waypoint.TYPE_INTERSECT))
 			else:
-				Globals.target_waypoint = Waypoint(self.start_station, Waypoint.TYPE_INTERSECT)
-			Globals.publish_target()
+				self.publish_target(Waypoint(self.start_station, Waypoint.TYPE_INTERSECT))
 	
 	def timer_callback(self, event):
 		self.station_timeout = True
@@ -220,7 +217,7 @@ class StationPlanner:
 		# Use service to determine 12m dist in gps
 		# Use this distance on how far to put the buoy outside the box
 		tol_dist = Services.to_gps(Point(20,0)).x
-		cur_pos_gps = Services.to_gps(Data.cur_pos)
+		cur_pos_gps = Services.to_gps(self.cur_pos)
 		
 		final_point = {0 : Point(box[0].x - tol_dist, cur_pos_gps.y),
 					1 : Point(cur_pos_gps.x, box[1].y + tol_dist),
@@ -230,11 +227,10 @@ class StationPlanner:
 		final_direction = {0 : "Left", 1: "Top", 2: "Right", 3: "Bottom"}
 		rospy.loginfo(rospy.get_caller_id() + " Exiting bounding box through: " + final_direction[i])
 		
-		Globals.target_waypoint = Waypoint(final_point[i], Waypoint.TYPE_INTERSECT)
-		Globals.publish_target()
+		self.publish_target(Waypoint(final_point[i], Waypoint.TYPE_INTERSECT))
 	
 	def _dist_from_line(self, start_point, end_point):
-		cur_pos_gps = Services.to_gps(Data.cur_pos)
+		cur_pos_gps = Services.to_gps(self.cur_pos)
 		if (end_point.x - start_point.x) <= 0.0001:
 			return cur_pos_gps.x - end_point.x
 		m = (end_point.y - start_point.y)/(end_point.x - start_point.x)
@@ -260,7 +256,7 @@ class StationPlanner:
 			inner_box[i] = pt
 	
 		# Create horizontal vector from the cur_pos towards +x
-		start_point = Services.to_gps(Data.cur_pos)
+		start_point = Services.to_gps(self.cur_pos)
 		m = 0
 		b = start_point.y
 		intersections = 0
