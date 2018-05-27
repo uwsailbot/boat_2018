@@ -14,20 +14,23 @@ _waypoints_pub = rospy.Publisher('waypoints_raw', WaypointArray, queue_size=10)
 _target_pub = rospy.Publisher('target_point', Waypoint, queue_size=10)
 
 
-# Abstract base class for all Planners
-# All implementations should be organized in the same order as this class
-# That is:
-#    - Class Variables
-#    - Constructor
-#    - Main Behaviour
-#    - Callbacks
-#    - Setters
-#    - Utilities
-#
-# Implementations should also use the @overrides (@overrides.overrides) decorator
-# to ensure proper inheritence on the setup() and planner() methods
-#
 class Planner:
+	"""Abstract base class for all Planners.
+	
+	All implementations should be organized in the same order as this class
+	That is:
+		- Class Variables
+		- Constructor
+		- Main Behaviour
+		- Callbacks
+		- Setters
+		- Utilities
+	
+	Implementations should also use the @overrides (@overrides.overrides) decorator
+	to ensure proper inheritence on the abstract setup() and planner() methods
+	
+	Note that implementations must implement the setup() and planner() methods
+	"""
 	__metaclass__ = ABCMeta
 	
 	# Static variables shared in in all implementations
@@ -39,24 +42,33 @@ class Planner:
 	cur_boat_heading = 0
 	ane_reading = 0
 	
-	def __init__(self):
-		pass
-	
 	
 	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Main Behaviour =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 	
 	@abstractmethod
 	def setup(self):
+		"""Setup the planner for the specific challenge.
+		
+		There are three times when this is called:
+		1) When the BoatState.major enters MAJ_AUTONOMOUS
+		2) When the BoatState.challenge enters the specified implementation's challenge
+		3) When the BoatState.minor is MIN_COMPLETE or MIN_INITIALIZE and a new waypoint is added to the waypoints_raw topic
+		"""
 		NotImplementedError("Class %s doesn't implement setup()" % (self.__class__.__name__))
 	
 	
 	@abstractmethod
 	def planner(self):
+		"""Compute the next point for the boat to navigate to.
+		
+		This is called whenever the boat's position is updated, and should compute the next
+		target_waypoint for the boat to navigate towards
+		"""
 		NotImplementedError("Class %s doesn't implement planner()" % (self.__class__.__name__))
 	
 	
 	def traverse_waypoints_planner(self):
-		
+		"""Navigate through the waypoints on the waypoints_raw topic sequentially."""
 		waypoints = self.waypoints
 		
 		# If the list of waypoints is not empty 
@@ -80,12 +92,14 @@ class Planner:
 	
 	@staticmethod
 	def _anemometer_callback(anemometer):
+		"""Callback for anemometer reading."""
 		Planner.ane_reading = anemometer.data
 		Planner._calc_wind_coming()
 	
 	
 	@staticmethod
 	def _compass_callback(compass):
+		"""Callback for compass reading."""
 		Planner.cur_boat_heading = compass.data
 		Planner._calc_wind_coming()
 	
@@ -94,20 +108,36 @@ class Planner:
 	
 	@staticmethod
 	def set_minor_state(minor):
+		"""Set the minor state of the BoatState.
+		
+		@param minor: The state to set
+		"""
 		Planner.state.minor = minor
 		_boat_state_pub.publish(Planner.state)
 	
 	@staticmethod
 	def clear_waypoints():
+		"""Clear all the waypoints. Equivalent to update_waypoints([])"""
 		Planner.update_waypoints([])
 	
 	@staticmethod
 	def update_waypoints(new_pts):
+		"""Set and publish the specified waypoints.
+		
+		@param new_pts: The waypoints to set
+		"""
 		Planner.waypoints = new_pts
 		_waypoints_pub.publish(Planner.waypoints)
 	
 	@staticmethod
 	def publish_target(*argv):
+		"""Publish the target waypoint.
+		
+		Publish the target waypoint, performing additional computation if the waypoint is
+		of type Waypoint.TYPE_ROUND to ensure the boat will properly round the waypoint.
+		
+		@param argv: Optionally specify the waypoint to publish. If unspecified, the Planner.target_waypoint will be used.
+		"""
 		assert len(argv) is 0 or len(argv) is 1, "Invalid number of arguments, expected 1"
 		
 		if len(argv) is 1:
@@ -117,11 +147,13 @@ class Planner:
 		target_waypoint = Planner.target_waypoint
 		cur_pos = Planner.cur_pos
 		
+		# Perform the neccessary computation to allow rounding of buoys
 		if target_waypoint.type is Waypoint.TYPE_ROUND and target_waypoint in waypoints and waypoints.index(target_waypoint) < len(waypoints)-1:
 			
 			r = 3/111319.492188 # meters to coords
-			k = 1.5
+			k = 1.5 #TODO: Use rosparam
 			
+			# Use the heading from the boat to the buoy and from the buoy to the next to calculate where around the target to place the waypoint.
 			next = waypoints[waypoints.index(target_waypoint)+1]
 			theta_boat = math.atan2(Services.to_gps(cur_pos).y - target_waypoint.pt.y, Services.to_gps(cur_pos).x - target_waypoint.pt.x)
 			theta_next = math.atan2(next.pt.y - target_waypoint.pt.y, next.pt.x - target_waypoint.pt.x)
@@ -135,7 +167,9 @@ class Planner:
 			roundPt = Point(target_waypoint.pt.x + math.cos(angle)*r, target_waypoint.pt.y + math.sin(angle)*r)
 			Planner.target_waypoint = Waypoint(roundPt, Waypoint.TYPE_ROUND)
 		
+		# Publish the target
 		_target_pub.publish(Planner.target_waypoint)
+		
 		##rospy.loginfo(rospy.get_caller_id() + " New target waypoint: (long: %.2f, lat: %.2f) or (x: %.f, y: %.f)", point.x, point.y, local.x, local.y)
 	
 	
@@ -143,17 +177,28 @@ class Planner:
 	
 	@staticmethod
 	def _calc_wind_coming():
+		"""Calculate the angle of the wind."""
 		Planner.new_wind_heading = (Planner.ane_reading + Planner.cur_boat_heading) % 360
 		Planner.wind_coming = (Planner.new_wind_heading + 180) % 360
 	
 	
 	def boat_reached_target(self):
+		"""Determine if the boat is within BUOY_TOL meters of the target_waypoint.
+		
+		@return: True if the boat is within the tolerance
+		"""
 		return self.is_within_dist(self.cur_pos, Services.to_lps(self.target_waypoint), BUOY_TOL)
 	
 	
-	# Determine if the dist between two points is within the specified tolerance
 	@staticmethod
 	def is_within_dist(p1, p2, dist):
+		"""Determine if the dist between two points is within the specified tolerance
+		
+		@param p1: The first point to compare
+		@param p2: The second point to compare
+		@param dist: The tolerance, in that same units as the points (meters, etc)
+		@return: True if the points are within the tolerance
+		"""
 		a = math.pow(p1.x - p2.x, 2) + math.pow(p1.y - p2.y, 2)
 		return math.sqrt(a) < dist
 
@@ -168,6 +213,11 @@ class Services:
 	
 	@staticmethod
 	def to_gps(p):
+		"""Convert a point from local (meters) position system to global (coords) position system.
+		
+		@param p: The Point or Waypoint to convert
+		@return: The converted Point
+		"""
 		with Services._to_gps_lock:
 			if type(p) is Point:
 				return Services._to_gps_srv(p).pt
@@ -178,6 +228,11 @@ class Services:
 	
 	@staticmethod
 	def to_lps(p):
+		"""Convert a point from global (coords) position system to local (meters) position system.
+		
+		@param p: The Point or Waypoint to convert
+		@return: The converted Point
+		"""
 		with Services._to_lps_lock:
 			if type(p) is Point:
 				return Services._to_lps_srv(p).pt
@@ -187,14 +242,14 @@ class Services:
 				raise ValueError("p is of invalid type " + str(type(p)) +", must be either Point or Waypoint")
 
 
-# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Initialize the class once =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
-# TODO: Make this less jank
-def initialize():
-	rospy.wait_for_service('gps_to_lps')
-	rospy.wait_for_service('lps_to_gps')
-	Services._to_lps_srv = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
-	Services._to_gps_srv = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
-	
-	rospy.Subscriber('anemometer', Float32, Planner._anemometer_callback)
-	rospy.Subscriber('compass', Float32, Planner._compass_callback)
+# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Initialize the module =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
+
+# TODO: Make this less jank and move Services to a new module (Shared on all ros packages?)
+rospy.wait_for_service('gps_to_lps')
+rospy.wait_for_service('lps_to_gps')
+Services._to_lps_srv = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
+Services._to_gps_srv = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
+
+rospy.Subscriber('anemometer', Float32, Planner._anemometer_callback)
+rospy.Subscriber('compass', Float32, Planner._compass_callback)
 

@@ -4,7 +4,7 @@ sys.dont_write_bytecode = True
 
 import rospy
 from boat_msgs.msg import BoatState, Point, WaypointArray
-from path_planners.planner_base import Planner, initialize
+from path_planners.planner_base import Planner
 from path_planners.search import SearchPlanner
 from path_planners.station import StationPlanner
 from path_planners.nav import NavPlanner
@@ -61,8 +61,6 @@ def position_callback(position):
 # Initialize the node
 def initialize_node():
 	rospy.init_node('path_planner')
-	
-	initialize()
 	
 	# If the filters work, change lps to use /odometry/filtered
 	rospy.Subscriber('lps', Point, position_callback)
