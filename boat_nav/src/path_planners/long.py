@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from overrides import overrides
 from boat_msgs.msg import BoatState
-from path_planners.planner_base import Planner
+from path_planners import Planner
 
 class LongPlanner(Planner):
 	"""Simple Planner implementation that traverses the waypoints in waypoints_raw,

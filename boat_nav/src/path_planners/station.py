@@ -3,7 +3,7 @@ import math
 import rospy
 from overrides import overrides
 from boat_msgs.msg import BoatState, Point, PointArray, Waypoint
-from path_planners.planner_base import Planner, Services
+from path_planners import Planner, Services
 
 HEIGHT_TO_TRAVEL = rospy.get_param('/boat/planner/station/height')
 MAX_WIDTH = rospy.get_param('/boat/planner/station/width')
@@ -248,8 +248,8 @@ class StationPlanner(Planner):
 		"""Calculate the distance of the boat from the line.
 		
 		@param start_point: The initial point on the line
-		@param end_point:The second point on the line
-		@return: The distance in coordinates
+		@param end_point: The second point on the line
+		@return The distance in coordinates
 		"""
 		cur_pos_gps = Services.to_gps(self.cur_pos)
 		if (end_point.x - start_point.x) <= 0.0001:
@@ -262,7 +262,7 @@ class StationPlanner(Planner):
 	def _within_box(self):
 		"""Determine if the boat is within the inner box.
 		
-		@return: True if the boat is within the box
+		@return True if the boat is within the box
 		"""
 		# Find centre of box
 		y_sum = 0

@@ -3,7 +3,7 @@ import math
 import rospy
 from overrides import overrides
 from boat_msgs.msg import BoatState, Point, PointArray, Waypoint
-from path_planners.planner_base import Planner
+from path_planners import Planner
 
 class SearchPlanner(Planner):
 	"""Planner implementation to perform a search algorithm to find a buoy."""

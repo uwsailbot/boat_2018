@@ -28,7 +28,7 @@ class Planner:
 		- Setters
 		- Utilities
 	
-	Implementations should also use the @overrides (@overrides.overrides) decorator
+	Implementations should also use the \@overrides (\@overrides.overrides) decorator
 	to ensure proper inheritence on the abstract setup() and planner() methods
 	
 	Note that implementations must implement the setup() and planner() methods
@@ -52,9 +52,9 @@ class Planner:
 		"""Setup the planner for the specific challenge.
 		
 		There are three times when this is called:
-		1) When the BoatState.major enters MAJ_AUTONOMOUS
-		2) When the BoatState.challenge enters the specified implementation's challenge
-		3) When the BoatState.minor is MIN_COMPLETE or MIN_INITIALIZE and a new waypoint is added to the waypoints_raw topic
+			1. When the BoatState.major enters MAJ_AUTONOMOUS
+			2. When the BoatState.challenge enters the specified implementation's challenge
+			3. When the BoatState.minor is MIN_COMPLETE or MIN_INITIALIZE and a new waypoint is added to the waypoints_raw topic
 		"""
 		NotImplementedError("Class %s doesn't implement setup()" % (self.__class__.__name__))
 	
@@ -187,7 +187,7 @@ class Planner:
 	def boat_reached_target(self):
 		"""Determine if the boat is within BUOY_TOL meters of the target_waypoint.
 		
-		@return: True if the boat is within the tolerance
+		@return True if the boat is within the tolerance
 		"""
 		return self.is_within_dist(self.cur_pos, Services.to_lps(self.target_waypoint), BUOY_TOL)
 	
@@ -199,7 +199,7 @@ class Planner:
 		@param p1: The first point to compare
 		@param p2: The second point to compare
 		@param dist: The tolerance, in that same units as the points (meters, etc)
-		@return: True if the points are within the tolerance
+		@return True if the points are within the tolerance
 		"""
 		a = math.pow(p1.x - p2.x, 2) + math.pow(p1.y - p2.y, 2)
 		return math.sqrt(a) < dist
@@ -218,7 +218,7 @@ class Services:
 		"""Convert a point from local (meters) position system to global (coords) position system.
 		
 		@param p: The Point or Waypoint to convert
-		@return: The converted Point
+		@return The converted Point
 		"""
 		with Services._to_gps_lock:
 			if type(p) is Point:
@@ -233,7 +233,7 @@ class Services:
 		"""Convert a point from global (coords) position system to local (meters) position system.
 		
 		@param p: The Point or Waypoint to convert
-		@return: The converted Point
+		@return The converted Point
 		"""
 		with Services._to_lps_lock:
 			if type(p) is Point:

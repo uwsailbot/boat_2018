@@ -1,0 +1,9 @@
+#!/bin/bash
+
+if ! [ -x "$(command -v doxypypy)" ]; then
+  echo "Error: doxypypy is not installed. Please install using 'pip install doxypypy'" >&2
+  exit 1
+else
+  doxypypy -a -c $1
+  exit 0
+fi

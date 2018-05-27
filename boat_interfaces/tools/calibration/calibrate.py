@@ -84,7 +84,6 @@ def get_next_number():
 
 # for some reason we can only read from the compasscal program after it finishes outputting everything
 # so we can't seem to print its outputs while it's running
-.
 print("Doing 3-axis calibration")
 send_input("3")
 print("Starting sampling...")

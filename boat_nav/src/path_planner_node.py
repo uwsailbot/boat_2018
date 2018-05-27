@@ -3,11 +3,7 @@ import sys
 sys.dont_write_bytecode = True
 import rospy
 from boat_msgs.msg import BoatState, Point, WaypointArray
-from path_planners.planner_base import Planner
-from path_planners.search import SearchPlanner
-from path_planners.station import StationPlanner
-from path_planners.nav import NavPlanner
-from path_planners.long import LongPlanner
+from path_planners import *
 
 # Dict of the planners to use
 planners = {BoatState.CHA_NAV: NavPlanner(),
