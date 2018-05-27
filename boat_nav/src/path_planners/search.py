@@ -6,6 +6,7 @@ from boat_msgs.msg import BoatState, Point, PointArray, Waypoint
 from path_planners.planner_base import Planner
 
 class SearchPlanner(Planner):
+	"""Planner implementation to perform a search algorithm to find a buoy."""
 	
 	def __init__(self):
 		self.search_center = Point() # center of search circle
@@ -59,6 +60,7 @@ class SearchPlanner(Planner):
 	
 	# receives point array from topic, first point is center, second point is on the edge of the circle
 	def _search_area_callback(self, search_area):
+		"""Callback for search area."""
 		if len(search_area.points) < 2:
 			return
 		
@@ -77,6 +79,11 @@ class SearchPlanner(Planner):
 	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Utility Functions =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 	
 	def _get_expaning_square_pts(self, angle, width):
+		"""Calculate the points required to search the given area, using an expanding square algorithm.
+		
+		@param angle: The heading of the incoming wind, in degrees
+		@param width: The width of the search path, in meters (?)
+		"""
 		moves = [[1,0],[0,1],[-1,0],[0,-1]]
 		direction = multiplier = 1
 		x = y = 0

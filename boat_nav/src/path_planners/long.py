@@ -4,6 +4,9 @@ from boat_msgs.msg import BoatState
 from path_planners.planner_base import Planner
 
 class LongPlanner(Planner):
+	"""Simple Planner implementation that traverses the waypoints in waypoints_raw,
+	but does not destroy achieved waypoints, allowing infinite looping.
+	"""
 	
 	@overrides
 	def setup(self):

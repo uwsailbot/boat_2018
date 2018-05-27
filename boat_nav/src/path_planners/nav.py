@@ -4,6 +4,7 @@ from boat_msgs.msg import BoatState
 from path_planners.planner_base import Planner
 
 class NavPlanner(Planner):
+	"""Simple Planner implementation that traverses the waypoints in waypoints_raw once each."""
 	
 	@overrides
 	def setup(self):

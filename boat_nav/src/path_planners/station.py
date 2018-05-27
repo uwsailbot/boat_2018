@@ -10,6 +10,7 @@ MAX_WIDTH = rospy.get_param('/boat/planner/station/width')
 INNER_BOX_SCALE = rospy.get_param('/boat/planner/station/inner_box_scale')
 
 class StationPlanner(Planner):
+	"""Planner implementation to stay within a location for 5 minutes, and then exit."""
 	
 	def __init__(self):
 		self.box = []
@@ -140,6 +141,7 @@ class StationPlanner(Planner):
 	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 	
 	def _timer_callback(self, event):
+		"""Exit the station once the 5 minutes of the challenge are complete."""
 		self.station_timeout = True
 		rospy.loginfo(rospy.get_caller_id() + " Reached end of station timer")
 		
@@ -171,6 +173,7 @@ class StationPlanner(Planner):
 	
 	
 	def _bounding_box_callback(self, bounding_box):
+		"""Callback for station bounding box."""
 		wind_coming = self.wind_coming
 		
 		# Reorganize the local points to create a box when drawn, if there are four
@@ -242,6 +245,12 @@ class StationPlanner(Planner):
 	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Utility Functions =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 	
 	def _dist_from_line(self, start_point, end_point):
+		"""Calculate the distance of the boat from the line.
+		
+		@param start_point: The initial point on the line
+		@param end_point:The second point on the line
+		@return: The distance in coordinates
+		"""
 		cur_pos_gps = Services.to_gps(self.cur_pos)
 		if (end_point.x - start_point.x) <= 0.0001:
 			return cur_pos_gps.x - end_point.x
@@ -251,6 +260,10 @@ class StationPlanner(Planner):
 	
 	
 	def _within_box(self):
+		"""Determine if the boat is within the inner box.
+		
+		@return: True if the boat is within the box
+		"""
 		# Find centre of box
 		y_sum = 0
 		x_sum = 0
@@ -298,4 +311,4 @@ class StationPlanner(Planner):
 				
 		
 		return (intersections % 2) is not 0
-		
+

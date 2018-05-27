@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import sys
 sys.dont_write_bytecode = True
-
 import rospy
 from boat_msgs.msg import BoatState, Point, WaypointArray
 from path_planners.planner_base import Planner
@@ -10,13 +9,14 @@ from path_planners.station import StationPlanner
 from path_planners.nav import NavPlanner
 from path_planners.long import LongPlanner
 
+# Dict of the planners to use
 planners = {BoatState.CHA_NAV: NavPlanner(),
 			BoatState.CHA_LONG: LongPlanner(),
 			BoatState.CHA_SEARCH: SearchPlanner(),
 			BoatState.CHA_STATION: StationPlanner() }
 
 def boat_state_callback(new_state):
-	
+	"""Callback for boat state."""
 	prev_state = Planner.state
 	state = Planner.state = new_state
 	waypoints = Planner.waypoints
@@ -24,16 +24,13 @@ def boat_state_callback(new_state):
 	if state.major is not BoatState.MAJ_AUTONOMOUS:
 		return
 	
-	new_cha = state.challenge is not prev_state.challenge
-	new_maj = state.major is not prev_state.major
-	
-	
 	# Setup the planner when the challenge or major state changes
-	if (new_cha or new_maj):
+	if state.challenge is not prev_state.challenge or state.major is not prev_state.major:
 		planners[state.challenge].setup()
 
 
 def waypoints_callback(new_waypoints):
+	"""Callback for waypoints_raw topic."""
 	Planner.waypoints = new_waypoints.points
 	
 	# If we are waiting in autonomous-complete, and a new waypoint is added, rerun setup
@@ -42,10 +39,11 @@ def waypoints_callback(new_waypoints):
 
 
 def position_callback(position):
+	"""Callback for boat position. Run the current planner."""
 	Planner.cur_pos = position
 	state = Planner.state
 	
-	# If the boat isn't in the autonomous planning state, exit
+	# If the boat isn't in the autonomous-planning state, exit
 	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
 		return
 	
@@ -58,8 +56,8 @@ def position_callback(position):
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
 
-# Initialize the node
 def initialize_node():
+	"""Initialize the node. Setup the node handle and subscribers for ROS."""
 	rospy.init_node('path_planner')
 	
 	# If the filters work, change lps to use /odometry/filtered
