@@ -16,6 +16,47 @@ class SearchPlanner(Planner):
 		rospy.Subscriber('search_area', PointArray, self._search_area_callback)
 	
 	
+	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Main Behaviour =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
+	
+	# sets up waypoints for the search routine
+	# TODO call this again if we ran through all the waypoints set without finding anything?
+	@overrides
+	def setup(self):
+		
+		if self.search_radius is 0:
+			return
+		
+		rospy.loginfo(rospy.get_caller_id() + " Setting waypoints for search challenge routine")
+	
+		self.search_target_found = False
+		self.search_moving_to_found_target = False
+	
+		# Clear previous points
+		#self.clear_waypoints()
+	
+		# stub for now
+		wind_heading = 45
+		num_sweeps = 10
+		sweep_width = 2*self.search_radius/num_sweeps
+		#waypoints = [_get_search_pt(i,wind_heading,sweep_width,search_radius) for i in xrange(0,num_sweeps-1)]
+		self.update_waypoints(self._get_expaning_square_pts(wind_heading, sweep_width))
+		self.publish_target(self.waypoints[0])
+		self.set_minor_state(BoatState.MIN_PLANNING)
+	
+	@overrides
+	def planner(self):
+		
+		if self.search_target_found:
+			# TODO: Read from vision topic and republish it as target
+			self.search_moving_to_found_target = True
+			pass
+		
+		else:
+			self.traverse_waypoints_planner()
+	
+	
+	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
+	
 	# receives point array from topic, first point is center, second point is on the edge of the circle
 	def _search_area_callback(self, search_area):
 		if len(search_area.points) < 2:
@@ -33,39 +74,7 @@ class SearchPlanner(Planner):
 			self.setup()
 	
 	
-	# sets up waypoints for the search routine
-	# TODO call this once we are in search mode and search area has been setup
-	# TODO call this again if we ran through all the waypoints set without finding anything?
-	@overrides
-	def setup(self):
-		rospy.loginfo(rospy.get_caller_id() + " Setting waypoints for search challenge routine")
-	
-		self.search_target_found = False
-		self.search_moving_to_found_target = False
-	
-		# Clear previous points
-		#self.clear_waypoints()
-	
-		# stub for now
-		wind_heading = 45
-		num_sweeps = 10
-		sweep_width = 2*self.search_radius/num_sweeps
-		#waypoints = [_get_search_pt(i,wind_heading,sweep_width,search_radius) for i in xrange(0,num_sweeps-1)]
-		self.update_waypoints(self._get_expaning_square_pts(wind_heading, sweep_width))
-		
-		self.set_minor_state(BoatState.MIN_PLANNING)
-	
-	@overrides
-	def planner(self):
-		
-		if self.search_target_found:
-			# TODO: Read from vision topic and republish it as target
-			self.search_moving_to_found_target = True
-			pass
-		
-		else:
-			self.traverse_waypoints_planner()
-	
+	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Utility Functions =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 	
 	def _get_expaning_square_pts(self, angle, width):
 		moves = [[1,0],[0,1],[-1,0],[0,-1]]
@@ -74,7 +83,6 @@ class SearchPlanner(Planner):
 		out = []
 		c,s = math.cos(math.radians(angle)),math.sin(math.radians(angle))
 		while(math.sqrt(x*x + y*y) < self.search_radius):
-			print len(out), x, y
 			index = len(out)%4
 			x += moves[index][0]*direction*multiplier*width
 			y += moves[index][1]*direction*multiplier*width

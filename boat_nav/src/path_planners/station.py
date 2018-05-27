@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import math
 import rospy
+from overrides import overrides
 from boat_msgs.msg import BoatState, Point, PointArray, Waypoint
 from path_planners.planner_base import Planner, Services
 
@@ -12,7 +13,6 @@ class StationPlanner(Planner):
 	
 	def __init__(self):
 		self.box = []
-		
 		self.start_station = Point()
 		self.end_station = Point()
 		self.station_timeout = False
@@ -20,80 +20,17 @@ class StationPlanner(Planner):
 		rospy.Subscriber('bounding_box', PointArray, self._bounding_box_callback)
 	
 	
-	def _bounding_box_callback(self, bounding_box):
-		wind_coming = self.wind_coming
-		
-		# Reorganize the local points to create a box when drawn, if there are four
-		if len(bounding_box.points) == 4:
-			x_sum = 0
-			y_sum = 0
-			for p in bounding_box.points:
-				x_sum += p.x
-				y_sum += p.y
-			x_avr = x_sum / 4.0
-			y_avr = y_sum / 4.0
-			temp = [None]*4
-			for p in bounding_box.points:
-				if p is None:
-					return
-				if wind_coming > 45 and wind_coming <= 135:
-					if p.x < x_avr:
-						if p.y < y_avr:
-							temp[0] = p
-						else: 
-							temp[1] = p
-					else:
-						if p.y < y_avr:
-							temp[3] = p
-						else:
-							temp[2] = p
-				elif wind_coming > 135 and wind_coming <= 225:
-					if p.x < x_avr:
-						if p.y < y_avr:
-							temp[1] = p
-						else: 
-							temp[2] = p
-					else:
-						if p.y < y_avr:
-							temp[0] = p
-						else:
-							temp[3] = p
-				elif wind_coming > 225 and wind_coming <= 315:
-					if p.x < x_avr:
-						if p.y < y_avr:
-							temp[2] = p
-						else: 
-							temp[3] = p
-					else:
-						if p.y < y_avr:
-							temp[1] = p
-						else:
-							temp[0] = p
-				else:
-					if p.x < x_avr:
-						if p.y < y_avr:
-							temp[3] = p
-						else: 
-							temp[0] = p
-					else:
-						if p.y < y_avr:
-							temp[2] = p
-						else:
-							temp[1] = p
-				self.box = temp
-		else:
-			self.box = bounding_box.points
-		
-		# For if bounding box is added after we are in station mode
-		if self.state.challenge is BoatState.CHA_STATION and len(self.box) is 4:
-			self.setup()
-	
+	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Main Behaviour =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 	
 	@overrides
 	def setup(self):
+		
+		if len(self.box) is not 4:
+			return
+		
 		rospy.loginfo(rospy.get_caller_id() + " Beginning station challenge path planner routine")
 		
-		rospy.Timer(rospy.Duration(5*60), self.timer_callback, oneshot=True)
+		rospy.Timer(rospy.Duration(5*60), self._timer_callback, oneshot=True)
 		
 		# Clear previous points
 		self.clear_waypoints()
@@ -162,8 +99,8 @@ class StationPlanner(Planner):
 			end_station.y = m_bottom * end_station.x + y_int + station_height
 		
 		self.publish_target(Waypoint(start_station, Waypoint.TYPE_INTERSECT))
-	
 		self.set_minor_state(BoatState.MIN_PLANNING)
+	
 	
 	@overrides
 	def planner(self):
@@ -199,7 +136,10 @@ class StationPlanner(Planner):
 			else:
 				self.publish_target(Waypoint(self.start_station, Waypoint.TYPE_INTERSECT))
 	
-	def timer_callback(self, event):
+	
+	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
+	
+	def _timer_callback(self, event):
 		self.station_timeout = True
 		rospy.loginfo(rospy.get_caller_id() + " Reached end of station timer")
 		
@@ -228,6 +168,78 @@ class StationPlanner(Planner):
 		rospy.loginfo(rospy.get_caller_id() + " Exiting bounding box through: " + final_direction[i])
 		
 		self.publish_target(Waypoint(final_point[i], Waypoint.TYPE_INTERSECT))
+	
+	
+	def _bounding_box_callback(self, bounding_box):
+		wind_coming = self.wind_coming
+		
+		# Reorganize the local points to create a box when drawn, if there are four
+		if len(bounding_box.points) == 4:
+			x_sum = 0
+			y_sum = 0
+			for p in bounding_box.points:
+				x_sum += p.x
+				y_sum += p.y
+			x_avr = x_sum / 4.0
+			y_avr = y_sum / 4.0
+			temp = [None]*4
+			for p in bounding_box.points:
+				if p is None:
+					return
+				if wind_coming > 45 and wind_coming <= 135:
+					if p.x < x_avr:
+						if p.y < y_avr:
+							temp[0] = p
+						else: 
+							temp[1] = p
+					else:
+						if p.y < y_avr:
+							temp[3] = p
+						else:
+							temp[2] = p
+				elif wind_coming > 135 and wind_coming <= 225:
+					if p.x < x_avr:
+						if p.y < y_avr:
+							temp[1] = p
+						else: 
+							temp[2] = p
+					else:
+						if p.y < y_avr:
+							temp[0] = p
+						else:
+							temp[3] = p
+				elif wind_coming > 225 and wind_coming <= 315:
+					if p.x < x_avr:
+						if p.y < y_avr:
+							temp[2] = p
+						else: 
+							temp[3] = p
+					else:
+						if p.y < y_avr:
+							temp[1] = p
+						else:
+							temp[0] = p
+				else:
+					if p.x < x_avr:
+						if p.y < y_avr:
+							temp[3] = p
+						else: 
+							temp[0] = p
+					else:
+						if p.y < y_avr:
+							temp[2] = p
+						else:
+							temp[1] = p
+				self.box = temp
+		else:
+			self.box = bounding_box.points
+		
+		# For if bounding box is added after we are in station mode
+		if self.state.challenge is BoatState.CHA_STATION:
+			self.setup()
+	
+	
+	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Utility Functions =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 	
 	def _dist_from_line(self, start_point, end_point):
 		cur_pos_gps = Services.to_gps(self.cur_pos)
@@ -285,9 +297,5 @@ class StationPlanner(Planner):
 					intersections += 1
 				
 		
-		if (intersections % 2) is not 0:
-			return True
-		else:
-			print "Not within inner box."
-			return False
-
+		return (intersections % 2) is not 0
+		

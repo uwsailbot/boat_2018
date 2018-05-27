@@ -15,10 +15,22 @@ _target_pub = rospy.Publisher('target_point', Waypoint, queue_size=10)
 
 
 # Abstract base class for all Planners
+# All implementations should be organized in the same order as this class
+# That is:
+#    - Class Variables
+#    - Constructor
+#    - Main Behaviour
+#    - Callbacks
+#    - Setters
+#    - Utilities
+#
+# Implementations should also use the @overrides (@overrides.overrides) decorator
+# to ensure proper inheritence on the setup() and planner() methods
+#
 class Planner:
 	__metaclass__ = ABCMeta
 	
-	# Static variables for all subclasses
+	# Static variables shared in in all implementations
 	state = BoatState()
 	waypoints = []
 	target_waypoint = Waypoint()
@@ -30,13 +42,55 @@ class Planner:
 	def __init__(self):
 		pass
 	
+	
+	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Main Behaviour =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
+	
 	@abstractmethod
 	def setup(self):
 		NotImplementedError("Class %s doesn't implement setup()" % (self.__class__.__name__))
 	
+	
 	@abstractmethod
 	def planner(self):
 		NotImplementedError("Class %s doesn't implement planner()" % (self.__class__.__name__))
+	
+	
+	def traverse_waypoints_planner(self):
+		
+		waypoints = self.waypoints
+		
+		# If the list of waypoints is not empty 
+		if len(waypoints) > 0:
+		
+			# If the boat is close enough to the waypoint, start navigating towards the next waypoint in the path
+			if self.boat_reached_target():
+				rospy.loginfo(rospy.get_caller_id() + " Reached intermediate waypoint (lat: %.2f, long: %.2f)", waypoints[0].pt.y, waypoints[0].pt.x)
+			
+				del waypoints[0]
+				self.update_waypoints(waypoints)
+				self.publish_target(waypoints[0])
+		
+		# If there are no waypoints left to navigate to, exit
+		else:
+			self.set_minor_state(BoatState.MIN_COMPLETE)
+			rospy.loginfo(rospy.get_caller_id() + " No waypoints left. Boat State = 'Autonomous - Complete'")
+	
+	
+	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
+	
+	@staticmethod
+	def _anemometer_callback(anemometer):
+		Planner.ane_reading = anemometer.data
+		Planner._calc_wind_coming()
+	
+	
+	@staticmethod
+	def _compass_callback(compass):
+		Planner.cur_boat_heading = compass.data
+		Planner._calc_wind_coming()
+	
+	
+	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Setters =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 	
 	@staticmethod
 	def set_minor_state(minor):
@@ -84,28 +138,14 @@ class Planner:
 		_target_pub.publish(Planner.target_waypoint)
 		##rospy.loginfo(rospy.get_caller_id() + " New target waypoint: (long: %.2f, lat: %.2f) or (x: %.f, y: %.f)", point.x, point.y, local.x, local.y)
 	
-	def traverse_waypoints_planner(self):
-		
-		waypoints = self.waypoints
-		state = self.state
-		
-		# If the list of waypoints is not empty 
-		if(len(waypoints) > 0):
-		
-			# If the boat is close enough to the waypoint, start navigating towards the next waypoint in the path
-			if self.boat_reached_target():
-				rospy.loginfo(rospy.get_caller_id() + " Reached intermediate waypoint (lat: %.2f, long: %.2f)", waypoints[0].pt.y, waypoints[0].pt.x)
-			
-				del waypoints[0]
-				self.update_waypoints(waypoints)
-		
-		# If there are no waypoints left to navigate to, exit
-		else:
-			self.set_minor_state(BoatState.MIN_COMPLETE)
-			rospy.loginfo(rospy.get_caller_id() + " No waypoints left. Boat State = 'Autonomous - Complete'")
 	
+	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Utility Functions =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 	
-	# =*=*=*=*=*=*=*=*=*=*=*=*= Math Helper Funcs =*=*=*=*=*=*=*=*=*=*=*=*=
+	@staticmethod
+	def _calc_wind_coming():
+		Planner.new_wind_heading = (Planner.ane_reading + Planner.cur_boat_heading) % 360
+		Planner.wind_coming = (Planner.new_wind_heading + 180) % 360
+	
 	
 	def boat_reached_target(self):
 		return self.is_within_dist(self.cur_pos, Services.to_lps(self.target_waypoint), BUOY_TOL)
@@ -118,7 +158,7 @@ class Planner:
 		return math.sqrt(a) < dist
 
 
-# =*=*=*=*=*=*=*=*=*=*=*=*= Services =*=*=*=*=*=*=*=*=*=*=*=*=
+# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Services =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 
 class Services:
 	_to_gps_srv = ()
@@ -147,31 +187,14 @@ class Services:
 				raise ValueError("p is of invalid type " + str(type(p)) +", must be either Point or Waypoint")
 
 
-# =*=*=*=*=*=*=*=*=*=*=*=*= Private =*=*=*=*=*=*=*=*=*=*=*=*=
-
-def _anemometer_callback(anemometer):
-	Planner.ane_reading = anemometer.data
-	_calc_wind_coming()
-
-
-def _compass_callback(compass):
-	Planner.cur_boat_heading = compass.data
-	_calc_wind_coming()
-
-
-def _calc_wind_coming():
-	Planner.new_wind_heading = (Planner.ane_reading + Planner.cur_boat_heading) % 360
-	Planner.wind_coming = (Planner.new_wind_heading + 180) % 360
-
-
-# =*=*=*=*=*=*=*=*=*=*=*=*= Initialize the class once =*=*=*=*=*=*=*=*=*=*=*=*=
-
+# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Initialize the class once =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
+# TODO: Make this less jank
 def initialize():
 	rospy.wait_for_service('gps_to_lps')
 	rospy.wait_for_service('lps_to_gps')
 	Services._to_lps_srv = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 	Services._to_gps_srv = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
 	
-	rospy.Subscriber('anemometer', Float32, _anemometer_callback)
-	rospy.Subscriber('compass', Float32, _compass_callback)
-	
+	rospy.Subscriber('anemometer', Float32, Planner._anemometer_callback)
+	rospy.Subscriber('compass', Float32, Planner._compass_callback)
+
