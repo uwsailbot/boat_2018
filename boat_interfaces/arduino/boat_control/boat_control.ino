@@ -17,10 +17,10 @@
 #define DEBUG_SERIAL (false) //Output GPS data to Serial2 if true
 
 // Defines for Futaba receiver
-#define CH_1_PIN 5 // RUDDER
-#define CH_3_PIN 6 // SAIL 
-#define CH_5_PIN 7 // SWITCH_A
-#define CH_6_PIN 8 // VR
+#define CH_1_PIN 8 // RUDDER
+#define CH_3_PIN 9 // SAIL 
+#define CH_5_PIN 10 // SWITCH_A
+#define CH_6_PIN 11 // VR
 #define BUFFER_SIZE 5
 
 // The pin the wind vane sensor is connected to
@@ -108,6 +108,11 @@ void setup(){
     pinMode(WIND_VANE_PIN, INPUT);
 
     GPS.begin(9600);
+    
+    // Uncomment following lines to increase GPS baud rate for higher update frequency
+    // GPS.sendCommand("PMTK251,115200*27");
+    // GPS.begin(115200);
+    
     // Tell gps to send RMC (recommended minimum) and GGA (fix data) data
     GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
     //Enable WAAS
@@ -231,12 +236,14 @@ void loop(){
           last_long = gpsData.longitude;
       
     }  
+    useInterrupt(false);
     // Read PWM pins on receiver for controller state  
     ch_1_buf[counter] = pulseIn(CH_1_PIN, HIGH, 10000);
     ch_3_buf[counter] = pulseIn(CH_3_PIN, HIGH, 10000);
     int ch_5_val = pulseIn(CH_5_PIN, HIGH, 10000);
     ch_6_buf[counter] = pulseIn(CH_6_PIN, HIGH, 10000);
-  
+    useInterrupt(true);
+    //TIMSK2 = 0x02;  
     // Lookup table for switch position
     int switch_state = 0;
     if (ch_5_val < 1300){

@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   phidgets_imu
   imu_filter_madgwick
+  tf2_ros
 )
 
 ## System dependencies are found with CMake's conventions

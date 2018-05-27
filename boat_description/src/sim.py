@@ -71,6 +71,7 @@ pause = False
 clock = 0
 last_time = -1
 boat_speed = 0 # px/s
+POS_OFFSET = rospy.get_param('/boat/nav/pos_offset')
 layline = rospy.get_param('/boat/nav/layline')
 winch_min = rospy.get_param('/boat/interfaces/winch_min')
 winch_max = rospy.get_param('/boat/interfaces/winch_max')
@@ -280,7 +281,9 @@ def to_lps(p):
 def update_gps():
 	gps = GPS()
 	gps.status = GPS.STATUS_FIX
-	coords = to_gps(pos)
+	# simulate position of gps at back of boat
+	pos_with_offset = Point(pos.x-POS_OFFSET*cosd(heading), pos.y-POS_OFFSET*sind(heading))
+	coords = to_gps(pos_with_offset)
 	gps.latitude = coords.y
 	gps.longitude = coords.x
 	gps.track = (450-heading)%360
@@ -384,7 +387,7 @@ def target_heading_callback(angle):
 
 def lps_callback(lps):
 	global pos
-	
+
 	if sim_mode is SimMode.REPLAY or sim_mode is SimMode.CONTROLLER:
 		pos = lps
 
@@ -1183,7 +1186,6 @@ def draw_boat():
 	glPopMatrix()
 
 
-
 # Draw the rudder diagram centered on (x, y)
 def draw_status_boat(x, y):
 	# draw boat
@@ -1418,6 +1420,11 @@ def proj(u,v):
 def polar_to_rect(rad, ang):
 	return (rad * math.cos(math.radians(ang)), rad * math.sin(math.radians(ang)))
 
+def cosd(angle):
+	return math.cos(math.radians(angle))
+
+def sind(angle):
+	return math.sin(math.radians(angle))
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
 

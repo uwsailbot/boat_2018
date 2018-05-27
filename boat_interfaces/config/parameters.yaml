@@ -1,4 +1,4 @@
-use_sim_time: true
+use_sim_time: false
 
 boat:
   interfaces:
@@ -11,6 +11,7 @@ boat:
     radius: 6378137.0
     min_tacking_speed: 0.8 # in m/s
     beating: 100.0 # m
+    pos_offset: 1.0 # m
   planner:
     buoy_tol: 2 # m Tolerance to consider a waypoint hit
     round_dist: 3 # m Distance  to round buoys
