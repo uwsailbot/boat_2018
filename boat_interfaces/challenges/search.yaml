@@ -8,7 +8,7 @@ Center:
   y: 0
   lps: true
   
-radius: 20
+radius: 100
 
 Target:
   x: 20
