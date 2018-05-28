@@ -11,6 +11,7 @@ state = BoatState()
 state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
 waypoints_pub = rospy.Publisher('waypoints_raw', WaypointArray, queue_size = 10)
 station_box_pub = rospy.Publisher('bounding_box', PointArray, queue_size = 10)
+search_area_pub = rospy.Publisher('search_area', PointArray, queue_size = 10)
 to_gps = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
 
 def state_callback(new_state):
@@ -48,7 +49,7 @@ def joy_callback(controller):
 	# If switch A is in the up position, set auto
 	if controller.switch_a == Joy.SWITCH_UP and state.major is not BoatState.MAJ_AUTONOMOUS:
 		state.major = BoatState.MAJ_AUTONOMOUS
-		state.minor = BoatState.MIN_COMPLETE
+		state.minor = BoatState.MIN_INITIALIZE
 		state_pub.publish(state)
 	
 	# If switch A is in the neutral position, set rc
@@ -67,7 +68,23 @@ def joy_callback(controller):
 
 def load_challenge_data():
 	
-	if state.challenge is BoatState.CHA_STATION:
+	# Search challenge
+	if state.challenge is BoatState.CHA_SEARCH:
+		data = yaml.load(open(rospack.get_path('boat_interfaces') + "/challenges/search.yaml"))
+		
+		center = Point(data["Center"]["x"], data["Center"]["y"])
+		edge = Point(center.x + data["radius"], center.y)
+		
+		if data["Center"]["lps"]:
+			center = to_gps(center).pt
+			edge = to_gps(edge).pt
+		
+		#TODO: Load target pt
+		
+		search_area_pub.publish([center, edge])
+	
+	# Station keeping challenge
+	elif state.challenge is BoatState.CHA_STATION:
 		data = yaml.load(open(rospack.get_path('boat_interfaces') + "/challenges/station.yaml"))
 		
 		box = PointArray()
@@ -80,6 +97,7 @@ def load_challenge_data():
 		
 		station_box_pub.publish(box)
 	
+	# Navigation and Long-Distance challenges
 	elif state.challenge is BoatState.CHA_LONG or state.challenge is BoatState.CHA_NAV:
 		if state.challenge is BoatState.CHA_LONG:
 			data = yaml.load(open(rospack.get_path('boat_interfaces') + "/challenges/long.yaml"))

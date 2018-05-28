@@ -62,6 +62,13 @@ def orientation_callback(imu):
 	heading = yaw
 	compass_pub.publish(Float32(heading))
 
+# allow overriding the origin a gps coordinate for new origin
+def origin_override_callback(gps_coords):
+	global origin_lps
+	origin_lps = Point()
+	print ('old point', origin_lps)
+	origin_lps = to_lps(gps_coords)
+	rospy.loginfo("Got origin: x:%f y:%f", origin_lps.x, origin_lps.y)
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Services =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -136,6 +143,7 @@ def listener():
 	
 	rospy.Subscriber('imu/data', Imu, orientation_callback)
 	rospy.Subscriber('gps_raw', GPS, gps_callback)
+	rospy.Subscriber('origin_override', Point, origin_override_callback)
 	srv2 = rospy.Service('gps_to_lps', ConvertPoint, gps_to_lps_srv)
 	rospy.spin()
 

@@ -1,0 +1,16 @@
+# Center is the center of the search area
+# Target is the target buoy to search for (For testing only)
+
+# The x and y fields describe the point's location
+# The lps field describes whether the x and y should be treated as meters from origin or coordinates
+Center:
+  x: 0
+  y: 0
+  lps: true
+  
+radius: 20
+
+Target:
+  x: 20
+  y: 20
+  lps: true

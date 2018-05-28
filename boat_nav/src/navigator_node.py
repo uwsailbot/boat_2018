@@ -3,6 +3,7 @@ import actionlib
 import math
 import rospy
 from boat_msgs.msg import BoatState, GPS, MaxVMGAction, MaxVMGGoal, Point, Waypoint, TackingAction, TackingGoal, LaylineAction, LaylineGoal
+from boat_msgs.srv import ConvertPoint
 from std_msgs.msg import Float32
 
 ## Trigger for when the wind shifts significantly
@@ -63,6 +64,8 @@ max_vmg_client = actionlib.SimpleActionClient('max_vmg_action', MaxVMGAction)
 tacking_client = actionlib.SimpleActionClient('tacking_action', TackingAction)
 layline_client = actionlib.SimpleActionClient('layline_action', LaylineAction)
 
+# Service to convert gps to lps
+to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
@@ -139,6 +142,7 @@ def target_callback(new_target):
 	global is_new_target
 	global start_pos
 
+	new_target = Waypoint(to_lps(new_target.pt).pt, new_target.type)
 	# If the target has changed, save the new target
 	if abs(target.pt.x - new_target.pt.x) > 0.01 or abs(target.pt.y - new_target.pt.y) > 0.01:
 		is_new_target = True
