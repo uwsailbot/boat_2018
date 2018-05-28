@@ -6,6 +6,8 @@ boat:
     winch_min: 900.0
     rudder_max: 150
     rudder_min: 30
+  vision:
+    width: 14 # Width of useable search area (Eg width of FOV at max useful distance)
   nav:
     layline: 30.0
     radius: 6378137.0
