@@ -45,7 +45,7 @@ class LaylineAction(object):
 
 	def target_callback(self, new_target):
 		self.new_target = True
-		print "new target"
+		#print "new target"
 
 	def gps_callback(self, gps):
 		self.boat_speed = gps.speed * 0.514444 # Knots to m/s
