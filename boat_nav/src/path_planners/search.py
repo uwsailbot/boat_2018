@@ -1,8 +1,9 @@
 #!/usr/bin/env python
+import actionlib
 import math
 import rospy
 from overrides import overrides
-from boat_msgs.msg import BoatState, Point, PointArray, Waypoint
+from boat_msgs.msg import BoatState, Point, PointArray, Waypoint, IronsAction, IronsGoal
 from std_msgs.msg import Bool
 from path_planners import Planner
 
@@ -19,7 +20,11 @@ class SearchPlanner(Planner):
 		
 		rospy.Subscriber('search_area', PointArray, self._search_area_callback)
 		rospy.Subscriber('vision', PointArray, self._vision_callback)
+		
+		self.irons_client = actionlib.SimpleActionClient('irons_action', IronsAction)
 		self.found_pub = rospy.Publisher('found_target', Bool, queue_size = 10)
+		
+		#self.irons_client.wait_for_server()
 	
 	
 	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Main Behaviour =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
@@ -68,8 +73,15 @@ class SearchPlanner(Planner):
 			#Once we intercept the vision target, publish and complete
 			if self.boat_reached_target(): #TODO: Add additional 'complete' criteria to ensure contact
 				self.found_pub.publish(True)
-				#TODO: Turn into the wind. We might need an action for this?
-				self.set_minor_state(BoatState.MIN_COMPLETE)
+				self.set_minor_state(BoatState.MIN_COMPLETE) #TODO: Add MIN_SHUTDOWN??
+				
+				
+				self.irons_client.send_goal(IronsGoal())
+				
+				# Adjust time delay until the layline setup action is considered failed
+				if not self.irons_client.wait_for_result(rospy.Duration(20)):
+					self.irons_client.cancel_goal()
+
 	
 	
 	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=

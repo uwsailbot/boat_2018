@@ -72,6 +72,7 @@ find_package(catkin REQUIRED COMPONENTS
    MaxVMG.action
    Tacking.action
    Layline.action
+   Irons.action
  )
 
 ## Generate added messages and services with any dependencies listed here
