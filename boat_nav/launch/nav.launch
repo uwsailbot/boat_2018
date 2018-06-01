@@ -2,7 +2,6 @@
 <launch>
   <node pkg="boat_nav" type="path_planner_node.py" name="path_planner" output="screen"/>
   <node pkg="boat_nav" type="navigator_node.py" name="navigator" output="screen"/>
-  <node pkg="boat_nav" type="sensor_parser_node.py" name="sensor_parser" output="screen"/>
-  <node pkg="boat_nav" type="max_vmg_action.py" name="max_vmg_action" output="screen"/>
+  <node pkg="boat_nav" type="sensor_parser_node.py" name="sensor_parser"/>
   <node pkg="boat_nav" type="layline_action.py" name="layline_action" output="screen"/>
 </launch>

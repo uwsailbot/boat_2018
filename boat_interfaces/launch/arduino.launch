@@ -1,0 +1,10 @@
+<!-- Arduino Connection launch file -->
+<launch>
+  <node pkg="rosserial_python" type="serial_node.py" name="arduino_mega" >
+    <param name="port" value="/dev/ttyACM1" />
+  </node>
+
+  <node pkg="rosserial_python" type="serial_node.py" name="arduino_micro" >
+    <param name="port" value="/dev/ttyACM0" />
+  </node>
+</launch>

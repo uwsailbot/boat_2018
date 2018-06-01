@@ -1,0 +1,12 @@
+<!-- Full system launch file -->
+<launch>
+  <!-- Arduino connection nodes -->
+  <include file="$(find boat_interfaces)/launch/arduino.launch" />
+
+  <!-- Boat Interface nodes -->
+  <include file="$(find boat_interfaces)/launch/interfaces_base.launch" />
+
+  <!-- Boat Navigation nodes -->
+  <include file="$(find boat_nav)/launch/nav.launch" />
+
+</launch>

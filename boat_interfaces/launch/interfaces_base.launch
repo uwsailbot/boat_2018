@@ -7,11 +7,11 @@
   </node>
 
   <node pkg="boat_interfaces" type="rudder_node.py"
-    name="rudder" output="screen">
+    name="rudder">
   </node> 
 
   <node pkg="boat_interfaces" type="winch_node.py"
-    name="winch" output="screen" >
+    name="winch">
   </node>
 
   <node pkg="boat_interfaces" type="tacking_action.py"
@@ -19,6 +19,6 @@
   </node>
   
   <node pkg="boat_interfaces" type="pid.py"
-    name="controller" ns="rudder_pid" output="screen">
+    name="controller" ns="rudder_pid">
   </node> 
 </launch>
