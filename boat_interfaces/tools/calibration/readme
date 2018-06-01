@@ -26,3 +26,8 @@ Tests:
 	of the actual calibration program has different behaviours than reading the output
 	of the mock program. The actual calibration program's output cannot seem to be read
 	until the program terminates.
+
+Troubleshooting:
+- If the scripts do something very wrong and erase both the launch file and the backup,
+	you can use `git reset --hard` to revert current uncommited changes, which should
+	restore the files

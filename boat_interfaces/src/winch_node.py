@@ -79,7 +79,7 @@ def anemometer_callback(anemometer):
 		if abs(new_position - winch_pos) > 50:
 			winch_pos = new_position
 			winch_pub.publish(Int32(winch_pos))
-			rospy.loginfo(rospy.get_caller_id() + " Autonomy Request: %f", winch_pos)
+			#rospy.loginfo(rospy.get_caller_id() + " Autonomy Request: %f", winch_pos)
 
 def listener():
 	# Setup subscribers

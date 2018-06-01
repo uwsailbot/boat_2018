@@ -40,7 +40,8 @@ camera_move_speed = 100
 camera_velocity = Point(0, 0)
 # should camera follow boat?
 follow_boat = False
-
+#raw mouse records
+mouse_pos = Point()
 
 # Resources
 compass_img = ()
@@ -70,6 +71,7 @@ pause = False
 clock = 0
 last_time = -1
 boat_speed = 0 # px/s
+POS_OFFSET = rospy.get_param('/boat/nav/pos_offset')
 layline = rospy.get_param('/boat/nav/layline')
 winch_min = rospy.get_param('/boat/interfaces/winch_min')
 winch_max = rospy.get_param('/boat/interfaces/winch_max')
@@ -81,6 +83,9 @@ prev_path_time = 0
 fov_radius = 15
 fov_angle = 60
 vision_points_gps = PointArray()
+vision_points_lps = PointArray()
+reset_origin_on_next_gps=False
+
 
 # ROS data
 wind_heading = 270
@@ -106,6 +111,138 @@ target_point = Waypoint()
 gps_bounding_box = PointArray()
 
 
+# ROS data -- search
+class SearchAreaSection:
+	def __init__(self, center, length, recursive_level, search_area):
+		self.center = center
+		self.length = length
+		self.children = []
+		self.recursive_level = recursive_level
+		self.full= True
+		if recursive_level > 0:
+			self.add_child(Point(center.x+length/4.0, center.y+length/4.0), search_area)
+			self.add_child(Point(center.x+length/4.0, center.y-length/4.0), search_area)
+			self.add_child(Point(center.x-length/4.0, center.y-length/4.0), search_area)
+			self.add_child(Point(center.x-length/4.0, center.y+length/4.0), search_area)
+
+	def add_child(self, child_center, search_area):
+		if self.recursive_level > 1 or (child_center.x-search_area.center.x)**2+(child_center.y-search_area.center.y)**2 < search_area.radius**2:
+			self.children.append(SearchAreaSection(child_center, self.length/2.0, self.recursive_level - 1, search_area))
+
+	def update(self):
+		# recursively do this so we can prune children at all levels
+		if self.recursive_level > 1:
+			# recursively update children
+			for child in self.children:
+				child.update()
+		
+		to_remove = []
+		for child in self.children:
+			if self.full and not child.full:
+				self.full = False
+			# remove leaf nodes who are in fov, remove non-leaf nodes who have no children
+			if child.recursive_level is 0:
+				if point_is_in_fov(child.center):
+					to_remove.append(child)
+			else:
+				if len(child.children) is 0:
+					to_remove.append(child)
+		for child in to_remove:
+			self.children.remove(child)
+
+		# consider oneself full when it has 4 children and all its children are full
+		# full means all of its non-leaf children have 4 children (are complete squares)
+		if self.full:
+			if len(self.children) is not 4:
+				self.full = False
+			else:
+				for child in self.children:
+					if not child.full:
+						self.full = False
+	
+	def draw(self, camera):
+		glBegin(GL_QUADS)
+		self._draw(camera)
+		glEnd()
+
+	def _draw(self, camera):
+		if self.recursive_level is 0 or self.full:
+			glColor4f(self.recursive_level*0.2, self.recursive_level*0.2, self.recursive_level*0.2, 0.3)
+			extent = self.length/2.0 * camera.scale
+			(x, y) = camera.lps_to_screen(self.center.x, self.center.y)
+			glVertex2f(x+extent, y-extent)
+			glVertex2f(x-extent, y-extent)
+			glVertex2f(x-extent, y+extent)
+			glVertex2f(x+extent, y+extent)
+		else:
+			for child in self.children:
+				child._draw(camera)
+	
+
+class SearchArea:
+
+	def __init__(self, center, radius, target):
+		self.center = center
+		self.radius = radius
+		self.target = target
+		self.sections = None
+
+	# cpu/mem will scale exponentially with resolution
+	# use ~4 for good computers, less for poorer computers
+	def setup_coverage(self, resolution=3):
+		if self.center is None or self.radius is 0 or self.target is None:
+			print("Tried to setup coverage check for search but search area was not completely setup (c:%s r:%s t:%s)" % (self.center, self.radius, self.target))
+			return
+		self.resolution = int(resolution)
+		sections = []
+		sections_per_half_row = int(float(self.radius)/fov_radius)+1
+		self.sections_per_row = sections_per_half_row*2
+
+		for i in range(-sections_per_half_row, sections_per_half_row):
+			section_x = self.center.x + fov_radius*i + fov_radius/2.0
+			for j in range(-sections_per_half_row, sections_per_half_row):
+				section_y = self.center.y + fov_radius*j + fov_radius/2.0
+				section = SearchAreaSection(Point(section_x, section_y), fov_radius, self.resolution, self)
+				section.update() # update once to finish setting up
+				sections.append(section)
+		self.sections = sections
+	
+	def update_coverage_section(self, x_section, y_section):
+		section_index = x_section*self.sections_per_row + y_section
+		try:
+			self.sections[section_index].update()
+		except IndexError:
+			pass
+		
+	def update_coverage(self):
+		if self.center is None or self.radius is 0 or self.target is None:
+			return
+		dx = pos.x-self.center.x
+		dy = pos.y-self.center.y
+		if dx**2 + dy**2 < (self.radius+fov_radius)**2:
+			if dx<0:
+				dx-=fov_radius # account for int trunction of neg numbers in next line
+			x_section = int(dx/fov_radius)+self.sections_per_row/2
+			if dy<0:
+				dy-=fov_radius # account for int trunction of neg numbers in next line
+			y_section = int(dy/fov_radius)+self.sections_per_row/2
+
+			# update current section and 8 adjacent sections
+			self.update_coverage_section(x_section, y_section)
+			self.update_coverage_section(x_section, y_section-1)
+			self.update_coverage_section(x_section, y_section+1)
+			self.update_coverage_section(x_section-1, y_section)
+			self.update_coverage_section(x_section-1, y_section-1)
+			self.update_coverage_section(x_section-1, y_section+1)
+			self.update_coverage_section(x_section+1, y_section)
+			self.update_coverage_section(x_section+1, y_section-1)
+			self.update_coverage_section(x_section+1, y_section+1)
+
+gps_search_area = PointArray() # in gps, first point is center of circle, second is on edge, record of ros data
+search_area = SearchArea(None, 0, None) # for use in simulator only
+
+
+
 # =*=*=*=*=*=*=*=*=*=*=*=*= ROS Publishers & Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
 waypoint_pub = rospy.Publisher('waypoints_raw', WaypointArray, queue_size = 10)
@@ -113,7 +250,9 @@ wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 10)
 gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
 orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
 joy_pub = rospy.Publisher('joy', Joy, queue_size = 10)
+origin_override_pub = rospy.Publisher('origin_override', Point, queue_size = 10)
 square_pub = rospy.Publisher('bounding_box', PointArray, queue_size = 10)
+search_area_pub = rospy.Publisher('search_area', PointArray, queue_size = 10)
 clock_pub = rospy.Publisher('clock', Clock, queue_size = 1)
 vision_pub = rospy.Publisher('vision', PointArray, queue_size = 10)
 to_gps_srv = rospy.ServiceProxy('lps_to_gps', ConvertPoint)
@@ -139,17 +278,18 @@ def to_lps(p):
 		else:
 			raise ValueError("p is of invalid type " + str(type(p)) +", must be either Point or Waypoint")
 
-
 def update_gps():
 	gps = GPS()
 	gps.status = GPS.STATUS_FIX
-	coords = to_gps(pos)
+	# simulate position of gps at back of boat
+	pos_with_offset = Point(pos.x-POS_OFFSET*cosd(heading), pos.y-POS_OFFSET*sind(heading))
+	coords = to_gps(pos_with_offset)
 	gps.latitude = coords.y
 	gps.longitude = coords.x
 	gps.track = (450-heading)%360
 	gps.speed = boat_speed * 1.94384 # m/s to KNOTS
 	gps_pub.publish(gps)
-	
+
 	orientation = quaternion_from_euler(0,0,math.radians(heading))
 	imu = Imu()
 	
@@ -171,9 +311,11 @@ def point_is_in_fov(point):
 	if dx*dx + dy*dy < fov_radius*fov_radius:
 		# within angle
 		angle = math.degrees(math.atan2(dy, dx))
-		if angle < 0:
-			angle += 360
 		if abs(angle-heading) < fov_angle / 2:
+			return True
+		if abs(angle+360-heading) < fov_angle / 2:
+			return True
+		if abs(angle-360-heading) < fov_angle / 2:
 			return True
 	return False
 
@@ -187,6 +329,14 @@ def update_vision():
 		lps = to_lps(waypoint)
 		if point_is_in_fov(lps):
 			vision_points_gps.points.append(waypoint.pt)
+	
+	if search_area.target is not None and point_is_in_fov(search_area.target):
+		vision_points_gps.points.append(to_gps(search_area.target))
+
+	# TODO place this somewhere better
+	# update search_area coverage, need to call this often
+	if state.challenge is BoatState.CHA_SEARCH:
+		search_area.update_coverage()
 	
 	vision_pub.publish(vision_points_gps)
 
@@ -237,7 +387,7 @@ def target_heading_callback(angle):
 
 def lps_callback(lps):
 	global pos
-	
+
 	if sim_mode is SimMode.REPLAY or sim_mode is SimMode.CONTROLLER:
 		pos = lps
 
@@ -271,9 +421,17 @@ def rudder_enable_callback(enabled):
 	global rudder_enable
 	rudder_enable = enabled.data
 
-def gps_raw_callback(gps_raw):
+def gps_raw_callback(gps):
 	global replay_gps_raw
-	replay_gps_raw = gps_raw
+	global reset_origin_on_next_gps
+	replay_gps_raw = gps
+	
+	if reset_origin_on_next_gps:
+		reset_origin_on_next_gps = False
+		new_origin = Point()
+		new_origin.x = gps.longitude
+		new_origin.y = gps.latitude
+		origin_override_pub.publish(new_origin)
 	
 def obstacles_callback(obstacles):
 	global obstacle_points
@@ -283,13 +441,36 @@ def bounding_box_callback(box):
 	global gps_bounding_box
 	gps_bounding_box = box
 
+
+def search_area_callback(new_search_area):
+	global gps_search_area
+
+	gps_search_area = new_search_area
+	if len(gps_search_area.points) >= 1:
+		search_area.center = to_lps(gps_search_area.points[0])
+		if len(gps_search_area.points) >= 2:
+			edge_point = to_lps(gps_search_area.points[1])
+			# first point is center and second defines radius from center
+			# calc radius
+			dx = (search_area.center.x - edge_point.x)
+			dy = (search_area.center.y - edge_point.y)
+			search_area.radius = math.sqrt(dx*dx+dy*dy)
+		else:
+			search_area.radius = 0
+	else:
+		search_area.center = None
+
 def target_point_callback(target_pt):
 	global target_point
 	target_point = target_pt
 
 def vision_callback(new_vision_points_gps):
 	global vision_points_gps
+	global vision_points_lps
 	vision_points_gps = new_vision_points_gps
+	vision_points_lps.points = []
+	for point in vision_points_gps.points:
+		vision_points_lps.points.append(to_lps(point))
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= GLUT callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -314,6 +495,8 @@ def mouse_handler(button, mouse_state, x, y):
 	global sliders
 	global cur_slider
 	global gps_bounding_box
+	global gps_search_area
+	global search_area
 	
 	if mouse_state != GLUT_DOWN:
 		cur_slider = ()
@@ -331,10 +514,13 @@ def mouse_handler(button, mouse_state, x, y):
 		if sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER:
 			waypoint_gps = WaypointArray()
 			gps_bounding_box = PointArray()
+			gps_search_area = PointArray()
+			search_area.target = None
 			waypoint_pub.publish(waypoint_gps)
 			square_pub.publish(gps_bounding_box)
+			search_area_pub.publish(gps_search_area)
 
-	elif cur_slider is () and (sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER) and state.challenge is not BoatState.CHA_STATION and (button == GLUT_LEFT_BUTTON or button == GLUT_MIDDLE_BUTTON):
+	elif cur_slider is () and (sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER) and state.challenge is not BoatState.CHA_STATION and state.challenge is not BoatState.CHA_SEARCH and (button == GLUT_LEFT_BUTTON or button == GLUT_MIDDLE_BUTTON):
 		newPt = Point()
 		(lps_x,lps_y) = camera.screen_to_lps(x,y)
 		newPt.x = lps_x
@@ -368,6 +554,27 @@ def mouse_handler(button, mouse_state, x, y):
 		
 		waypoint_pub.publish(waypoint_gps)
 
+	elif cur_slider is () and (sim_mode is SimMode.DEFAULT or sim_mode is SimMode.CONTROLLER) and state.challenge is BoatState.CHA_SEARCH and button == GLUT_LEFT_BUTTON:
+		(lps_x,lps_y) = camera.screen_to_lps(x,y)		
+		new_point = to_gps(Point(lps_x, lps_y))
+
+		if len(gps_search_area.points) == 2:
+			if search_area.target is None:
+				# set search target
+				# no other nodes need to know this since this is for testing only,
+				# so we can just do it here and not publish anything 
+				search_area.target = to_lps(new_point) #TODO fix this when lps origin is shifted.
+				search_area.setup_coverage()
+			else:
+				# Reset if we were gonna add to a list of 2 points and a target already
+				search_area.target = None
+				gps_search_area = PointArray()
+				gps_search_area.points.append(new_point)
+		else:
+			gps_search_area.points.append(new_point)
+		
+		search_area_pub.publish(gps_search_area)
+
 	elif (button == 3 or button == 4) and mouse_state == GLUT_DOWN:
 		
 		if not follow_boat:
@@ -391,8 +598,12 @@ def mouse_handler(button, mouse_state, x, y):
 
 # Handler for mouse position
 def passive_mouse_handler(x,y):
+	global mouse_pos
 	global camera_velocity
-	
+
+	#save mouse pos
+	mouse_pos = Point(x,y)
+
 	# if mouse is on right info panel, don't move camera
 	if x > win_width-120:
 		camera_velocity.x = 0
@@ -461,7 +672,8 @@ def ASCII_handler(key, mousex, mousey):
 	global display_path
 	global path
 	global follow_boat
-	
+	global reset_origin_on_next_gps
+
 	# Handle cheat codes
 	cur_input += key;
 	valid = False
@@ -484,10 +696,13 @@ def ASCII_handler(key, mousex, mousey):
 	elif key is 'm':
 		if sim_mode is SimMode.DEFAULT:
 			sim_mode = SimMode.REPLAY
+			reset_origin_on_next_gps = True
 		elif sim_mode is SimMode.REPLAY:
 			sim_mode = SimMode.CONTROLLER
+			reset_origin_on_next_gps = True
 		else:
 			sim_mode = SimMode.DEFAULT
+			reset_origin_on_next_gps = False
 		print 'Changed sim mode, is now', sim_mode
 	elif key is 'i':
 		show_details = not show_details
@@ -552,7 +767,9 @@ def redraw():
 	# Render stuff
 	draw_grid()
 	if state.challenge is BoatState.CHA_STATION:
-		draw_bounding_box()	
+		draw_bounding_box()
+	if state.challenge is BoatState.CHA_SEARCH:
+		draw_search_area() 
 	if display_path:
 		draw_path()
 	draw_fov()
@@ -612,11 +829,60 @@ def draw_bounding_box():
 		
 	glPopMatrix()
 	
+def draw_search_area():
+	glPushMatrix()
+
+	if search_area.center is not None:
+		# draw center point
+		(center_x,center_y) = camera.lps_to_screen(search_area.center.x, search_area.center.y)
+		glColor3f(0,1,0)
+		draw_circle(0.5 * camera.scale,center_x,center_y)
+
+		# draw circle around center
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+		glEnable(GL_BLEND)
+		if search_area.radius > 0:
+			# draw actual circle
+			glColor4f(0, 1, 1, 0.2)
+			draw_circle(search_area.radius*camera.scale, center_x, center_y, 50)
+			glDisable(GL_BLEND)
+		else:
+			# preview the circle based on mouse pos
+			(mouse_x, mouse_y) = camera.screen_to_lps(mouse_pos.x, mouse_pos.y)
+			dx = (search_area.center.x - mouse_x)
+			dy = (search_area.center.y - mouse_y)
+			radius = math.sqrt(dx*dx+dy*dy)
+			glColor4f(0, 1, 1, 0.1)
+			draw_circle(radius*camera.scale, center_x, center_y, 50)
+		glDisable(GL_BLEND)
+
+		if search_area.target is not None:
+			# draw target
+			(target_x,target_y) = camera.lps_to_screen(search_area.target.x, search_area.target.y)
+			glColor3f(1,1,0)
+			draw_circle(0.5 * camera.scale,target_x,target_y)
+
+			# draw coverage
+			if search_area.sections is not None:
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+				glEnable(GL_BLEND)
+				glColor4f(1, 1, 0, 0.1)
+
+				glPushMatrix()
+				
+				for section in search_area.sections:
+					section.draw(camera)
+					
+				glPopMatrix()
+				glDisable(GL_BLEND)
+
+	glPopMatrix()
 
 def draw_target_point():
 	if target_point is not () and state.major is BoatState.MAJ_AUTONOMOUS and state.minor is not BoatState.MIN_COMPLETE:
 		glColor3f(1,1,1)
-		(x,y) = camera.lps_to_screen(target_point.pt.x, target_point.pt.y)
+		lps_point = to_lps(target_point.pt)
+		(x,y) = camera.lps_to_screen(lps_point.x, lps_point.y)
 		draw_circle(0.7 * camera.scale, x, y)
 
 def draw_obstacles():
@@ -695,9 +961,8 @@ def draw_waypoints_in_fov():
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
 	glColor4f(245/255.0, 200/255.0, 5/255.0, 0.3)
-	#print(vision_points_lps.points)
-	for point in vision_points_gps.points:
-		point = to_lps(point)
+
+	for point in vision_points_lps.points:
 		(x,y) = camera.lps_to_screen(point.x, point.y)
 		draw_circle(0.8 * camera.scale, x, y)
 
@@ -728,7 +993,7 @@ def draw_status():
 	
 	# Draw the wind readout
 	glColor3f(0.0, 0.0, 0.0)
-	draw_text("Wind: " + str(wind_heading), win_width-60, win_height-20, 'center')
+	draw_text("Wind: %.1f" % wind_heading, win_width-60, win_height-20, 'center')
 	draw_wind_arrow(win_width-60,win_height-65)
 	
 	# Draw wind speed text
@@ -767,6 +1032,8 @@ def draw_status():
 	minor = ""
 	if state.minor is BoatState.MIN_COMPLETE:
 		minor = "Complete"
+	elif state.minor is BoatState.MIN_INITIALIZE:
+		minor = "Initilize"
 	elif state.minor is BoatState.MIN_PLANNING:
 		minor = "Planning"
 	elif state.minor is BoatState.MIN_TACKING:
@@ -838,8 +1105,8 @@ def draw_detailed_status():
 	draw_text("GPS Raw:", panel_width/2, win_height*gps_offset, 'center', 18)
 	draw_text("status: %f" % replay_gps_raw.status, panel_width/2, win_height*gps_offset-20, 'center')
 	draw_text("satellites_used: %.1f" % replay_gps_raw.satellites_used, panel_width/2, win_height*gps_offset-35, 'center')
-	draw_text("lat: %.0000001f" % replay_gps_raw.latitude, panel_width/2, win_height*gps_offset-50, 'center')
-	draw_text("long: %.0000001f" % replay_gps_raw.longitude, panel_width/2, win_height*gps_offset-65, 'center')
+	draw_text("lat: %.000000001f" % replay_gps_raw.latitude, panel_width/2, win_height*gps_offset-50, 'center')
+	draw_text("long: %.000000001f" % replay_gps_raw.longitude, panel_width/2, win_height*gps_offset-65, 'center')
 	draw_text("alt: %.0000001f" % replay_gps_raw.altitude, panel_width/2, win_height*gps_offset-80, 'center')
 	draw_text("track: %.0000001f" % replay_gps_raw.track, panel_width/2, win_height*gps_offset-95, 'center')
 	draw_text("speed: %.001f" % replay_gps_raw.speed, panel_width/2, win_height*gps_offset-110, 'center')
@@ -917,7 +1184,6 @@ def draw_boat():
 		sail_angle,
 		(cur_sail_img[1][0]*camera.scale, cur_sail_img[1][1]*camera.scale))
 	glPopMatrix()
-
 
 
 # Draw the rudder diagram centered on (x, y)
@@ -1154,6 +1420,11 @@ def proj(u,v):
 def polar_to_rect(rad, ang):
 	return (rad * math.cos(math.radians(ang)), rad * math.sin(math.radians(ang)))
 
+def cosd(angle):
+	return math.cos(math.radians(angle))
+
+def sind(angle):
+	return math.sin(math.radians(angle))
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -1275,6 +1546,7 @@ def listener():
 	rospy.Subscriber('obstacles', PointArray, obstacles_callback)
 	rospy.Subscriber('target_point', Waypoint, target_point_callback)
 	rospy.Subscriber('bounding_box', PointArray, bounding_box_callback)
+	rospy.Subscriber('search_area', PointArray, search_area_callback)
 	rospy.Subscriber('vision', PointArray, vision_callback)
 
 
@@ -1300,4 +1572,3 @@ if __name__ == '__main__':
 	gps_pub.publish(gps)
 	
 	init_GLUT()
-

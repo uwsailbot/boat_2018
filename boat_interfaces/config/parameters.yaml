@@ -11,8 +11,11 @@ boat:
     radius: 6378137.0
     min_tacking_speed: 0.8 # in m/s
     beating: 100.0 # m
+    pos_offset: 1.0 # m
   planner:
     buoy_tol: 2 # m Tolerance to consider a waypoint hit
+    round_dist: 3 # m Distance  to round buoys
+    round_factor: 1.5 # Adjustment factor for rounding buoys
     station:
       width: 0.6
       height: 0.3
