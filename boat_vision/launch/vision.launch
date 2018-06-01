@@ -1,0 +1,15 @@
+<launch>
+
+  <arg name="left" default="/dev/video1" />
+  <arg name="right" default="/dev/video2" />
+  <arg name="debug" default="false" />
+  
+  <node name="stereo_vision" pkg="boat_vision" type="stereo_vision_node.py" output="screen">
+    <param name="left_cam" value="$(arg left)" />
+    <param name="right_cam" value="$(arg right)" />
+    <param name="debug" value="$(arg debug)" />
+  </node>
+  
+  <node name="vision_parser" pkg="boat_vision" type="vision_parser_node.py" output="screen"/>
+
+</launch>
