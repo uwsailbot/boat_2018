@@ -17,7 +17,7 @@ CAM_WIDTH = 1280;
 
 left_img = ()
 right_img = ()
-vision_pub = rospy.Publisher('vision', PolarPoint, queue_size=10)
+vision_pub = rospy.Publisher('vision_target', VisionTarget, queue_size=10)
 debug = rospy.get_param("stereo_vision/debug")
 
 def sind(angle):
@@ -116,10 +116,9 @@ def get_buoy_coords(img, win):
 			p.y += float(c[1])/len(circles[0])
 			found = True
 	
-	# Get center via blob
+	# Get center via contours
 	edge_detected_image = cv2.convertScaleAbs(cv2.Canny(threshold_img, 75, 200))
 	_,contours,_ = cv2.findContours(edge_detected_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-	
 	
 	maxArea = 0
 	bestContour = ()
@@ -150,6 +149,7 @@ def get_buoy_coords(img, win):
 			
 			found = True
 	
+	# Draw stuff for debug
 	if debug:
 		if bestContour is not ():
 			cv2.drawContours(filtered, [bestContour], 0, (255,255,255), 1)
@@ -166,6 +166,7 @@ def get_buoy_coords(img, win):
 		cv2.drawMarker(filtered, c, (0,255,0), cv2.MARKER_CROSS, 10, 3);
 		cv2.drawMarker(filtered, c, (0,0,255), cv2.MARKER_CROSS, 5, 3);
 		
+		#TODO: Publish as image rather than displaying in window
 		cv2.imshow(win, filtered)
 		cv2.waitKey(1)
 	
@@ -213,7 +214,8 @@ def initialize_node():
 		cv2.namedWindow("l")
 		cv2.namedWindow("r")
 	
-	rate = rospy.Rate(10)
+	# Constantly process cams
+	rate = rospy.Rate(rospy.get_param("/stereo_vision/rate"))
 	while not rospy.is_shutdown():
 		if not left.has or not right.has:
 			continue
@@ -224,13 +226,14 @@ def initialize_node():
 		points = map(get_buoy_coords, [left_img, right_img], ["l", "r"])
 		if points[0] is not False and points[1] is not False:
 			polar = process_cams(points[0], points[1], CAM_SPACING)
+			msg = VisionTarget()
+			msg.header.stamp = rospy.Time.now()
 			if polar is not False:
-				msg = VisionTarget()
-				msg.header.stamp = rospy.Time.now()
+				msg.has = True
 				msg.pt = polar
-				vision_pub.publish(msg)
-				
-				print polar
+			else:
+				msg.has = False
+			vision_pub.publish(msg)
 		
 		rate.sleep()
 	

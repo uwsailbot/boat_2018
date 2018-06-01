@@ -8,8 +8,11 @@
     <param name="left_cam" value="$(arg left)" />
     <param name="right_cam" value="$(arg right)" />
     <param name="debug" value="$(arg debug)" />
+    <param name="rate" value="10" />
   </node>
   
-  <node name="vision_parser" pkg="boat_vision" type="vision_parser_node.py" output="screen"/>
+  <node name="vision_parser" pkg="boat_vision" type="vision_parser_node.py" output="screen">
+    <param name="rate" value="10" />
+  </node>
 
 </launch>
