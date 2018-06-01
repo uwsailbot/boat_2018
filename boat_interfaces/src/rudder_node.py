@@ -119,7 +119,7 @@ def joy_callback(controller):
 	position_msg = Float32()
 	
 	# Set the rudder position with the right joystick, if close to 90 set dead straight
-	if abs(controller.right_stick_x - (Joy.JOY_RANGE/2.0)) <= 5:
+	if abs(controller.right_stick_x - (Joy.JOY_RANGE/2.0)) <= 15:
 		position_msg.data = 90.0
 		
 	else:

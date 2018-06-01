@@ -4,11 +4,13 @@
  #include <WProgram.h>
 #endif
 
+#define USE_USBCON
+
 #include <ros.h>
 #include <boat_msgs/Joy.h>
 
-#define CH_1_PIN 3 // RUDDER
-#define CH_3_PIN 5 // SAIL 
+#define CH_1_PIN 5 // RUDDER
+#define CH_3_PIN 6 // SAIL 
 #define CH_5_PIN 9 // SWITCH_A
 #define CH_6_PIN 10 // VR
 #define BUFFER_SIZE 5
@@ -34,10 +36,10 @@ void setup() {
 
 void loop() {
   // Read PWM pins
-  ch_1_buf[counter] = pulseIn(CH_1_PIN, HIGH);
-  ch_3_buf[counter] = pulseIn(CH_3_PIN, HIGH);
-  int ch_5_val = pulseIn(CH_5_PIN, HIGH);
-  ch_6_buf[counter] = pulseIn(CH_6_PIN, HIGH);
+  ch_1_buf[counter] = pulseIn(CH_1_PIN, HIGH, 10000);
+  ch_3_buf[counter] = pulseIn(CH_3_PIN, HIGH, 10000);
+  int ch_5_val = pulseIn(CH_5_PIN, HIGH, 10000);
+  ch_6_buf[counter] = pulseIn(CH_6_PIN, HIGH, 10000);
   
   // Lookup table for switch position
   int switch_state = 0;
@@ -52,14 +54,14 @@ void loop() {
   }
   
   // Write averaged values to ROS, pwm oscillates slightly, so we average the readings in a buffer
-  joy.right_stick_x = average(ch_1_buf) - 1000;
-  joy.left_stick_y = average(ch_3_buf) - 1000 ;
+  joy.right_stick_x = average(ch_1_buf) - 995;
+  joy.left_stick_y = average(ch_3_buf) - 995 ;
   joy.switch_a = switch_state;
-  joy.vr = average(ch_6_buf) - 875;
+  joy.vr = average(ch_6_buf) - 870;
   
   // Check that controller values are valid (end up being -1000 if controller is not on)
   // Check uses -160 because the values can briefly drop to -1 and trim can set them as low as -150
-  if (joy.right_stick_x > -160 && joy.left_stick_y > -160 && joy.vr > -25){
+  if (joy.right_stick_x > -160 && joy.left_stick_y > -160 && joy.vr > -25 && joy.right_stick_x < 3000 && joy.right_stick_y < 3000 && joy.vr < 3000){
     joy_pub.publish(&joy);
     counter = (counter + 1) % 5;
   }

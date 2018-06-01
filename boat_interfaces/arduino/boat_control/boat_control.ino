@@ -12,16 +12,8 @@
 #include <std_msgs/Int32.h>
 #include <boat_msgs/GPS.h>
 #include <math.h>
-#include <boat_msgs/Joy.h>
 
 #define DEBUG_SERIAL (false) //Output GPS data to Serial2 if true
-
-// Defines for Futaba receiver
-#define CH_1_PIN 8 // RUDDER
-#define CH_3_PIN 9 // SAIL 
-#define CH_5_PIN 10 // SWITCH_A
-#define CH_6_PIN 11 // VR
-#define BUFFER_SIZE 5
 
 // The pin the wind vane sensor is connected to
 #define WIND_VANE_PIN (A0)
@@ -35,7 +27,6 @@ const int anemometerInterval = 100; //ms between anemometer reads
 ros::NodeHandle nh;
 std_msgs::Float32 winddir;
 boat_msgs::GPS gpsData;
-boat_msgs::Joy joy;
 
 Adafruit_GPS GPS(&Serial1);
 Servo servo_rudder1;
@@ -47,22 +38,6 @@ uint32_t GPS_timer = millis();
 float last_lat = 0, last_long = 0;
 float last_track = 0, last_speed = 0;
 unsigned long previousMillis = 0;
-int ch_1_buf [BUFFER_SIZE] = {0};
-int ch_3_buf [BUFFER_SIZE] = {0};
-int ch_6_buf [BUFFER_SIZE] = {0};
-int counter = 0;
-
-int average(int buffer[]){
-    int sum = 0;
-    int valid_data_counter = 0;
-    for(int i = 0; i < BUFFER_SIZE; i++){
-        sum += buffer[i];
-        if (buffer[i] != 0){
-            valid_data_counter ++;
-        }
-    }
-    return sum/valid_data_counter;
-}
 
 float mapf(float value, float fromLow, float fromHigh, float toLow, float toHigh){
     return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow;
@@ -83,7 +58,6 @@ ros::Subscriber<std_msgs::Float32> sub_rudder("rudder", rudder_cb);
 ros::Subscriber<std_msgs::Int32> sub_winch("winch", winch_cb);
 ros::Publisher anemometer("anemometer", &winddir);
 ros::Publisher gps("gps_raw", &gpsData);
-ros::Publisher joy_pub("joy", &joy);
 
 void setup(){
     // setup subscribers 
@@ -96,30 +70,20 @@ void setup(){
     nh.subscribe(sub_winch);
     nh.advertise(anemometer);
     nh.advertise(gps);
-    nh.advertise(joy_pub);
 
     servo_rudder1.attach(RUDDER_PIN1); // attach rudder1
     servo_rudder2.attach(RUDDER_PIN2); // attach rudder2
     servo_winch.attach(WINCH_PIN); // attach winch
-    pinMode(CH_1_PIN, INPUT);
-    pinMode(CH_3_PIN, INPUT);
-    pinMode(CH_5_PIN, INPUT);
-    pinMode(CH_6_PIN, INPUT);
     pinMode(WIND_VANE_PIN, INPUT);
 
     GPS.begin(9600);
-    
-    // Uncomment following lines to increase GPS baud rate for higher update frequency
-    // GPS.sendCommand("PMTK251,115200*27");
-    // GPS.begin(115200);
-    
     // Tell gps to send RMC (recommended minimum) and GGA (fix data) data
     GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
     //Enable WAAS
     GPS.sendCommand("$PMTK313,1*2E");
     GPS.sendCommand("$PMTK301,2*2E");
     // Set the update rate
-    GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);   // 1 Hz update rate
+    GPS.sendCommand(PMTK_SET_NMEA_UPDATE_2HZ);   // 1 Hz update rate
     useInterrupt(true);
 
 
@@ -174,7 +138,7 @@ void loop(){
             return;  // we can fail to parse a sentence in which case we should just wait for another
     }  
     // approximately publish at 1 HZ the current stats
-    if (millis() - GPS_timer > 1000) {
+    if (millis() - GPS_timer > 500) {
       GPS_timer = millis(); // reset the timer
       
       if (DEBUG_SERIAL){
@@ -236,38 +200,6 @@ void loop(){
           last_long = gpsData.longitude;
       
     }  
-    useInterrupt(false);
-    // Read PWM pins on receiver for controller state  
-    ch_1_buf[counter] = pulseIn(CH_1_PIN, HIGH, 10000);
-    ch_3_buf[counter] = pulseIn(CH_3_PIN, HIGH, 10000);
-    int ch_5_val = pulseIn(CH_5_PIN, HIGH, 10000);
-    ch_6_buf[counter] = pulseIn(CH_6_PIN, HIGH, 10000);
-    useInterrupt(true);
-    //TIMSK2 = 0x02;  
-    // Lookup table for switch position
-    int switch_state = 0;
-    if (ch_5_val < 1300){
-        switch_state = joy.SWITCH_UP;
-    }
-    else if(ch_5_val > 1700){
-        switch_state = joy.SWITCH_DOWN;
-    }
-    else{
-        switch_state = joy.SWITCH_MIDDLE;
-    }
-  
-    // Write averaged values to ROS, pwm oscillates slightly, so we average the readings in a buffer
-    joy.right_stick_x = average(ch_1_buf) - 1000;
-    joy.left_stick_y = average(ch_3_buf) - 1000 ;
-    joy.switch_a = switch_state;
-    joy.vr = average(ch_6_buf) - 875;
-  
-    // Check that controller values are valid (end up being -1000 if controller is not on)
-    // Check uses -160 because the values can briefly drop to -1 and trim can set them as low as -150
-    if (joy.right_stick_x > -160 && joy.left_stick_y > -160 && joy.vr > -25){
-        joy_pub.publish(&joy);
-        counter = (counter + 1) % 5;
-    }
     
     nh.spinOnce();
 }
