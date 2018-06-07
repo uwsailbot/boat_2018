@@ -372,7 +372,7 @@ def awa_algorithm():
 	n = 1 + p*1.3/dist_to_target(start_pos) # Tacking weight, can add app_wind_offset here to make even less desirable
 
 	# Tolerance the headings and the wind possibly
-	if new_wind or is_new_target or direct_heading is not old_direct_heading:
+	if new_wind or is_new_target or direct_heading is not old_direct_heading: # TODO: Add a slow timer to this as well. Sometimes on state changes we get stuck because nothing updates.
 		new_wind = False
 		is_new_target = False
 		found_max_vmg = False
@@ -429,6 +429,7 @@ def awa_algorithm():
 
 		#Final leg of the course, traveling on an optimal vmg course, time to get to layline.  Second condition to make sure this doesn't run if we are already on the layline
 		# TODO: Tolerance correctly, make sure this isnt called on a downwind cuz we mistolerance it.  Shouldnt be because target_heading will constantly be updating to be equal to global_vmg_heading above
+		# TODO: Ensure this is only called once per run. Currently if we have a short laylineaction, it can get repeated
 		elif per_course_left <= 40 and not on_layline(wind_coming, 1.0) and boat_speed >= min_tacking_speed:
 			rospy.loginfo(rospy.get_caller_id() + " Entering the navigate to layline routine. Saved current tack angle as: %f ", target_heading)
 			goal = LaylineGoal(alt_tack_angle = target_heading, overshoot_angle = 3.0, target = target)

@@ -82,7 +82,8 @@ class Planner:
 			
 				del waypoints[0]
 				self.update_waypoints(waypoints)
-				self.publish_target(waypoints[0])
+				if len(waypoints) > 0:
+					self.publish_target(waypoints[0])
 		
 		# If there are no waypoints left to navigate to, exit
 		else:

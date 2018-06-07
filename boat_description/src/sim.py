@@ -8,15 +8,16 @@ import pygame
 import rospy
 import time
 from enum import Enum
+from sys import argv
+
 from boat_msgs.msg import BoatState, GPS, Point, PointArray, Waypoint, WaypointArray, Joy
 from boat_msgs.srv import ConvertPoint
 from sensor_msgs.msg import Imu
 from std_msgs.msg import Float32, Int32, Bool
 from rosgraph_msgs.msg import Clock
 from tf.transformations import quaternion_from_euler
-#from OpenGL.GL import *
+
 from OpenGL.GLUT import *
-from sys import argv
 from sim_io import *
 from sim_ui import *
 
@@ -72,9 +73,8 @@ clock = 0
 last_time = -1
 boat_speed = 0 # px/s
 POS_OFFSET = rospy.get_param('/boat/nav/pos_offset')
-layline = rospy.get_param('/boat/nav/layline')
-winch_min = rospy.get_param('/boat/interfaces/winch_min')
-winch_max = rospy.get_param('/boat/interfaces/winch_max')
+WINCH_MIN = rospy.get_param('/boat/interfaces/winch_min')
+WINCH_MAX = rospy.get_param('/boat/interfaces/winch_max')
 wind_speed = 0
 speed_graph = {0 : 0}
 display_path = True
@@ -83,7 +83,6 @@ prev_path_time = 0
 fov_radius = 15
 fov_angle = 60
 vision_points_gps = PointArray()
-vision_points_lps = PointArray()
 reset_origin_on_next_gps=False
 
 
@@ -325,18 +324,13 @@ def update_vision():
 	global vision_points_gps
 	
 	vision_points_gps = PointArray()
-	for waypoint in waypoint_gps.points:
-		lps = to_lps(waypoint)
-		if point_is_in_fov(lps):
-			vision_points_gps.points.append(waypoint.pt)
+	#for waypoint in waypoint_gps.points:
+	#	lps = to_lps(waypoint)
+	#	if point_is_in_fov(lps):
+	#		vision_points_gps.points.append(waypoint.pt)
 	
 	if search_area.target is not None and point_is_in_fov(search_area.target):
 		vision_points_gps.points.append(to_gps(search_area.target))
-
-	# TODO place this somewhere better
-	# update search_area coverage, need to call this often
-	if state.challenge is BoatState.CHA_SEARCH:
-		search_area.update_coverage()
 	
 	vision_pub.publish(vision_points_gps)
 
@@ -466,11 +460,8 @@ def target_point_callback(target_pt):
 
 def vision_callback(new_vision_points_gps):
 	global vision_points_gps
-	global vision_points_lps
 	vision_points_gps = new_vision_points_gps
-	vision_points_lps.points = []
-	for point in vision_points_gps.points:
-		vision_points_lps.points.append(to_lps(point))
+
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= GLUT callbacks =*=*=*=*=*=*=*=*=*=*=*=*=
 
@@ -764,6 +755,10 @@ def redraw():
 	
 	glViewport(0, 0, win_width, win_height)
 	
+	# Update search_area coverage, need to call this often
+	if state.challenge is BoatState.CHA_SEARCH:
+		search_area.update_coverage()
+	
 	# Render stuff
 	draw_grid()
 	if state.challenge is BoatState.CHA_STATION:
@@ -962,8 +957,9 @@ def draw_waypoints_in_fov():
 	glEnable(GL_BLEND)
 	glColor4f(245/255.0, 200/255.0, 5/255.0, 0.3)
 
-	for point in vision_points_lps.points:
-		(x,y) = camera.lps_to_screen(point.x, point.y)
+	for point in vision_points_gps.points:
+		lps = to_lps(point)
+		(x,y) = camera.lps_to_screen(lps.x, lps.y)
 		draw_circle(0.8 * camera.scale, x, y)
 
 	glDisable(GL_BLEND)
@@ -1125,11 +1121,11 @@ def draw_wind_arrow(x,y):
 
 # Draw grid
 def draw_grid():
-	screen_gridsize = int(gridsize * camera.scale)
-	if screen_gridsize == 0:
+	screen_gridsize = gridsize * camera.scale
+	if screen_gridsize < 1:
 		screen_gridsize = 1
-	x = int(win_width/2.0 - camera.x * camera.scale) % screen_gridsize
-	y = int(win_height/2.0 - camera.y * camera.scale) % screen_gridsize
+	x = (win_width/2.0 - camera.x * camera.scale) % screen_gridsize
+	y = (win_height/2.0 - camera.y * camera.scale) % screen_gridsize
 
 	glColor3f(30/255.0,118/255.0,110/255.0)
 	
@@ -1172,7 +1168,7 @@ def draw_boat():
 		(cur_boat_img[1][0]*camera.scale, cur_boat_img[1][1]*camera.scale))
 	
 	#draw sail
-	sail_angle = 90 * float(winch_max - winch_pos)/(winch_max - winch_min)
+	sail_angle = 90 * float(WINCH_MAX - winch_pos)/(WINCH_MAX - WINCH_MIN)
 	if ane_reading <= 180:
 		sail_angle = -sail_angle
 	glPushMatrix()
@@ -1201,7 +1197,7 @@ def draw_status_boat(x, y):
 		(cur_rudder_img[1][0]*rudder_scale, cur_rudder_img[1][1]*rudder_scale))
 	
 	sail_scale = 42.0/cur_sail_img[1][1]
-	sail_angle = 90 * float(winch_max - winch_pos)/(winch_max - winch_min)
+	sail_angle = 90 * float(WINCH_MAX - winch_pos)/(WINCH_MAX - WINCH_MIN)
 	draw_image(
 		cur_sail_img[0],
 		(x+1, y+20),
@@ -1275,11 +1271,11 @@ def calc_tack(boat_heading, wind_heading):
 
 # returns heading of vector point from end of boom to mast
 def calc_boom_heading(boat_heading, wind_heading, winch):
-	winch_range = winch_max - winch_min
+	winch_range = WINCH_MAX - WINCH_MIN
 	
 	tack = calc_tack(boat_heading, wind_heading)
 	# Note close-hauled boom is not quite parallel with boat
-	return boat_heading - tack * ((winch_max - winch) * 75/winch_range + 15)
+	return boat_heading - tack * ((WINCH_MAX - winch) * 75/winch_range + 15)
 
 def pause_sim():
 	global pause
@@ -1302,7 +1298,6 @@ def calc(_):
 	global last_time
 	global clock
 	global rudder_pos
-	global layline
 	global ane_reading
 	global boat_speed
 	global path
@@ -1386,9 +1381,9 @@ def calc(_):
 			path = PointArray()
 		
 		update_vision()
-
+		
 		update_gps()
-
+		
 		# Don't let drawn path be too long 
 		if display_path:
 			if len(path.points) > 1000:

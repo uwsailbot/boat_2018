@@ -1,0 +1,6 @@
+---
+#result definition
+bool success
+---
+#feedback definition
+string status
