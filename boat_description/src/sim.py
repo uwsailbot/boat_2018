@@ -1121,11 +1121,11 @@ def draw_wind_arrow(x,y):
 
 # Draw grid
 def draw_grid():
-	screen_gridsize = int(gridsize * camera.scale)
-	if screen_gridsize == 0:
+	screen_gridsize = gridsize * camera.scale
+	if screen_gridsize < 1:
 		screen_gridsize = 1
-	x = int(win_width/2.0 - camera.x * camera.scale) % screen_gridsize
-	y = int(win_height/2.0 - camera.y * camera.scale) % screen_gridsize
+	x = (win_width/2.0 - camera.x * camera.scale) % screen_gridsize
+	y = (win_height/2.0 - camera.y * camera.scale) % screen_gridsize
 
 	glColor3f(30/255.0,118/255.0,110/255.0)
 	

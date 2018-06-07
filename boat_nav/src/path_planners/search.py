@@ -140,29 +140,57 @@ class SearchPlanner(Planner):
 		@param width: The width of the search path, in meters
 		"""
 		width = width / 111319.492188 # meters to coords
-		angle -= 90
+		angle += 90
 		out = []
-		radius = width/2
+		radius = width *1.5
 		increment = width * math.sqrt(2) / 4
 		
-		# Add an extra points for better startup central coverage
-		x = math.cos(math.radians(angle-180))*radius
-		y = math.sin(math.radians(angle-180))*radius
-		out.append(Waypoint(Point(x,y), Waypoint.TYPE_INTERSECT))
+		# --- past stuff 
+
+		# Add an extra point for better startup central coverage
+		# out.append(self._make_waypoint(angle-90, width/2))
 		
 		#x = math.cos(math.radians(angle-90))*radius
 		#y = math.sin(math.radians(angle-90))*radius
 		#out.append(Waypoint(Point(x,y), Waypoint.TYPE_INTERSECT))
 		
-		while radius < self.area_radius:
-			x = math.cos(math.radians(angle))*radius
-			y = math.sin(math.radians(angle))*radius
-			out.append(Waypoint(Point(x,y), Waypoint.TYPE_INTERSECT))
+		# ---
+
+		# Set 4 points in the beginning for initial loop/square
+		for i in range(0,4):
+			out.append(self._make_waypoint(angle, radius))
+			angle += 90
+			radius += increment
+
+		# do some sweeping lines while going downwind to cover the areas around center
+		out.append(self._make_waypoint(angle-90, radius*0.6))
+		out.append(self._make_waypoint(angle-45, radius*0.707))
+		out.append(self._make_waypoint(angle-90, radius*0.4))
+		out.append(self._make_waypoint(angle-20, radius*0.8))
+		out.append(self._make_waypoint(angle-90, 0))
+		out.append(self._make_waypoint(angle, radius*0.9))
+		angle += 90
+		radius += increment
+
+		# continue setting points until we reach outer radius of circle
+		while radius < self.area_radius + width:
+			out.append(self._make_waypoint(angle, radius))
 			angle += 90
 			radius += increment
 		
+		# Add extra points for better coverage at edge of circle
+		radius += increment
+		for i in range(0,4):
+			out.append(self._make_waypoint(angle, radius))
+			angle += 90
+
 		return out
 	
+	def _make_waypoint(self, angle, radius):
+		x = self.area_center.x + math.cos(math.radians(angle))*radius
+		y = self.area_center.y + math.sin(math.radians(angle))*radius
+		return Waypoint(Point(x,y), Waypoint.TYPE_INTERSECT)
+
 	#def _get_search_pt(i,angle,width,radius):
 	#		y = -radius + (i+1)*width
 	#		x = (1-2*(i%2))*math.sqrt(radius**2 - y**2)
