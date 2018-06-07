@@ -1,7 +1,7 @@
 <launch>
 
   <!-- These paths are provided by v4l. The left path is to the bottom usb port -->
-  <arg name="left" default="/dev/v4l/by-path/platform-xhci-hcd.2.auto-usb-0:1.1:1.0-video-index0" />
+  <arg name="left" default="/dev/v4l/by-path/platform-12110000.usb-usb-0:1:1.0-video-index0" />
   <arg name="right" default="/dev/v4l/by-path/platform-xhci-hcd.2.auto-usb-0:1.2:1.0-video-index0" />
   <arg name="debug" default="false" />
   

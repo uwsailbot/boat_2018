@@ -49,7 +49,7 @@ def process_cams(left, right, spacing):
 	angle1 = ((left.x / CAM_WIDTH) * 2 - 1) * CAM_FOV_HORIZ / 2; # -30 to 30deg
 	angle2 = ((right.x / CAM_WIDTH) * 2 - 1) * CAM_FOV_HORIZ / 2; # -30 to 30deg
 	
-	#print("left: %f, right: %f", angle1, angle2)
+	print("left: %f, right: %f", angle1, angle2)
 	
 	# If the lines are parallel or diverging, there is no solution
 	if (angle1 <= angle2 or angle2 >= angle1):
