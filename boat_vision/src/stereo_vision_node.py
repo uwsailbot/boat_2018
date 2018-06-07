@@ -9,9 +9,9 @@ from boat_msgs.msg import Point, PolarPoint, VisionTarget
 
 # Assume that both cams are facing forwards, 0deg
 CAM_SPACING = 0.30;	# 0.3m
-CAM_F_LEN = 4.0;	# 4.0mm ** Not needed because FOV was specified?
-CAM_FOV_HORIZ = 67; # 60deg
-CAM_FOV_VERT = CAM_FOV_HORIZ * 0.75
+#CAM_F_LEN = 4.0;	# 4.0mm ** Not needed because FOV was specified
+CAM_FOV_HORIZ = 67; # Degrees
+#CAM_FOV_VERT = CAM_FOV_HORIZ * 0.75 # Not used and tbh probably not accurate
 CAM_HEIGHT = 720;
 CAM_WIDTH = 1280;
 
@@ -42,21 +42,25 @@ def process_cams(left, right, spacing):
 	#rospy.loginfo(rospy.get_caller_id() + " Request: left=%.2f,%.2f, right=%.2f,%.2f", left.x, left.y, right.x, right.y)
 	
 	# Calculate the average y value and the angle to that y val
-	avg_y = (left.y + right.y)/2.0
-	vert_angle = ((avg_y / CAM_HEIGHT) * 2 - 1) * CAM_FOV_VERT / 2
+	#avg_y = (left.y + right.y)/2.0
+	#vert_angle = ((avg_y / CAM_HEIGHT) * 2 - 1) * CAM_FOV_VERT / 2
 	
 	# Determine the angle to the object in each camera, from -30 to 30deg (0deg is straight ahead)
 	angle1 = ((left.x / CAM_WIDTH) * 2 - 1) * CAM_FOV_HORIZ / 2; # -30 to 30deg
 	angle2 = ((right.x / CAM_WIDTH) * 2 - 1) * CAM_FOV_HORIZ / 2; # -30 to 30deg
 	
+	#print("left: %f, right: %f", angle1, angle2)
+	
 	# If the lines are parallel or diverging, there is no solution
 	if (angle1 <= angle2 or angle2 >= angle1):
-		rospy.logerr("Invalid input, angles are diverging")
+		rospy.logwarn("Invalid input, angles are diverging")
 		return False
 	
 	# Convert the angles from 0deg = straight to the internal angle of the triangle bound by the rays
 	angle1 = -angle1 + 90
 	angle2 += 90
+	
+	#print("int A: %f, int B: %f", angle1, angle2)
 	
 	# Determine the third angle through simple geometrical relationships
 	angle3 = 180 - angle1 - angle2
@@ -79,7 +83,7 @@ def process_cams(left, right, spacing):
 	
 	target.dist = math.sqrt(x_final * x_final + y_final * y_final)
 	#res.buoy.dist = sqrt(x_final * x_final + y_final * y_final + z_final * z_final)
-	target.heading = math.degrees(math.atan(y_final / x_final))
+	target.heading = math.degrees(math.atan2(y_final, x_final))
 	
 	#rospy.loginfo(rospy.get_caller_id() + "Returning response: [dist:%.2f, heading:%.2f]", res.target.dist, res.target.heading)
 	return target
@@ -94,7 +98,8 @@ def get_buoy_coords(img, win):
 	
 	# HSV Threshold
 	hsv_img = cv2.cvtColor(filtered, cv2.COLOR_BGR2HSV);
-	threshold_img = cv2.inRange(hsv_img, np.array([0, 165, 130]), np.array([15, 255, 255]));
+	#threshold_img = cv2.inRange(hsv_img, np.array([0, 165, 130]), np.array([15, 255, 255]));
+	threshold_img = cv2.inRange(hsv_img, np.array([0, 125, 100]), np.array([25, 255, 255]));
 	
 	# Blur
 	threshold_img = cv2.medianBlur(threshold_img, 3);
@@ -222,6 +227,12 @@ def initialize_node():
 		
 		_, left_img = left.cam.retrieve()
 		_, right_img = right.cam.retrieve()
+		
+		# Make sure the resolution is accurate
+		global CAM_WIDTH
+		global CAM_HEIGHT
+		CAM_WIDTH = left.cam.get(cv2.CAP_PROP_FRAME_WIDTH)
+		CAM_HEIGHT = left.cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
 		
 		points = map(get_buoy_coords, [left_img, right_img], ["l", "r"])
 		if points[0] is not False and points[1] is not False:

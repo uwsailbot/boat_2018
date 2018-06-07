@@ -1,7 +1,8 @@
 <launch>
 
-  <arg name="left" default="/dev/video1" />
-  <arg name="right" default="/dev/video2" />
+  <!-- These paths are provided by v4l. The left path is to the bottom usb port -->
+  <arg name="left" default="/dev/v4l/by-path/platform-xhci-hcd.2.auto-usb-0:1.1:1.0-video-index0" />
+  <arg name="right" default="/dev/v4l/by-path/platform-xhci-hcd.2.auto-usb-0:1.2:1.0-video-index0" />
   <arg name="debug" default="false" />
   
   <node name="stereo_vision" pkg="boat_vision" type="stereo_vision_node.py" output="screen">
