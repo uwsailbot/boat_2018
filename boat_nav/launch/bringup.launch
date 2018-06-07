@@ -9,4 +9,7 @@
   <!-- Boat Navigation nodes -->
   <include file="$(find boat_nav)/launch/nav.launch" />
 
+  <!-- Boat Vision nodes -->
+  <include file="$(find boat_vision)/launch/vision.launch" />
+
 </launch>
