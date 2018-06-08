@@ -9,6 +9,8 @@ project(boat_nav)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   boat_msgs
+  boat_interfaces
+  boat_vision
   actionlib
   roslaunch
   roscpp
