@@ -185,13 +185,12 @@ include_directories(
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
  install(FILES
+   launch/arduino.launch
    launch/interfaces_base.launch
-   # myfile2
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
  )
  install(FILES
    config/parameters.yaml
-   # myfile2
    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
  )
 
