@@ -1,4 +1,6 @@
 <!-- Launch file for viewing image and stereo data -->
+
+<!--
 <launch>
   <node name="image_view0" pkg="image_view" type="image_view" respawn="false" output="screen">
      <remap from="image" to="/usb_cam0/image_raw"/>
@@ -13,4 +15,4 @@
      <remap from="stereo" to="stereo" />
      <remap from="image" to="image_rect" />
   </node>
-</launch>
+</launch> -->
