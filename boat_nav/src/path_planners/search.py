@@ -163,6 +163,7 @@ class SearchPlanner(Planner):
 			radius += increment
 
 		# do some sweeping lines while going downwind to cover the areas around center
+		# these points are arbituarily made based on simulator and can be modified based on current needs
 		out.append(self._make_waypoint(angle-90, radius*0.6))
 		out.append(self._make_waypoint(angle-45, radius*0.707))
 		out.append(self._make_waypoint(angle-90, radius*0.4))

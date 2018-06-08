@@ -84,6 +84,8 @@ fov_radius = 15
 fov_angle = 60
 vision_points_gps = PointArray()
 reset_origin_on_next_gps=False
+gps_publish_interval = 0.5
+gps_last_published = 0
 
 
 # ROS data
@@ -277,7 +279,12 @@ def to_lps(p):
 		else:
 			raise ValueError("p is of invalid type " + str(type(p)) +", must be either Point or Waypoint")
 
-def update_gps():
+def update_gps(force = False):
+	global gps_last_published
+	if not force and (time.time() - gps_last_published)*speed < gps_publish_interval:
+		return
+	gps_last_published = time.time()
+
 	gps = GPS()
 	gps.status = GPS.STATUS_FIX
 	# simulate position of gps at back of boat
@@ -744,7 +751,7 @@ def ASCII_handler(key, mousex, mousey):
 			camera.y = 0
 			camera.scale = 10
 			path = PointArray()
-			update_gps()
+			update_gps(True)
 			
 
 
