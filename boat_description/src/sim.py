@@ -1163,7 +1163,7 @@ def draw_boat():
 	draw_image(
 		cur_rudder_img[0], # texture id
 		(0, (-cur_boat_img[1][1]/2+cur_rudder_img[1][1]*0.1)*camera.scale), # local y coord of rudder, moves to end of boat 
-		rudder_pos-90, # rudder pos
+		90-rudder_pos, # rudder pos
 		(cur_rudder_img[1][0]*camera.scale,cur_rudder_img[1][1]*camera.scale)) # rudder visual size
 	glPopMatrix()
 	
@@ -1200,7 +1200,7 @@ def draw_status_boat(x, y):
 	draw_image(
 		cur_rudder_img[0],
 		(x, y-10),
-		rudder_pos-90,
+		90-rudder_pos,
 		(cur_rudder_img[1][0]*rudder_scale, cur_rudder_img[1][1]*rudder_scale))
 	
 	sail_scale = 42.0/cur_sail_img[1][1]
@@ -1367,7 +1367,7 @@ def calc(_):
 		
 		#old_wind_head = ane_reading
 		
-		heading -= (rudder_pos-90)*0.4*boat_speed * dt
+		heading -= (90-rudder_pos)*0.4*boat_speed * dt
 		heading %= 360
 			
 		# Update anemometer reading because of new heading and speed

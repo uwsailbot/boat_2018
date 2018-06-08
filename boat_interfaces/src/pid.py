@@ -4,7 +4,7 @@ import time
 from std_msgs.msg import Bool, Float32
 
 pid_is_enabled = False
-kp = -1.0
+kp = 1.0
 kd = 0.0
 ki = 0.0
 output_pub = rospy.Publisher('output', Float32, queue_size=10)
