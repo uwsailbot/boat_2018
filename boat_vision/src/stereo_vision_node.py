@@ -6,7 +6,9 @@ import cv2
 import numpy as np
 import threading
 from boat_msgs.msg import Point, PolarPoint, VisionTarget
-
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
+  
 # Assume that both cams are facing forwards, 0deg
 CAM_SPACING = 0.30;	# 0.3m
 #CAM_F_LEN = 4.0;	# 4.0mm ** Not needed because FOV was specified
@@ -17,6 +19,8 @@ CAM_WIDTH = 1280;
 
 left_img = ()
 right_img = ()
+left_pub = rospy.Publisher('left_cam', Image, queue_size=10)
+right_pub = rospy.Publisher('right_cam', Image, queue_size=10)
 vision_pub = rospy.Publisher('vision_target', VisionTarget, queue_size=10)
 debug = rospy.get_param("stereo_vision/debug")
 
@@ -89,7 +93,7 @@ def process_cams(left, right, spacing):
 	return target
 
 # Super sloppy OpenCV code
-def get_buoy_coords(img, win):
+def get_buoy_coords(img, pub):
 	p = Point()
 	found = False
 	
@@ -171,9 +175,8 @@ def get_buoy_coords(img, win):
 		cv2.drawMarker(filtered, c, (0,255,0), cv2.MARKER_CROSS, 10, 3);
 		cv2.drawMarker(filtered, c, (0,0,255), cv2.MARKER_CROSS, 5, 3);
 		
-		#TODO: Publish as image rather than displaying in window
-		cv2.imshow(win, filtered)
-		cv2.waitKey(1)
+		image_message = CvBridge().cv2_to_imgmsg(filtered, encoding="bgr8")
+		pub.publish(image_message)
 	
 	if found:
 		return p
@@ -215,10 +218,6 @@ def initialize_node():
 	left.start()
 	right.start()
 	
-	if debug:
-		cv2.namedWindow("l")
-		cv2.namedWindow("r")
-	
 	# Constantly process cams
 	rate = rospy.Rate(rospy.get_param("/stereo_vision/rate"))
 	while not rospy.is_shutdown():
@@ -234,7 +233,7 @@ def initialize_node():
 		CAM_WIDTH = left.cam.get(cv2.CAP_PROP_FRAME_WIDTH)
 		CAM_HEIGHT = left.cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
 		
-		points = map(get_buoy_coords, [left_img, right_img], ["l", "r"])
+		points = map(get_buoy_coords, [left_img, right_img], [left_pub, right_pub])
 		if points[0] is not False and points[1] is not False:
 			polar = process_cams(points[0], points[1], CAM_SPACING)
 			msg = VisionTarget()
