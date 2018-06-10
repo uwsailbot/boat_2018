@@ -84,6 +84,8 @@ fov_radius = 15
 fov_angle = 60
 vision_points_gps = PointArray()
 reset_origin_on_next_gps=False
+gps_publish_interval = 0.5
+gps_last_published = 0
 
 
 # ROS data
@@ -277,7 +279,12 @@ def to_lps(p):
 		else:
 			raise ValueError("p is of invalid type " + str(type(p)) +", must be either Point or Waypoint")
 
-def update_gps():
+def update_gps(force = False):
+	global gps_last_published
+	if not force and (time.time() - gps_last_published)*speed < gps_publish_interval:
+		return
+	gps_last_published = time.time()
+
 	gps = GPS()
 	gps.status = GPS.STATUS_FIX
 	# simulate position of gps at back of boat
@@ -744,7 +751,7 @@ def ASCII_handler(key, mousex, mousey):
 			camera.y = 0
 			camera.scale = 10
 			path = PointArray()
-			update_gps()
+			update_gps(True)
 			
 
 
@@ -1156,7 +1163,7 @@ def draw_boat():
 	draw_image(
 		cur_rudder_img[0], # texture id
 		(0, (-cur_boat_img[1][1]/2+cur_rudder_img[1][1]*0.1)*camera.scale), # local y coord of rudder, moves to end of boat 
-		rudder_pos-90, # rudder pos
+		90-rudder_pos, # rudder pos
 		(cur_rudder_img[1][0]*camera.scale,cur_rudder_img[1][1]*camera.scale)) # rudder visual size
 	glPopMatrix()
 	
@@ -1193,7 +1200,7 @@ def draw_status_boat(x, y):
 	draw_image(
 		cur_rudder_img[0],
 		(x, y-10),
-		rudder_pos-90,
+		90-rudder_pos,
 		(cur_rudder_img[1][0]*rudder_scale, cur_rudder_img[1][1]*rudder_scale))
 	
 	sail_scale = 42.0/cur_sail_img[1][1]
@@ -1360,7 +1367,7 @@ def calc(_):
 		
 		#old_wind_head = ane_reading
 		
-		heading -= (rudder_pos-90)*0.4*boat_speed * dt
+		heading -= (90-rudder_pos)*0.4*boat_speed * dt
 		heading %= 360
 			
 		# Update anemometer reading because of new heading and speed

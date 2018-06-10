@@ -38,6 +38,8 @@ def initialize_node():
 	rospy.Subscriber('lps', Point, position_callback, queue_size=1) # Only want it to receive the most recent position
 	rospy.Subscriber('compass', Float32, compass_callback, queue_size=1)
 	
+	rospy.wait_for_service("lps_to_gps")
+	
 	# Read vision topic and boat_pos and aggregate data into waypoints
 	#TODO: Maybe move to vision callback??
 	rate = rospy.Rate(10)

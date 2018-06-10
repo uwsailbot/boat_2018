@@ -11,9 +11,10 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   roslaunch
-  boat_nav
   boat_msgs
+  boat_nav
   boat_interfaces
+  boat_vision
 )
 
 ## System dependencies are found with CMake's conventions

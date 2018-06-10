@@ -101,8 +101,8 @@ class TackingAction(object):
 					if self.ltAngle(self.cur_boat_heading, self.init_target):
 						# Nothing relevant to publish it for other than debugging and the simulator
 						self.target_pub.publish(Float32(self.cur_boat_heading))
-					if not self.rudder_pos == self.rudder_max:
-						self.rudder_pos = self.rudder_max
+					if not self.rudder_pos == self.rudder_min:
+						self.rudder_pos = self.rudder_min
 						self.rudder_pos_pub.publish(Float32(self.rudder_pos))
 				else:
 					if self.state.major is not BoatState.MAJ_AUTONOMOUS:
@@ -118,8 +118,8 @@ class TackingAction(object):
 					if self.gtAngle(self.cur_boat_heading,self.init_target):
 						# Nothing relevant to publish it for other than debugging and the simulator
 						self.target_pub.publish(Float32(self.cur_boat_heading)) 
-					if not self.rudder_pos == self.rudder_min:
-						self.rudder_pos = self.rudder_min
+					if not self.rudder_pos == self.rudder_max:
+						self.rudder_pos = self.rudder_max
 						self.rudder_pos_pub.publish(Float32(self.rudder_pos))
 				else:
 					if self.state.major is not BoatState.MAJ_AUTONOMOUS:

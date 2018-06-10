@@ -5,3 +5,4 @@ sudo apt-get install python-pip
 pip install freetype-py
 pip install overrides
 pip install doxypypy # Not needed for Travis, but needed for Doxygen
+pip install opencv-python

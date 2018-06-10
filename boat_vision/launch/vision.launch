@@ -15,5 +15,15 @@
   <node name="vision_parser" pkg="boat_vision" type="vision_parser_node.py" output="screen">
     <param name="rate" value="10" />
   </node>
+  
+  <group if="$(arg debug)">
+    <node name="left_cam_view" pkg="image_view" type="image_view" respawn="false" output="screen">
+      <remap from="image" to="/left_cam" />
+    </node>
+    
+    <node name="right_cam_view" pkg="image_view" type="image_view" respawn="false" output="screen">
+      <remap from="image" to="/right_cam" />
+    </node>
+  </group>
 
 </launch>
