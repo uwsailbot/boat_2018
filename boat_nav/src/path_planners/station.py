@@ -27,6 +27,8 @@ class StationPlanner(Planner):
 	def setup(self):
 		
 		if len(self.box) is not 4:
+			rospy.loginfo(rospy.get_caller_id() + " Box is invalid")
+			self.set_minor_state(BoatState.MIN_COMPLETE)
 			return
 		
 		rospy.loginfo(rospy.get_caller_id() + " Beginning station challenge path planner routine")

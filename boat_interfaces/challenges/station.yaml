@@ -2,18 +2,18 @@
 # The x and y fields describe the point's location
 # The lps field describes whether the x and y should be treated as meters from origin or coordinates
 Box:
-  - x: 20
-    y: 20
-    lps: true
+  - y: 42.27686
+    x: -71.75627
+    lps: false
     
-  - x: 20
-    y: -20
-    lps: true
+  - y: 42.27651
+    x: -71.75613
+    lps: false
     
-  - x: -20
-    y: -20
-    lps: true
+  - y: 42.27670
+    x: -71.75694
+    lps: false
     
-  - x: -20
-    y: 20
-    lps: true
+  - y: 42.27642
+    x: -71.75685
+    lps: false

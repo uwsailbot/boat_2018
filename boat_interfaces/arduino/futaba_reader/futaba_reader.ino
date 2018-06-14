@@ -29,6 +29,8 @@ void setup() {
   pinMode(CH_3_PIN, INPUT);
   pinMode(CH_5_PIN, INPUT);
   pinMode(CH_6_PIN, INPUT);
+
+  Serial.begin(115200);
   
   nh.initNode();
   nh.advertise(joy_pub);
@@ -58,6 +60,13 @@ void loop() {
   joy.left_stick_y = average(ch_3_buf) - 995 ;
   joy.switch_a = switch_state;
   joy.vr = average(ch_6_buf) - 870;
+
+  Serial.print("rx: ");
+  Serial.print(joy.right_stick_x);
+  Serial.print("\tly: ");
+  Serial.print(joy.left_stick_y);
+  Serial.print("\tsw: ");
+  Serial.println(joy.switch_a);
   
   // Check that controller values are valid (end up being -1000 if controller is not on)
   // Check uses -160 because the values can briefly drop to -1 and trim can set them as low as -150
