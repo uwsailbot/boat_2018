@@ -1,9 +1,25 @@
+<!-- Vision launch files -->
 <launch>
 
+  <!-- USB / v4l info
+    
+    - USB 2 port:      platform-12110000.usb-usb-0:1
+    - USB 3 bottom:    platform-xhci-hcd.2.auto-usb-0:1.1
+    - USB 3 top:       platform-xhci-hcd.2.auto-usb-0:1.2
+    - USB Hub:        (platform-xhci-hcd.2.auto-usb-0:1.2).1, .2, .3, .4
+    - Lifecam suffix:  1.0-video-index0
+    
+    For example:
+    - Top USB3, hub port 3: platform-xhci-hcd.2.auto-usb-0:1.2.3:1.0-video-index0
+    - Bot USB3, direct:     platform-xhci-hcd.2.auto-usb-0:1.1:1.0-video-index0
+    - Side USB2, direct:    platform-12110000.usb-usb-0:1:1.0-video-index0
+    -->
+
   <!-- These paths are provided by v4l. The left path is to the bottom usb port -->
-  <arg name="left" default="/dev/v4l/by-path/platform-12110000.usb-usb-0:1:1.0-video-index0" />
-  <arg name="right" default="/dev/v4l/by-path/platform-xhci-hcd.2.auto-usb-0:1.2:1.0-video-index0" />
+  <arg name="left" default="/dev/v4l/by-path/platform-xhci-hcd.2.auto-usb-0:1.1:1.0-video-index0" />
+  <arg name="right" default="/dev/v4l/by-path/platform-xhci-hcd.2.auto-usb-0:1.2.3:1.0-video-index0" />
   <arg name="debug" default="false" />
+  <arg name="show-cam" default="false" />
   
   <node name="stereo_vision" pkg="boat_vision" type="stereo_vision_node.py" output="screen">
     <param name="left_cam" value="$(arg left)" />
@@ -16,7 +32,7 @@
     <param name="rate" value="10" />
   </node>
   
-  <group if="$(arg debug)">
+  <group if="$(arg show-cam)">
     <node name="left_cam_view" pkg="image_view" type="image_view" respawn="false" output="screen">
       <remap from="image" to="/left_cam" />
     </node>
@@ -25,5 +41,5 @@
       <remap from="image" to="/right_cam" />
     </node>
   </group>
-
+  
 </launch>

@@ -3,13 +3,13 @@ use_sim_time: false
 boat:
   interfaces:
     winch_max: 2000.0
-    winch_min: 900.0
+    winch_min: 1675.0
     rudder_max: 150
     rudder_min: 30
   vision:
     width: 14 # Width of useable search area (Eg width of FOV at max useful distance)
   nav:
-    layline: 30.0
+    layline: 40.0
     radius: 6378137.0
     min_tacking_speed: 0.8 # in m/s
     beating: 100.0 # m

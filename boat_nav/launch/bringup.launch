@@ -1,5 +1,7 @@
 <!-- Full system launch file -->
 <launch>
+  <arg name="vision" default="false" />
+
   <!-- Arduino connection nodes -->
   <include file="$(find boat_interfaces)/launch/arduino.launch" />
 
@@ -10,6 +12,9 @@
   <include file="$(find boat_nav)/launch/nav.launch" />
 
   <!-- Boat Vision nodes -->
-  <include file="$(find boat_vision)/launch/vision.launch" />
+  <group if="$(arg vision)">
+    <include file="$(find boat_vision)/launch/vision.launch" />
+    <!-- TODO: Pass through params for debug -->
+  </group>
 
 </launch>

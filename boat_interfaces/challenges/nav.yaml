@@ -4,17 +4,22 @@
 # The round field describes whether the waypoint should be TYPE_ROUND or TYPE_INTERSECT
 # TODO: Make the round field more versatile for more waypoint types
 Path:
-  - x: -25
-    y: -43
+  - y: 42.27681
+    x: -71.75626
+    round: false
+    lps: false
+  
+  - y: 42.27670
+    x: -71.75694
     round: true
-    lps: true
-    
-  - x: 25
-    y: -43
+    lps: false
+  
+  - y: 42.27642
+    x: -71.75685
     round: true
-    lps: true
-    
-  - x: 0
-    y: 0
+    lps: false
+  
+  - y: 42.27681
+    x: -71.75626
     round: false
     lps: false

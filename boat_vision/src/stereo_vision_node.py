@@ -53,8 +53,6 @@ def process_cams(left, right, spacing):
 	angle1 = ((left.x / CAM_WIDTH) * 2 - 1) * CAM_FOV_HORIZ / 2; # -30 to 30deg
 	angle2 = ((right.x / CAM_WIDTH) * 2 - 1) * CAM_FOV_HORIZ / 2; # -30 to 30deg
 	
-	print("left: %f, right: %f", angle1, angle2)
-	
 	# If the lines are parallel or diverging, there is no solution
 	if (angle1 <= angle2 or angle2 >= angle1):
 		rospy.logwarn("Invalid input, angles are diverging")
@@ -63,8 +61,6 @@ def process_cams(left, right, spacing):
 	# Convert the angles from 0deg = straight to the internal angle of the triangle bound by the rays
 	angle1 = -angle1 + 90
 	angle2 += 90
-	
-	#print("int A: %f, int B: %f", angle1, angle2)
 	
 	# Determine the third angle through simple geometrical relationships
 	angle3 = 180 - angle1 - angle2
@@ -197,8 +193,10 @@ class cam_thread(threading.Thread):
 	
 	def run(self):
 		
+		rate = rospy.Rate(50) #50 hz
 		while self.running:
 			self.has = self.cam.grab()
+			rate.sleep()
 		
 		self.cam.release
 
