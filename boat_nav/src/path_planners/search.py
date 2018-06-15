@@ -24,7 +24,7 @@ class SearchPlanner(Planner):
 		self.irons_client = actionlib.SimpleActionClient('irons_action', IronsAction)
 		self.found_pub = rospy.Publisher('found_target', Bool, queue_size = 10)
 		
-		#self.irons_client.wait_for_server()
+		self.irons_client.wait_for_server()
 	
 	
 	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Main Behaviour =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=

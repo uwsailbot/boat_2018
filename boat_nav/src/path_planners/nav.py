@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import rospy
 from overrides import overrides
 from boat_msgs.msg import BoatState
 from path_planners import Planner
@@ -9,6 +10,8 @@ class NavPlanner(Planner):
 	@overrides
 	def setup(self):
 		if len(self.waypoints) is 0:
+			rospy.loginfo(rospy.get_caller_id() + " No points to nav")
+			self.set_minor_state(BoatState.MIN_COMPLETE)
 			return
 		
 		self.publish_target(self.waypoints[0])
