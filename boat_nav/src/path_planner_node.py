@@ -6,10 +6,7 @@ from boat_msgs.msg import BoatState, Point, WaypointArray
 from path_planners import *
 
 # Dict of the planners to use
-planners = {BoatState.CHA_NAV: NavPlanner(),
-			BoatState.CHA_LONG: LongPlanner(),
-			BoatState.CHA_SEARCH: SearchPlanner(),
-			BoatState.CHA_STATION: StationPlanner() }
+planners = {}
 
 def boat_state_callback(new_state):
 	"""Callback for boat state."""
@@ -60,6 +57,14 @@ def initialize_node():
 	rospy.Subscriber('lps', Point, position_callback)
 	rospy.Subscriber('waypoints_raw', WaypointArray, waypoints_callback)
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
+	
+	global planners
+	planners =	{BoatState.CHA_NAV: NavPlanner(),
+				BoatState.CHA_LONG: LongPlanner(),
+				BoatState.CHA_SEARCH: SearchPlanner(),
+				BoatState.CHA_STATION: StationPlanner(),
+				BoatState.CHA_AVOID: AvoidPlanner() }
+		
 	rospy.spin()
 
 if __name__ == '__main__':

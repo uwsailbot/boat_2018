@@ -4,3 +4,4 @@ from search import SearchPlanner
 from station import StationPlanner
 from nav import NavPlanner
 from long import LongPlanner
+from avoid import AvoidPlanner

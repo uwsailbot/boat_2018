@@ -263,6 +263,8 @@ to_lps_lock = threading.Lock()
 
 def to_gps(p):
 	with to_gps_lock:
+		if rospy.is_shutdown():
+			return Point()
 		if type(p) is Point:
 			return to_gps_srv(p).pt
 		elif type(p) is Waypoint:
@@ -272,6 +274,8 @@ def to_gps(p):
 
 def to_lps(p):
 	with to_lps_lock:
+		if rospy.is_shutdown():
+			return Point()
 		if type(p) is Point:
 			return to_lps_srv(p).pt
 		elif type(p) is Waypoint:
@@ -331,10 +335,9 @@ def update_vision():
 	global vision_points_gps
 	
 	vision_points_gps = PointArray()
-	#for waypoint in waypoint_gps.points:
-	#	lps = to_lps(waypoint)
-	#	if point_is_in_fov(lps):
-	#		vision_points_gps.points.append(waypoint.pt)
+	for waypoint in waypoint_gps.points:
+		if point_is_in_fov(to_lps(waypoint)):
+			vision_points_gps.points.append(waypoint.pt)
 	
 	if search_area.target is not None and point_is_in_fov(search_area.target):
 		vision_points_gps.points.append(to_gps(search_area.target))
@@ -1408,6 +1411,7 @@ def calc(_):
 	if sim_is_running:
 		glutTimerFunc(1000/30, calc, 0)
 	else:
+		rospy.signal_shutdown("Close") 
 		glutDestroyWindow(win_ID)
 		glutLeaveMainLoop()
 
@@ -1525,7 +1529,7 @@ def init_GLUT():
 
 def listener():
 	# Setup subscribers
-	rospy.init_node('visualizer', anonymous=True)
+	rospy.init_node('visualizer', anonymous=True, disable_signals=True)
 	rospy.Subscriber('boat_state', BoatState, boat_state_callback)
 	rospy.Subscriber('rudder', Float32, rudder_callback)
 	rospy.Subscriber('winch', Int32, winch_callback)

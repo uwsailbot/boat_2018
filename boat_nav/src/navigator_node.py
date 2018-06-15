@@ -161,6 +161,11 @@ def position_callback(position):
 	# If the boat isn't in the autonomous planning state, exit
 	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
 		return
+	
+	# Temporary jank solution
+	if state.challenge is BoatState.CHA_AVOID:
+		return
+	
 	awa_algorithm()
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Calculations =*=*=*=*=*=*=*=*=*=*=*=*=
