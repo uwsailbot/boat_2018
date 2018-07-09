@@ -13,16 +13,6 @@
 #include <boat_msgs/GPS.h>
 #include <math.h>
 
-// Compass stuff
-#include <Wire.h>
-#include "HMC5883Llib.h"
-
-// Compass calibration
-#define MIN_X (-0.49)
-#define MIN_Y (-0.58)
-#define MAX_X (0.54)
-#define MAX_Y (0.48)
-
 #define DEBUG_SERIAL (false) //Output GPS data to Serial2 if true
 
 // The pin the wind vane sensor is connected to
@@ -41,8 +31,6 @@ boat_msgs::GPS gpsData;
 std_msgs::Float32 compassData;
 
 Adafruit_GPS GPS(&Serial1);
-Magnetometer mag;
-bool magConnected = false;
 Servo servo_rudder1;
 Servo servo_rudder2;
 Servo servo_winch;
@@ -103,25 +91,8 @@ void setup(){
     // Set the update rate
     GPS.sendCommand(PMTK_SET_NMEA_UPDATE_2HZ);   // 2 Hz update rate
     useInterrupt(true);
-
-    // Setup the compass
-    mag.begin();
-    // set the amount of gain - Use the most sensitive
-    // for reading the earths magnetic field
-    // 
-    // MSB/Gauss   Field Range
-    // 1370     +- 0.88 Ga
-    // 1090     +- 1.3 Ga
-    // 820      +- 1.9 Ga
-    // 660      +- 2.5 Ga
-    // 440      +- 4.0 Ga
-    // 390      +- 4.7 Ga
-    // 330      +- 5.6 Ga
-    // 230      +- 8.1 Ga
-    mag.setGain(HMC5833L_GAIN_1370);
-
-      
-    //Serial3.begin(9600, SERIAL_8N2);
+    
+    Serial3.begin(9600, SERIAL_8N2);
 
     bubbleSortlookupTable();
 }
@@ -144,7 +115,6 @@ void useInterrupt(boolean v) {
 }
 
 void loop(){
-  
     // Read Anemometer
     if ((millis() - anemometerTimer) > anemometerInterval){
         // Map 0-1023 ADC value to 0-360
@@ -171,53 +141,7 @@ void loop(){
         }
     }
     
-    // Check compass connect
-    if(!magConnected){
-      if(mag.begin() != 0){
-        magConnected = false;
-      } else {
-        magConnected = true;
-        mag.setGain(HMC5833L_GAIN_1370);
-      }
-    }
-
-    // I2C compass
-    if (magConnected && (millis() - compassTimer) > compassInterval){
-      compassTimer = millis();
-      double data = 0;
-      double x, y, z;
-      int8_t ret = mag.readGauss(&x, &y, &z);
-
-      if (ret == 0){
-        x = mapf(x, MIN_X, MAX_X, -1, 1);
-        y = mapf(y, MIN_Y, MAX_Y, -1, 1);
-        
-        data = atan2(y, x);
-        // Correct for when signs are reversed.
-        if(data < 0)
-          data += 2 * PI;
-
-        data = data * 180 / PI;
-      } else {
-        magConnected = false;
-      }
-
-      // Add 90deg to move 0deg from north to east
-      data = 90-data;
-      if (data > 360)
-        data -= 360;
-      if (data < 0)
-        data += 360;
-      
-      // Only publish if change in heading is greater than a degree
-      if(ret == 0 && abs(data - prevCompass) >= 1.0){
-        prevCompass = data;
-        compassData.data = data;
-        compass.publish(&compassData);      
-      }
-    }
-
-    // Old serial compass
+    //Read compass
     /*if ((millis() - compassTimer) > compassInterval){
         compassTimer = millis();
         float data = 0;
@@ -229,7 +153,7 @@ void loop(){
         // Only publish if change in heading is greater than a degree
         if (abs(data - prevCompass) >= 1.0){
             prevCompass = data;
-            compassData.data = data;
+            compassData.data = (data + 90) % 360;
             compass.publish(&compassData);
         }
     }*/
@@ -300,12 +224,9 @@ void loop(){
           gps.publish(&gpsData);
       
           last_lat = gpsData.latitude;
-          last_long = gpsData.longitude;  
+          last_long = gpsData.longitude;
           last_track = gpsData.track;
-          last_speed = gpsData.speed;  
-
-          //compassData.data = gpsData.track+90;
-          //compass.publish(&compassData);
+          last_speed = gpsData.speed;      
     }  
     
     nh.spinOnce();
