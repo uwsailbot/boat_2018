@@ -51,7 +51,7 @@ def initialize_node():
 			point = cur_pos
 			cur_pos.x += target.pt.dist*cosd(compass-target.pt.heading)
 			cur_pos.y += target.pt.dist*sind(compass-target.pt.heading)
-			points.points.append(to_gps(cur_pos))
+			points.points.append(to_gps(cur_pos).pt)
 		
 		# Publish it
 		pub.publish(points)

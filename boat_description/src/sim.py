@@ -336,7 +336,7 @@ def update_vision():
 	
 	vision_points_gps = PointArray()
 	for waypoint in waypoint_gps.points:
-		if point_is_in_fov(to_lps(waypoint)):
+		if point_is_in_fov(to_lps(waypoint)) and state.challenge is not BoatState.CHA_SEARCH:
 			vision_points_gps.points.append(waypoint.pt)
 	
 	if search_area.target is not None and point_is_in_fov(search_area.target):
