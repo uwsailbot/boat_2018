@@ -1,6 +1,6 @@
 <!-- Full system launch file -->
 <launch>
-  <arg name="vision" default="false" />
+  <arg name="vision" default="true" />
 
   <!-- Arduino connection nodes -->
   <include file="$(find boat_interfaces)/launch/arduino.launch" />

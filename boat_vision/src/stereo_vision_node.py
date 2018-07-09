@@ -237,13 +237,17 @@ def initialize_node():
 			polar = process_cams(points[0], points[1], CAM_SPACING)
 			msg = VisionTarget()
 			msg.header.stamp = rospy.Time.now()
-			if polar is not False:
+			if polar is not False and polar.dist < 3:
 				msg.has = True
 				msg.pt = polar
 			else:
 				msg.has = False
 			vision_pub.publish(msg)
-		
+		else:
+			msg = VisionTarget()
+			msg.has = False
+			vision_pub.publish(msg)
+
 		rate.sleep()
 	
 	left.stop()
