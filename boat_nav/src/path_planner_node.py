@@ -16,7 +16,6 @@ def boat_state_callback(new_state):
 	
 	if state.major is not BoatState.MAJ_AUTONOMOUS:
 		return
-	print "State"
 	
 	# Setup the planner when the challenge or major state changes
 	if state.challenge is not prev_state.challenge or state.major is not prev_state.major:
@@ -62,7 +61,7 @@ def initialize_node():
 	global planners
 	planners =	{BoatState.CHA_NAV: NavPlanner(),
 				BoatState.CHA_LONG: LongPlanner(),
-				#BoatState.CHA_SEARCH: SearchPlanner(),
+				BoatState.CHA_SEARCH: SearchPlanner(),
 				BoatState.CHA_STATION: StationPlanner(),
 				BoatState.CHA_AVOID: AvoidPlanner() }
 		

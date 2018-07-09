@@ -122,18 +122,12 @@ def load_challenge_data():
 
 def listener():
 	global rospack
-	global state
 	rospack = rospkg.RosPack()
 
 	# Setup subscribers
 	rospy.init_node('boat_state_controller_node')
 	rospy.Subscriber('joy', Joy, joy_callback)
 	rospy.Subscriber('boat_state', BoatState, state_callback)
-	while True:
-		state.major = BoatState.MAJ_AUTONOMOUS
-		state.minor = BoatState.MIN_PLANNING
-		state.challenge = BoatState.CHA_AVOID
-		state_pub.publish(state)
 	rospy.spin()
 
 if __name__ == '__main__':

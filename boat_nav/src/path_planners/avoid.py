@@ -23,7 +23,6 @@ class AvoidPlanner(Planner):
 	
 	@overrides
 	def planner(self):
-		
 		if self.has_obstacle:
 			self.rudder_pub.publish(Float32(150))
 		else:
@@ -31,8 +30,6 @@ class AvoidPlanner(Planner):
 	
 	
 	def _obstacle_callback(self, targets):
-		print len(targets.points)
-
 		self.has_obstacle = len(targets.points) > 0
 		
 		if Planner.state.challenge is BoatState.CHA_AVOID:
