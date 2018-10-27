@@ -1,0 +1,32 @@
+<!-- Simulator launch file -->
+<launch>
+  <arg name="joy" default="false" />
+  <arg name="controller" default="/dev/ttyUSB0" />
+
+  <!-- Can later add case for futaba -->
+
+  <!-- If joy is true -->
+  <group if="$(arg joy)">
+    <node pkg="boat_simulation" type="run_simulation.py" args="-j"
+      name="visualizer" output="screen">
+    </node>
+    <!-- Launches usb_joy node for the ps4 controller -->
+    <node pkg="boat_description" type="usb_joy.py" 
+      name="usb_joy" output="screen" > 
+    </node>
+  </group>
+
+  <!-- If joy is false -->
+  <group unless="$(arg joy)">
+    <node pkg="boat_simulation" type="run_simulation.py"
+      name="visualizer" output="screen" >
+    </node>
+  </group>
+
+  <!-- Boat Navigation nodes -->
+  <include file="$(find boat_nav)/launch/nav.launch" />
+
+  <!-- Boat Interface nodes -->
+  <include file="$(find boat_interfaces)/launch/interfaces_base.launch" />
+
+</launch>
