@@ -189,12 +189,16 @@ class SimulationData():
 						 "rudder_setpoint": 0,
 						 "rudder_enable": False,
 						 "replay_gps_raw": GPS(),
-						 "obstable_points": PointArray(),
+						 "obstacle_points": PointArray(),
 						 "gps_bounding_box": PointArray(),
 			             "gps_search_area": PointArray(),
 						 "target_point": Waypoint(),
-						 "vision_points_gps": PointArray()
-		                 }
+						 "vision_points_gps": PointArray(),
+		                 "fov_angle": 60,
+						 "fov_radius": 15,
+						 "camera_velocity": Point(0,0),
+						 "camera_move_speed": 100,
+						 }
 
 		self.sim_mode = SimMode.DEFAULT
 		self.reset_origin_on_next_gps = False

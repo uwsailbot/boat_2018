@@ -1,11 +1,14 @@
 from OpenGL.GLUT import *
 from OpenGL.GL import *
 
-from boat_msgs.msg import BoatState
+from boat_msgs.msg import BoatState, Point, PointArray
 
 from ui_elements import Slider
 
+from ui_elements import *
+
 import utils
+import math
 
 class OpenGLDrawing():
 
@@ -65,7 +68,7 @@ class OpenGLDrawing():
     def draw_waypoints(self):
         glPushMatrix()
         
-        for gps in waypoint_gps.points:
+        for gps in self.all_data.ros_data["waypoint_gps"].points:
             
             if gps.type is Waypoint.TYPE_ROUND:
                 glColor3f(1,0.5,0)
@@ -152,7 +155,7 @@ class OpenGLDrawing():
         glPopMatrix()
 
     def draw_target_point(self):
-        if target_point is not () and state.major is BoatState.MAJ_AUTONOMOUS and state.minor is not BoatState.MIN_COMPLETE:
+        if self.all_data.ros_data["target_point"] is not () and self.all_data.boat_state.state.major is BoatState.MAJ_AUTONOMOUS and self.all_data.boat_state.state.minor is not BoatState.MIN_COMPLETE:
             glColor3f(1,1,1)
             lps_point = to_lps(target_point.pt)
             (x,y) = self.camera.lps_to_screen(lps_point.x, lps_point.y)
@@ -162,7 +165,7 @@ class OpenGLDrawing():
         glPushMatrix()
         
         glColor3f(0.2, 0.2, 0.2)
-        for p in obstacle_points.points:
+        for p in self.all_data.ros_data["obstacle_points"].points:
             (x,y) = self.camera.lps_to_screen(p.x, p.y)
             draw_circle(0.5 * self.camera.scale,x,y)
         
@@ -198,14 +201,14 @@ class OpenGLDrawing():
         
         # calculate points for drawing fov cone (facing up)
         resolution = 5
-        angle_step = float(fov_angle) / resolution
+        angle_step = float(self.all_data.ros_data["fov_angle"]) / resolution
         cone_points = PointArray()
         cone_points.points.append(Point(0, 0))
         for i in range(-resolution, resolution + 1):
             if i is not 0:
                 angle = i * angle_step
-                x = math.sin(math.radians(angle/2)) * fov_radius * self.camera.scale
-                y = math.cos(math.radians(angle/2)) * fov_radius * self.camera.scale
+                x = math.sin(math.radians(angle/2)) * self.all_data.ros_data["fov_radius"] * self.camera.scale
+                y = math.cos(math.radians(angle/2)) * self.all_data.ros_data["fov_radius"] * self.camera.scale
                 cone_points.points.append(Point(x,y))
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glEnable(GL_BLEND)
@@ -213,7 +216,7 @@ class OpenGLDrawing():
         
         glPushMatrix()
         glTranslatef(boat_x, boat_y, 0)
-        glRotatef(heading-90, 0, 0, 1)
+        glRotatef(self.all_data.ros_data["heading"]-90, 0, 0, 1)
 
         glBegin(GL_POLYGON)
         for point in cone_points.points:
@@ -235,7 +238,7 @@ class OpenGLDrawing():
         glEnable(GL_BLEND)
         glColor4f(245/255.0, 200/255.0, 5/255.0, 0.3)
 
-        for point in vision_points_gps.points:
+        for point in self.all_data.ros_data["vision_points_gps"].points:
             lps = to_lps(point)
             (x,y) = self.camera.lps_to_screen(lps.x, lps.y)
             draw_circle(0.8 * self.camera.scale, x, y)
@@ -433,20 +436,20 @@ class OpenGLDrawing():
         #draw rudder
         glPushMatrix()
         glTranslatef(x, y, 0)
-        glRotatef(heading-90, 0, 0, 1)
+        glRotatef(self.all_data.ros_data["heading"]-90, 0, 0, 1)
         draw_image(
-            cur_rudder_img[0], # texture id
-            (0, (-cur_boat_img[1][1]/2+cur_rudder_img[1][1]*0.1)*self.camera.scale), # local y coord of rudder, moves to end of boat 
-            90-rudder_pos, # rudder pos
-            (cur_rudder_img[1][0]*self.camera.scale,cur_rudder_img[1][1]*self.camera.scale)) # rudder visual size
+            self.display_data.cur_rudder_img[0], # texture id
+            (0, (-self.display_data.cur_boat_img[1][1]/2+self.display_data.cur_rudder_img[1][1]*0.1)*self.camera.scale), # local y coord of rudder, moves to end of boat 
+            90-self.ros_data["rudder_pos"], # rudder pos
+            (self.display_data.cur_rudder_img[1][0]*self.camera.scale,self.display_data.cur_rudder_img[1][1]*self.camera.scale)) # rudder visual size
         glPopMatrix()
         
         #draw boat
         draw_image(
-            cur_boat_img[0],
+            self.display_data.cur_boat_img[0],
             (x, y),
-            heading-90,
-            (cur_boat_img[1][0]*self.camera.scale, cur_boat_img[1][1]*self.camera.scale))
+            self.ros_data["heading"]-90,
+            (self.display_data.cur_boat_img[1][0]*self.camera.scale, self.display_data.cur_boat_img[1][1]*self.camera.scale))
         
         #draw sail
         sail_angle = 90 * float(WINCH_MAX - winch_pos)/(WINCH_MAX - WINCH_MIN)
@@ -455,6 +458,8 @@ class OpenGLDrawing():
         glPushMatrix()
         glTranslatef(x, y, 0)
         glRotatef(heading-90, 0, 0, 1)
+
+        cur_sail_img = self.display_data.cur_sail_img
         draw_image(
             cur_sail_img[0],
             (0.1*self.camera.scale, 0.5*self.camera.scale),

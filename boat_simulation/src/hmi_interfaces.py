@@ -1,6 +1,8 @@
 from OpenGL.GLUT import *
 from OpenGL.GL import *
 
+from boat_msgs.msg import Point, PointArray
+
 
 class OpenGLHMI():
     def __init__(self, display_data, all_data):
@@ -128,22 +130,22 @@ class OpenGLHMI():
         mouse_pos = Point(x,y)
 
         # if mouse is on right info panel, don't move self.camera
-        if x > win_width-120:
+        if x > self.display_data.win_width-120:
             self.camera_velocity.x = 0
             self.camera_velocity.y = 0
             return
         
         # set self.camera_velocity when mouse is near edge of screen or edge of info display panel
-        if (x < 55 and x > 5 and not show_details) or (x < 180+50 and x > 180 and show_details):
+        if (x < 55 and x > 5 and not self.display_data.show_details) or (x < 180+50 and x > 180 and self.display_data.show_details):
             self.camera_velocity.x = -self.camera_move_speed / self.camera.scale
-        elif x > win_width-120-50:
+        elif x > self.display_data.win_width-120-50:
             self.camera_velocity.x = self.camera_move_speed / self.camera.scale
         else:
-            self.camera_velocity.x = 0
+            self.all_data.ros_data["camera_velocity"].x = 0
         # The > 5 makes sure that when we scroll off the window, the self.camera stops moving
         if y < 55 and y > 5:
             self.camera_velocity.y = self.camera_move_speed / self.camera.scale
-        elif y > win_height-55 and y < win_height-5:
+        elif y > self.display_data.win_height-55 and y < self.display_data.win_height-5:
             self.camera_velocity.y = -self.camera_move_speed / self.camera.scale
         else:
             self.camera_velocity.y = 0	

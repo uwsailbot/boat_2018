@@ -1,3 +1,6 @@
+from OpenGL.GLUT import *
+from OpenGL.GL import *
+
 class Slider:
     def __init__(self,x,y,w,h,callback,min_val,max_val,cur_val):
         self.x=x
