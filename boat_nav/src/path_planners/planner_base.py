@@ -1,7 +1,7 @@
 #!/usr/bin/env python
+import rospy
 import threading
 import math
-import rospy
 from abc import ABCMeta, abstractmethod
 from boat_msgs.msg import BoatState, Point, Waypoint, WaypointArray
 from boat_msgs.srv import ConvertPoint

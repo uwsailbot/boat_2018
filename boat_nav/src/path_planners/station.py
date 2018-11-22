@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-import math
 import rospy
+import math
 from overrides import overrides
 from boat_msgs.msg import BoatState, Point, PointArray, Waypoint
 from path_planners import Planner, Services

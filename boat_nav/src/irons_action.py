@@ -1,18 +1,18 @@
-#! /usr/bin/env python
-import actionlib
-import boat_msgs.msg
+#!/usr/bin/env python
 import rospy
+from actionlib import SimpleActionServer
+from boat_msgs.msg import IronsAction as IronsActionMsg, IronsFeedback, IronsResult
 from std_msgs.msg import Bool, Float32
 
 class IronsAction(object):
 
 	# create messages that are used to publish feedback/result
-	_feedback = boat_msgs.msg.IronsFeedback()
-	_result = boat_msgs.msg.IronsResult()
+	_feedback = IronsFeedback()
+	_result = IronsResult()
 
 	def __init__(self, name):
 		self._name = name
-		self._as = actionlib.SimpleActionServer(self._name, boat_msgs.msg.IronsAction, execute_cb=self.execute, auto_start = False)
+		self._as = SimpleActionServer(self._name, IronsActionMsg, execute_cb=self.execute, auto_start = False)
 		self._as.start()
 		
 		self.ane_reading = 0

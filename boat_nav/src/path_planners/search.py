@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-import actionlib
-import math
 import rospy
+import math
 from overrides import overrides
+from actionlib import SimpleActionClient
 from boat_msgs.msg import BoatState, Point, PointArray, Waypoint, IronsAction, IronsGoal
 from std_msgs.msg import Bool
 from path_planners import Planner
@@ -21,7 +21,7 @@ class SearchPlanner(Planner):
 		rospy.Subscriber('search_area', PointArray, self._search_area_callback)
 		rospy.Subscriber('vision', PointArray, self._vision_callback)
 		
-		self.irons_client = actionlib.SimpleActionClient('irons_action', IronsAction)
+		self.irons_client = SimpleActionClient('irons_action', IronsAction)
 		self.found_pub = rospy.Publisher('found_target', Bool, queue_size = 10)
 		
 		self.irons_client.wait_for_server()

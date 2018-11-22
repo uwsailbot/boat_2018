@@ -1,20 +1,19 @@
-#! /usr/bin/env python
-import actionlib
-import boat_msgs.msg
-import math
+#!/usr/bin/env python
 import rospy
-from boat_msgs.msg import GPS, Point
+import math
+from actionlib import SimpleActionServer
+from boat_msgs.msg import MaxVMGAction as MaxVMGActionMsg, MaxVMGFeedback, MaxVMGResult, GPS, Point
 from std_msgs.msg import Bool, Float32
 
 class MaxVMGAction(object):
 
 	# create messages that are used to publish feedback/result
-	_feedback = boat_msgs.msg.MaxVMGFeedback()
-	_result = boat_msgs.msg.MaxVMGResult()
+	_feedback = MaxVMGFeedback()
+	_result = MaxVMGResult()
 
 	def __init__(self, name):
 		self._name = name
-		self._as = actionlib.SimpleActionServer(self._name, boat_msgs.msg.MaxVMGAction, execute_cb=self.execute, auto_start = False)
+		self._as = SimpleActionServer(self._name, MaxVMGActionMsg, execute_cb=self.execute, auto_start = False)
 		self._as.start()
 		
 		self.layline = rospy.get_param('/boat/nav/layline')

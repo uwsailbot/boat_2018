@@ -1,22 +1,21 @@
-#! /usr/bin/env python
-import actionlib
-import boat_msgs.msg
+#!/usr/bin/env python
 import rospy
 import math
-from boat_msgs.msg import BoatState, Point, Waypoint, TackingAction, TackingGoal, GPS
+from actionlib import SimpleActionClient, SimpleActionServer
+from boat_msgs.msg import LaylineAction as LaylineActionMsg, LaylineFeedback, LaylineResult, BoatState, Point, Waypoint, TackingAction, TackingGoal, GPS
 from std_msgs.msg import Float32
 from actionlib_msgs.msg import GoalStatus
 
 class LaylineAction(object):
 	# create messages that are used to publish feedback/result
-	_feedback = boat_msgs.msg.LaylineFeedback()
-	_result = boat_msgs.msg.LaylineResult()
+	_feedback = LaylineFeedback()
+	_result = LaylineResult()
 
 	def __init__(self, name):
 		self._name = name
-		self._as = actionlib.SimpleActionServer(self._name, boat_msgs.msg.LaylineAction, execute_cb=self.layline_callback, auto_start = False)
+		self._as = SimpleActionServer(self._name, LaylineActionMsg, execute_cb=self.layline_callback, auto_start = False)
 		self._as.start()
-		self.tacking_client = actionlib.SimpleActionClient('tacking_action', TackingAction)
+		self.tacking_client = SimpleActionClient('tacking_action', TackingAction)
 		self.cur_pos = Point()
 		self.min_speed = rospy.get_param('/boat/nav/min_tacking_speed')
 		self.layline = rospy.get_param('/boat/nav/layline')
