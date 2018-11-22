@@ -10,7 +10,6 @@ project(boat_vision)
 find_package(catkin REQUIRED COMPONENTS
   boat_msgs
   roslaunch
-  roscpp
   rospy
   std_msgs
   cv_bridge

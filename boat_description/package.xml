@@ -4,39 +4,18 @@
   <version>0.0.0</version>
   <description>The boat_description package</description>
 
-  <maintainer email="sbjohnst@uwaterloo.ca">Seamus Johnston</maintainer>
+  <maintainer email="mtreynolds@uwaterloo.ca">Matt Reynolds</maintainer>
 
-
-  <!-- One license tag required, multiple allowed, one license per tag -->
-  <!-- Commonly used license strings: -->
-  <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
   <license>TODO</license>
 
-
-  <!-- Url tags are optional, but multiple are allowed, one per tag -->
-  <!-- Optional attribute type can be: website, bugtracker, or repository -->
-  <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/boat_description</url> -->
-
-
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>roscpp</build_depend>
-  <build_depend>rospy</build_depend>
+  <depend>rospy</depend>
+  <depend>boat_msgs</depend>
+  <depend>boat_nav</depend>
+  <depend>boat_interfaces</depend>
+  <depend>boat_vision</depend>
+  <depend>python-pygame</depend>
   <build_depend>roslaunch</build_depend>
-  <build_depend>boat_msgs</build_depend>
-  <build_depend>boat_nav</build_depend>
-  <build_depend>boat_interfaces</build_depend>
-  <build_depend>boat_vision</build_depend>
-  <build_export_depend>roscpp</build_export_depend>
-  <build_export_depend>rospy</build_export_depend>
-  <build_export_depend>boat_nav</build_export_depend>
-  <build_export_depend>boat_interfaces</build_export_depend>
-  <build_export_depend>boat_vision</build_export_depend>
-  <exec_depend>roscpp</exec_depend>
-  <exec_depend>rospy</exec_depend>
-  <exec_depend>python-pygame</exec_depend>
-  <exec_depend>boat_nav</exec_depend>
-  <exec_depend>boat_interfaces</exec_depend>
-  <exec_depend>boat_vision</exec_depend>
+
 
 </package>

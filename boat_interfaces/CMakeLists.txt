@@ -11,7 +11,6 @@ find_package(catkin REQUIRED COMPONENTS
   boat_msgs
   actionlib
   roslaunch
-  roscpp
   rospy
   std_msgs
 )

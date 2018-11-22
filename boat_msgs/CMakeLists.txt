@@ -10,7 +10,6 @@ project(boat_msgs)
 find_package(catkin REQUIRED COMPONENTS
   message_generation
   actionlib
-  roscpp
   rospy
   std_msgs
 )
@@ -115,7 +114,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES boat_msgs
-  CATKIN_DEPENDS roscpp rospy std_msgs message_runtime
+  CATKIN_DEPENDS rospy std_msgs message_runtime
 #  DEPENDS system_lib
 )
 

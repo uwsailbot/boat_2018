@@ -6,37 +6,14 @@
 
   <maintainer email="sbjohnst@uwaterloo.ca">Seamus Johnston</maintainer>
 
-
-  <!-- One license tag required, multiple allowed, one license per tag -->
-  <!-- Commonly used license strings: -->
-  <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
   <license>TODO</license>
 
-
-  <!-- Url tags are optional, but multiple are allowed, one per tag -->
-  <!-- Optional attribute type can be: website, bugtracker, or repository -->
-  <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/boat_interfaces</url> -->
-
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>boat_msgs</build_depend>
-  <build_depend>roscpp</build_depend>
-  <build_depend>rospy</build_depend>
+  <depend>rospy</depend>
+  <depend>actionlib</depend>
+  <depend>boat_msgs</depend>
+  <depend>rosserial_python</depend>
+  <depend>std_msgs</depend>
   <build_depend>roslaunch</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>actionlib</build_depend>
-  <build_depend>rosserial_python</build_depend>
-  <build_export_depend>boat_msgs</build_export_depend>
-  <build_export_depend>roscpp</build_export_depend>
-  <build_export_depend>rospy</build_export_depend>
-  <build_export_depend>std_msgs</build_export_depend>
-  <build_export_depend>actionlib</build_export_depend>
-  <build_export_depend>rosserial_python</build_export_depend>
-  <exec_depend>boat_msgs</exec_depend>
-  <exec_depend>roscpp</exec_depend>
-  <exec_depend>rospy</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
-  <exec_depend>actionlib</exec_depend>
-  <exec_depend>rosserial_python</exec_depend>
 
 </package>

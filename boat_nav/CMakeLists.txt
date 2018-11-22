@@ -13,7 +13,6 @@ find_package(catkin REQUIRED COMPONENTS
   boat_vision
   actionlib
   roslaunch
-  roscpp
   rospy
   std_msgs
   phidgets_imu
