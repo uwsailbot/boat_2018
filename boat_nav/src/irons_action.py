@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python
 import actionlib
 import boat_msgs.msg
 import rospy
