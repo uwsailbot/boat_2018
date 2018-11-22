@@ -9,10 +9,13 @@
   <license>TODO</license>
 
   <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- Core Dependencies -->
   <depend>rospy</depend>
-  <depend>actionlib</depend>
+  <depend>actionlib_msgs</depend>
   <depend>std_msgs</depend>
-  <build_depend>roslaunch</build_depend>
+
+  <!-- Custom Message Dependencies -->
   <build_depend>message_generation</build_depend>
   <exec_depend>message_runtime</exec_depend>
 

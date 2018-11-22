@@ -9,16 +9,24 @@
   <license>TODO</license>
 
   <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- Core Dependencies -->
   <depend>rospy</depend>
-  <depend>boat_interfaces</depend>
-  <depend>boat_msgs</depend>
-  <depend>boat_vision</depend>
-  <depend>imu_filter_madgwick</depend>
-  <depend>nodelet</depend>
-  <depend>phidgets_imu</depend>
-  <depend>robot_localization</depend>
+  <depend>actionlib</depend>
   <depend>std_msgs</depend>
-  <depend>tf2_ros</depend>
+  <depend>boat_msgs</depend>
+  <depend>tf</depend>
+
+  <!-- Launch file dependencies -->
+  <exec_depend>boat_interfaces</exec_depend>
+  <exec_depend>boat_vision</exec_depend>
+  <exec_depend>imu_filter_madgwick</exec_depend>
+  <exec_depend>nodelet</exec_depend>
+  <exec_depend>phidgets_imu</exec_depend>
+  <exec_depend>robot_localization</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+
+  <!-- Testing Dependencies -->
   <build_depend>roslaunch</build_depend>
 
 </package>

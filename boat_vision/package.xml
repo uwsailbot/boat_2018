@@ -9,10 +9,14 @@
   <license>TODO</license>
 
   <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- Core Dependencies -->
   <depend>rospy</depend>
+  <depend>std_msgs</depend>
   <depend>boat_msgs</depend>
   <depend>cv_bridge</depend>
-  <depend>std_msgs</depend>
+
+  <!-- Testing Dependencies -->
   <build_depend>roslaunch</build_depend>
 
 </package>
