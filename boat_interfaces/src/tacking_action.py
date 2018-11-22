@@ -1,18 +1,17 @@
 #!/usr/bin/env python
-import actionlib
-import boat_msgs.msg
 import rospy
-from boat_msgs.msg import BoatState
+from actionlib import SimpleActionServer
+from boat_msgs.msg import TackingAction as TackingActionMsg, TackingFeedback, TackingResult, BoatState
 from std_msgs.msg import Bool, Float32
 
 class TackingAction(object):
 	# create messages that are used to publish feedback/result
-	_feedback = boat_msgs.msg.TackingFeedback()
-	_result = boat_msgs.msg.TackingResult()
+	_feedback = TackingFeedback()
+	_result = TackingResult()
 
 	def __init__(self, name):
 		self._name = name
-		self._as = actionlib.SimpleActionServer(self._name, boat_msgs.msg.TackingAction, execute_cb=self.tacking_callback, auto_start = False)
+		self._as = SimpleActionServer(self._name, TackingActionMsg, execute_cb=self.tacking_callback, auto_start = False)
 		self._as.start()
 		self.layline = rospy.get_param('/boat/nav/layline')
 		self.rudder_max = rospy.get_param('boat/interfaces/rudder_max')

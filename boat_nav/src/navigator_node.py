@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-import actionlib
-import math
 import rospy
+import math
+from actionlib import SimpleActionClient
 from boat_msgs.msg import BoatState, GPS, MaxVMGAction, MaxVMGGoal, Point, Waypoint, TackingAction, TackingGoal, LaylineAction, LaylineGoal
 from boat_msgs.srv import ConvertPoint
 from std_msgs.msg import Float32
@@ -60,9 +60,9 @@ layline = rospy.get_param('/boat/nav/layline')
 # Declare the publishers for the node
 heading_pub = rospy.Publisher('target_heading', Float32, queue_size=10)
 boat_state_pub = rospy.Publisher('boat_state', BoatState, queue_size=10)
-max_vmg_client = actionlib.SimpleActionClient('max_vmg_action', MaxVMGAction)
-tacking_client = actionlib.SimpleActionClient('tacking_action', TackingAction)
-layline_client = actionlib.SimpleActionClient('layline_action', LaylineAction)
+max_vmg_client = SimpleActionClient('max_vmg_action', MaxVMGAction)
+tacking_client = SimpleActionClient('tacking_action', TackingAction)
+layline_client = SimpleActionClient('layline_action', LaylineAction)
 
 # Service to convert gps to lps
 to_lps = rospy.ServiceProxy('gps_to_lps', ConvertPoint)

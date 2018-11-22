@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import rospy
-import time
 from std_msgs.msg import Bool, Float32
 
 pid_is_enabled = False
