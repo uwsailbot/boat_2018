@@ -15,6 +15,7 @@
   <depend>actionlib</depend>
   <depend>std_msgs</depend>
   <depend>boat_msgs</depend>
+  <depend>boat_utilities</depend>
 
   <!-- Launch file dependencies -->
   <exec_depend>rosserial_python</exec_depend>

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy
 from std_msgs.msg import Bool, Float32
+from boat_utilities import angles
 
 pid_is_enabled = False
 kp = 1.0
@@ -8,26 +9,16 @@ kd = 0.0
 ki = 0.0
 output_pub = rospy.Publisher('output', Float32, queue_size=10)
 setpoint = 0
-pid_input = 0
 
 # TODO: Modify this to make the PID node generalizable and usable for multiple controllers
 max_range = (rospy.get_param('/boat/interfaces/rudder_max') - rospy.get_param('/boat/interfaces/rudder_min')) / 2.0
 
 
 # If the boat state topic changes, update local boat state
-def input_callback(pid):
-	global pid_input
-	global setpoint
-	global kp
-	global max_range
-	global pid_is_enabled
+def input_callback(input):
+
 	if pid_is_enabled:
-		pid_input = pid.data
-		e = setpoint - pid_input
-		if e > 180:
-			e -= 360
-		elif e < -180:
-			e += 360
+		e = angles.normalize_signed(setpoint - input.data)
 		prop= kp * e
 		# TODO: Add integral and derivative
 		integral = 0 

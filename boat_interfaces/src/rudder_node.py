@@ -2,6 +2,7 @@
 import rospy
 from boat_msgs.msg import BoatState, GPS, Joy
 from std_msgs.msg import Bool, Float32
+from boat_utilities import angles
 
 
 # Declare global variables needed for the node
@@ -59,7 +60,7 @@ def compass_callback(compass):
 	wind_heading = (ane_reading + compass.data) % 360
 	
 	cur_boat_heading = compass.data
-	heading_msg = Float32(conform_angle(cur_boat_heading))
+	heading_msg = Float32(angles.normalize_signed(cur_boat_heading))
 	pid_input_pub.publish(heading_msg)
 	# Don't loginfo here, this would be somewhat redundant as this callback just parses and republishes the same information
 
@@ -93,7 +94,7 @@ def target_heading_callback(target_heading):
 	# We have a new valid setpoint, therefore output it	
 	#rospy.loginfo(rospy.get_caller_id() + " New rudder setpoint: %f", target_heading.data)
 
-	pid_setpoint = Float32(conform_angle(target_heading.data))
+	pid_setpoint = Float32(angles.normalize_signed(target_heading.data))
 	pid_setpoint_pub.publish(pid_setpoint)
 
 
@@ -137,10 +138,6 @@ def joy_callback(controller):
 		rudder_pos_pub.publish(position_msg)
 		rospy.loginfo(rospy.get_caller_id() + " Read value: %f", controller.right_stick_x)
 		rudder_pos = position_msg.data
-
-# Conform an input angle to range (-180, 180)
-def conform_angle(val):
-	return (val + 180) % 360 - 180
 
 def listener():
 	# Setup subscribers
