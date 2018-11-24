@@ -4,6 +4,7 @@ import math
 from overrides import overrides
 from boat_msgs.msg import BoatState, Point, PointArray, Waypoint
 from path_planners import Planner, Services
+from boat_utilities import points
 
 HEIGHT_TO_TRAVEL = rospy.get_param('/boat/planner/station/height')
 MAX_WIDTH = rospy.get_param('/boat/planner/station/width')
@@ -134,7 +135,7 @@ class StationPlanner(Planner):
 		
 		# If we've reached the set waypoint, flip around
 		if self.boat_reached_target():
-			if self.is_within_dist(self.target_waypoint.pt, self.start_station, 0.0001):
+			if points.is_within_dist(self.target_waypoint.pt, self.start_station, 0.0001):
 				self.publish_target(Waypoint(self.end_station, Waypoint.TYPE_INTERSECT))
 			else:
 				self.publish_target(Waypoint(self.start_station, Waypoint.TYPE_INTERSECT))

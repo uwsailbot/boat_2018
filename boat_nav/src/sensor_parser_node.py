@@ -6,6 +6,7 @@ from boat_msgs.srv import ConvertPoint, ConvertPointResponse
 from std_msgs.msg import Float32
 from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus
 from tf.transformations import euler_from_quaternion
+from boat_utilities.angles import cosd, sind
 
 # Declare global variables needed for the node
 origin_lps = Point()
@@ -105,7 +106,7 @@ def to_lps(gps):
 # Convert from gps to lps
 def to_gps(local):
 	gps = Point()
-	
+
 	gps.y = math.degrees((local.y + origin_lps.y)/RADIUS)
 	gps.x = math.degrees((local.x + origin_lps.x)/(RADIUS * cosd(gps.y)))
 	return gps
@@ -118,14 +119,6 @@ def get_coords(gps):
 	coords.y = gps.latitude
 	return coords
 
-
-def cosd(angle):
-	return math.cos(math.radians(angle))
-
-def sind(angle):
-	return math.sin(math.radians(angle))
-
-
 # Initialize the node
 def listener():
 	global origin_lps
@@ -135,7 +128,7 @@ def listener():
 	# Setup first so that simulator can send the origin point
 	srv1 = rospy.Service('lps_to_gps', ConvertPoint, lps_to_gps_srv)
 
-	
+
 	# setup the origin
 	origin_coords = rospy.wait_for_message('gps_raw', GPS)
 	origin_lps = to_lps(get_coords(origin_coords))

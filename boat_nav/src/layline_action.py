@@ -5,6 +5,7 @@ from actionlib import SimpleActionClient, SimpleActionServer
 from boat_msgs.msg import LaylineAction as LaylineActionMsg, LaylineFeedback, LaylineResult, BoatState, Point, Waypoint, TackingAction, TackingGoal, GPS
 from std_msgs.msg import Float32
 from actionlib_msgs.msg import GoalStatus
+from boat_utilities import angles
 
 class LaylineAction(object):
 	# create messages that are used to publish feedback/result
@@ -49,43 +50,19 @@ class LaylineAction(object):
 	def gps_callback(self, gps):
 		self.boat_speed = gps.speed * 0.514444 # Knots to m/s
 
-	def is_within_bounds(self, val, boundA, boundB):
-		if boundA < boundB:
-			val -= boundA
-			boundB -= boundA
-			boundA = 0
-		else:
-			val -= boundB
-			boundA -= boundB
-			boundB = 0
-		if val < 0:
-			val += 360
-		val = val % 360
-		return (boundA <= val and val <= boundB) or (boundB <= val and val <= boundA)
-
-	def gtAngle(self, angle1, angle2):
-		comp_angle = (angle2 + 180) % 360
-		if angle2 >= 180:
-			return not self.is_within_bounds(angle1, angle2, comp_angle)
-		else:
-			return self.is_within_bounds(angle1, angle2, comp_angle)
-	
-	def ltAngle(self, angle1, angle2):
-		comp_angle = (angle2 + 180) % 360
-		if angle2 >= 180:
-			return self.is_within_bounds(angle1, angle2, comp_angle)
-		else:
-			return not self.is_within_bounds(angle1, angle2, comp_angle)
-
 	def anemometer_callback(self, new_heading):
 		self.ane_reading = new_heading.data
-		self.apparent_wind_heading = (self.ane_reading + self.compass) % 360
-		self.wind_coming = (self.apparent_wind_heading + 180) % 360
+		self.update_apparent_wind()
+
 
 	def compass_callback(self, compass):
 		self.compass = compass.data
-		self.apparent_wind_heading = (self.ane_reading + self.compass) % 360
-		self.wind_coming = (self.apparent_wind_heading + 180) % 360
+		self.update_apparent_wind()
+
+	def update_apparent_wind(self):
+		self.apparent_wind_heading = angles.normalize(self.ane_reading + self.compass)
+		self.wind_coming =  angles.normalize(self.apparent_wind_heading + 180)
+
 
 	def layline_callback(self, goal):
 		# helper variables
@@ -102,7 +79,7 @@ class LaylineAction(object):
 		pos = self.cur_pos
 		tar = goal.target.pt
 		
-		a = math.tan(math.radians(self.compass))
+		a = angles.tand(self.compass)
 		b = -1
 		c = tar.y - a*tar.x
 		dx = pos.x-tar.x
@@ -111,28 +88,25 @@ class LaylineAction(object):
 		d_perp = abs(a*pos.x + b*pos.y + c)/math.sqrt(a*a+b*b)
 		d_par = math.sqrt(dx*dx+dy*dy-d_perp*d_perp)
 		
-		if self.gtAngle(goal.alt_tack_angle, self.wind_coming):
+		if angles.is_on_left(goal.alt_tack_angle, self.wind_coming):
 			tacking_direction = 1
 		else:
 			tacking_direction = -1
 		self._feedback.status = " Tacking away from mark to hit layline. "
 		rospy.loginfo(rospy.get_caller_id() + self._feedback.status)
-		new_target = self.wind_coming - tacking_direction * self.layline
-		print new_target, self.wind_coming, tacking_direction
-		if new_target < 0:
-			new_target += 360
-		new_target = new_target % 360
+		new_target = angles.normalize(self.wind_coming - tacking_direction * self.layline)
 		self.target_heading = new_target
 		self.target_pub.publish(Float32(self.target_heading))
 		
 		tacking_goal = TackingGoal(direction = tacking_direction)
 		self.tacking_client.send_goal(tacking_goal)
-		
+
 		endtime = rospy.Time.now() + rospy.Duration(10)
 		
+		# TODO: Sometimes this loop abruptly exits for no reason
 		while (self.tacking_client.get_state() is GoalStatus.ACTIVE or\
 			   self.tacking_client.get_state() is GoalStatus.PENDING) and rospy.Time.now() < endtime and not did_hit_midpoint:
-			
+
 			pos = self.cur_pos
 			cur_d_perp = abs(a*pos.x + b*pos.y + c)/math.sqrt(a*a+b*b)
 			if cur_d_perp < d_perp*0.48:
@@ -184,15 +158,14 @@ class LaylineAction(object):
 
 		# Wait until we hit the layline heading
 		while (not hit_layline or self.boat_speed < self.min_speed) and not preempted:
-			direct_heading = math.atan2(goal.target.pt.y - self.cur_pos.y, goal.target.pt.x - self.cur_pos.x) * 180 / math.pi
-			direct_heading = (direct_heading + 360) % 360
-			if goal.alt_tack_angle - goal.overshoot_angle < 0:
-				lower_bound = goal.alt_tack_angle - goal.overshoot_angle + 360
-			else:
-				lower_bound = goal.alt_tack_angle - goal.overshoot_angle
-			upper_bound = (goal.alt_tack_angle + goal.overshoot_angle) % 360
-			if (tacking_direction is 1 and self.gtAngle(direct_heading, upper_bound)) or\
-				(tacking_direction is -1 and self.ltAngle(direct_heading, lower_bound)):
+			direct_heading = angles.atan2d(goal.target.pt.y - self.cur_pos.y, goal.target.pt.x - self.cur_pos.x)
+			direct_heading = angles.normalize(direct_heading)
+
+			lower_bound = angles.normalize(goal.alt_tack_angle - goal.overshoot_angle)
+			upper_bound = angles.normalize(goal.alt_tack_angle + goal.overshoot_angle)
+
+			if (tacking_direction is 1 and angles.is_on_left(direct_heading, upper_bound)) or\
+				(tacking_direction is -1 and angles.is_on_right(direct_heading, lower_bound)):
 				hit_layline = True
 
 			if self._as.is_preempt_requested() or self.new_target:
@@ -208,7 +181,7 @@ class LaylineAction(object):
 		if preempted:
 			return
 
-		self._feedback.status = " Tacking towards mark after hitting layline. "
+		self._feedback.status = " Hit layline. Tacking towards mark"
 		rospy.loginfo(rospy.get_caller_id() + self._feedback.status)
 		# Reverse tacking direction
 		tacking_goal.direction = tacking_direction * -1

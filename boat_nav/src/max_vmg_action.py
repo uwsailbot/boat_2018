@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import rospy
-import math
 from actionlib import SimpleActionServer
 from boat_msgs.msg import MaxVMGAction as MaxVMGActionMsg, MaxVMGFeedback, MaxVMGResult, GPS, Point
 from std_msgs.msg import Bool, Float32
+from boat_utilities import angles
 
 class MaxVMGAction(object):
 
@@ -50,12 +50,12 @@ class MaxVMGAction(object):
 		self.ane_reading = anemometer.data
 	
 	def vmg(self):
-		return math.cos(self.heading - self.direct_heading()) * self.speed
+		return angles.cosd(self.heading - self.direct_heading()) * self.speed
 	
 	def direct_heading(self):
 		orig = self.pos
 		dest = self.goal.target
-		return math.degrees(math.atan2(dest.y-orig.y, dest.x-orig.x))
+		return angles.atan2d(dest.y-orig.y, dest.x-orig.x)
 	
 	def execute(self, goal):
 		self.goal = goal

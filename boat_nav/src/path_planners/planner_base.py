@@ -7,6 +7,8 @@ from boat_msgs.msg import BoatState, Point, Waypoint, WaypointArray
 from boat_msgs.srv import ConvertPoint
 from std_msgs.msg import Float32
 
+from boat_utilities import angles, points
+
 BUOY_TOL = rospy.get_param('/boat/planner/buoy_tol')
 ROUND_DIST = rospy.get_param('/boat/planner/round_dist')
 ROUND_FACTOR = rospy.get_param('/boat/planner/round_factor')
@@ -181,8 +183,8 @@ class Planner:
 	@staticmethod
 	def _calc_wind_coming():
 		"""Calculate the angle of the wind."""
-		Planner.new_wind_heading = (Planner.ane_reading + Planner.cur_boat_heading) % 360
-		Planner.wind_coming = (Planner.new_wind_heading + 180) % 360
+		Planner.new_wind_heading = angles.normalize(Planner.ane_reading + Planner.cur_boat_heading)
+		Planner.wind_coming = angles.normalize(Planner.new_wind_heading + 180)
 	
 	
 	def boat_reached_target(self):
@@ -190,20 +192,7 @@ class Planner:
 		
 		@return True if the boat is within the tolerance
 		"""
-		return self.is_within_dist(self.cur_pos, Services.to_lps(self.target_waypoint), BUOY_TOL)
-	
-	
-	@staticmethod
-	def is_within_dist(p1, p2, dist):
-		"""Determine if the dist between two points is within the specified tolerance
-		
-		@param p1: The first point to compare
-		@param p2: The second point to compare
-		@param dist: The tolerance, in that same units as the points (meters, etc)
-		@return True if the points are within the tolerance
-		"""
-		a = math.pow(p1.x - p2.x, 2) + math.pow(p1.y - p2.y, 2)
-		return math.sqrt(a) < dist
+		return points.is_within_dist(self.cur_pos, Services.to_lps(self.target_waypoint), BUOY_TOL)
 
 
 # =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Services =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
