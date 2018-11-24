@@ -1,4 +1,5 @@
-#goal definition -1, 1
+#goal definition
+# 1 = From left to right of wind, -1 = From right to left of wind
 int32 direction
 ---
 #result definition

@@ -56,7 +56,10 @@ class TackingAction(object):
 		self._feedback.status = "Entered Action Callback"
 		
 		# publish info to the console for the user
-		rospy.loginfo('Tacking Action: Tacking Action Startup')
+		if goal.direction == 1:
+			rospy.loginfo(rospy.get_caller_id() + ' Startup - Tacking from left to right')
+		else:
+			rospy.loginfo(rospy.get_caller_id() + ' Startup - Tacking from right to left')
 		self.state.minor = BoatState.MIN_TACKING
 		self.state_pub.publish(self.state)
 				
@@ -84,7 +87,6 @@ class TackingAction(object):
 					else:
 						self.state.minor = BoatState.MIN_PLANNING
 					self.state_pub.publish(self.state)
-					print "Tacking success: ", goal.direction, self.ane_reading
 					success = True
 			
 			# From right to left of wind:
@@ -102,11 +104,11 @@ class TackingAction(object):
 					else:
 						self.state.minor = BoatState.MIN_PLANNING
 					self.state_pub.publish(self.state)
-					print "Tacking success: ", goal.direction, self.ane_reading
 					success = True
 
 			if self._as.is_preempt_requested():
-				rospy.loginfo('Tacking Action: Preempted')
+				self._feedback.status = ' Preempted'
+				rospy.loginfo(rospy.get_caller_id() + self._feedback.status)
 				if self.state.major is not BoatState.MAJ_AUTONOMOUS:
 					self.state.minor = BoatState.MIN_COMPLETE
 				else:
@@ -114,7 +116,6 @@ class TackingAction(object):
 				self.state_pub.publish(self.state)
 				self._result.success = False
 				self._result.target_heading = self.target_heading
-				self._feedback.status = "Preempted"
 				self._as.set_preempted()
 				preempted = True
 			self.rate.sleep()
@@ -127,7 +128,8 @@ class TackingAction(object):
 				self.target_pub.publish(Float32(self.cur_boat_heading))
 				self.target_heading = self.cur_boat_heading
 			self._result.target_heading = self.target_heading
-			rospy.loginfo('Tacking Action: Success')
+			self._feedback.status = ' Success'
+			rospy.loginfo(rospy.get_caller_id() + self._feedback.status)
 			self._as.set_succeeded(self._result)
 		
 if __name__ == '__main__':
