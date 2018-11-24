@@ -32,6 +32,9 @@ Custom messages for path planning, gps coordinates and boat states in order to f
 ## boat_nav 
 Package for planning boat navigation given the specified task. This package is "the brains" of the boat, and decides how the boat should sail autonomously.
 
+## boat_utilites
+Package for various helper functions and utilities used throughout the codebase.
+
 ## boat_vision
 Package for stereoscopic machine vision. This package is responsible for identifying objects in the water including obstacles (eg. Other boats, the shore, etc) and buoys used for navigation.
 
