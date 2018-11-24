@@ -37,22 +37,3 @@ Package for various helper functions and utilities used throughout the codebase.
 
 ## boat_vision
 Package for stereoscopic machine vision. This package is responsible for identifying objects in the water including obstacles (eg. Other boats, the shore, etc) and buoys used for navigation.
-
-## Deprecated
-
-Previously, this stack relied on the `phidgets_imu` package. This is no longer required. If you still wish to install it, clone https://github.com/ros-drivers/phidgets_drivers.git into your src and then rebuild:
-
-	$ catkin build
-
-Make sure to read the README.md in their repo and follow some extra steps to setup the phidgets package.
-You need to download the library from this [link](https://www.phidgets.com/downloads/phidget22/libraries/linux/libphidget22.tar.gz) and you must run this in the libphidget folder to build it:
-Run this in the libphidget folder to build it:
-
-	$ ./configure --prefix=/usr && make && sudo make install
-
-Also be sure to download the phidgets compass calibration program [See here](https://www.phidgets.com/?tier=3&catid=10&pcid=8&prodid=32)
-
-
-The compass calibration script can be found in the tools section of the `boat_interfaces` package, along with a readme on how to use it.
-
-If you want to download the python phidgets API [See here](https://www.phidgets.com/docs/Language_-_Python#Install_Phidget_Python_module_for_Linux)
