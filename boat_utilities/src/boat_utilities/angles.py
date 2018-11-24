@@ -78,11 +78,8 @@ def is_on_right(angle, ref):
     ref = normalize(ref)
     ref_opp = normalize(ref + __UNITS/2)
 
-    # If the range (ref, ref_opp) doesn't cross 0, we check if ref_opp < angle < ref
-    if ref > __UNITS/2:
-        return is_within_bounds(angle, ref, ref_opp)
-    else:
-        return not is_within_bounds(angle, ref, ref_opp)
+    # We check if ref_opp < angle < ref
+    return is_within_bounds(angle, ref_opp, ref)
 
 
 def is_on_left(angle, ref):
@@ -98,8 +95,5 @@ def is_on_left(angle, ref):
     ref = normalize(ref)
     ref_opp = normalize(ref + __UNITS/2)
 
-    # If the range (ref, ref_opp) doesn't cross 0, we check if !(ref_opp < angle < ref)
-    if ref > __UNITS/2:
-        return not is_within_bounds(angle, ref, ref_opp)
-    else:
-        return is_within_bounds(angle, ref, ref_opp)
+    # We check if ref < angle < ref_opp
+    return is_within_bounds(angle, ref, ref_opp)
