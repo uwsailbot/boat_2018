@@ -32,7 +32,7 @@ Custom messages for path planning, gps coordinates and boat states in order to f
 ## boat_nav 
 Package for planning boat navigation given the specified task. This package is "the brains" of the boat, and decides how the boat should sail autonomously.
 
-## boat_utilites
+## boat_utilities
 Package for various helper functions and utilities used throughout the codebase.
 
 ## boat_vision
