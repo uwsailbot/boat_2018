@@ -5,7 +5,7 @@ from actionlib import SimpleActionClient
 from boat_msgs.msg import BoatState, GPS, MaxVMGAction, MaxVMGGoal, Point, Waypoint, TackingAction, TackingGoal, LaylineAction, LaylineGoal
 from boat_msgs.srv import ConvertPoint
 from std_msgs.msg import Float32
-from boat_utilities import points, angles
+from boat_utilities import points, angles, units
 
 ## Trigger for when the wind shifts significantly
 new_wind = False
@@ -105,7 +105,7 @@ def anemometer_callback(new_heading):
 #
 def gps_callback(gps):
 	global boat_speed
-	boat_speed = gps.speed * 0.514444 # Knots to m/s
+	boat_speed = units.from_knots(gps.speed)
 
 
 ##	Callback for setting the boat's heading when the `/compass` topic is updated.
@@ -204,7 +204,7 @@ def calc_global_max_vmg(wind_coming):
 	else:
 		vmg_heading = direct_heading
 
-	theoretic_boat_speed = 2.5 * 0.514444 # 2.5 Knots to m/s (measured boat speed)
+	theoretic_boat_speed = units.from_knots(2.5) # 2.5 Knots to m/s (measured boat speed)
 	max_vmg = theoretic_boat_speed * angles.cosd(vmg_heading - direct_heading)
 	return max_vmg, vmg_heading
 
@@ -221,7 +221,7 @@ def calc_cur_tack_max_vmg(wind_coming):
 
 	# If direct heading is in irons, then max_vmg will be on the edge of the no go zone
 	if angles.is_within_bounds(direct_heading, lower_bound, upper_bound):
-		theoretic_boat_speed = 2.5 * 0.514444 # 2.5 Knots to m/s
+		theoretic_boat_speed = units.from_knots(2.5) # 2.5 Knots to m/s (measured boat speed)
 
 		# Snap to whichever edge of the no go zone is closer
 		if angles.is_on_left(target_heading, wind_coming):
@@ -232,7 +232,7 @@ def calc_cur_tack_max_vmg(wind_coming):
 	# If the direct heading is somewhere in our current tack (direct_heading and target_heading on same side of wind)
 	elif (angles.is_on_left(direct_heading, wind_coming) and angles.is_on_left(target_heading, wind_coming)) or\
 		(angles.is_on_right(direct_heading, wind_coming) and angles.is_on_right(target_heading, wind_coming)):
-		theoretic_boat_speed = 2.5 * 0.514444 # 2.5 Knots to m/s
+		theoretic_boat_speed = units.from_knots(2.5) # 2.5 Knots to m/s (measured boat speed)
 		vmg_heading = direct_heading
 
 	# If none of the above, the best heading will be on the opposite tack
@@ -258,7 +258,7 @@ def calc_vmg(wind_coming):
 	if angles.is_within_bounds(target_heading, lower_bound, upper_bound):
 		theoretic_boat_speed = 0
 	else:
-		theoretic_boat_speed = 2.5 * 0.514444 # 2.5 Knots to m/s (measured boat speed)
+		theoretic_boat_speed = units.from_knots(2.5) # 2.5 Knots to m/s (measured boat speed)
 
 	cur_vmg = theoretic_boat_speed * angles.cosd(target_heading - direct_heading)
 	return cur_vmg

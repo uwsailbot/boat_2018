@@ -5,7 +5,7 @@ from actionlib import SimpleActionClient, SimpleActionServer
 from boat_msgs.msg import LaylineAction as LaylineActionMsg, LaylineFeedback, LaylineResult, BoatState, Point, Waypoint, TackingAction, TackingGoal, GPS
 from std_msgs.msg import Float32
 from actionlib_msgs.msg import GoalStatus
-from boat_utilities import angles
+from boat_utilities import angles, units
 
 class LaylineAction(object):
 	# create messages that are used to publish feedback/result
@@ -48,7 +48,7 @@ class LaylineAction(object):
 		#print "new target"
 
 	def gps_callback(self, gps):
-		self.boat_speed = gps.speed * 0.514444 # Knots to m/s
+		self.boat_speed = units.from_knots(gps.speed)
 
 	def anemometer_callback(self, new_heading):
 		self.ane_reading = new_heading.data
