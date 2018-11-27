@@ -320,7 +320,7 @@ def awa_algorithm():
 	old_direct_heading = direct_heading
 	direct_heading = angles.atan2d(target.pt.y - cur_pos.y, target.pt.x - cur_pos.x)
 	direct_heading = angles.normalize(direct_heading)
-	wind_coming = angles.normalize(apparent_wind_heading + 180) # Determine the direction the wind is coming from
+	wind_coming = angles.opposite(apparent_wind_heading) # Determine the direction the wind is coming from
 
 	# TODO: Make n a function of boat speed to negate the effects of apparent wind?
 	n = 1 + p*1.3/dist_to_target(start_pos) # Tacking weight, can add app_wind_offset here to make even less desirable
@@ -411,7 +411,7 @@ def taras_algorithm():
 	# This should never be undefined, as the atan2(0,0) case would already be caught by the proximity check above
 	best_heading = angles.atan2d(target.pt.y - cur_pos.y, target.pt.x - cur_pos.x)
 	best_heading = angles.normalize(best_heading)
-	wind_coming = angles.normalize(apparent_wind_heading + 180) # Determine the direction the wind is coming from
+	wind_coming = angles.opposite(apparent_wind_heading) # Determine the direction the wind is coming from
 
 	# If the direct path isn't possible...
 	if best_heading > wind_coming-layline and best_heading < wind_coming+layline:
@@ -446,7 +446,7 @@ def taras_algorithm():
 		else:
 			boat_dir = -1
 
-		wind_coming = angles.normalize(apparent_wind_heading + 180) # Which direction the wind is coming from
+		wind_coming = angles.opposite(apparent_wind_heading) # Which direction the wind is coming from
 
 		# TODO: This may be broken now that is_within_bounds is not bi-directional
 		if (boat_dir is 1 and not angles.is_within_bounds(wind_coming, cur_boat_heading, target_heading)) or\

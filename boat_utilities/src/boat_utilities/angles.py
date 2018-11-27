@@ -43,6 +43,16 @@ def normalize_signed(angle):
     return angle
 
 
+def opposite(angle):
+    """Calculate the opposite angle, normalized to be 0 to 360."""
+    return normalize(angle + __UNITS/2)
+
+
+def opposite_signed(angle):
+    """Calculate the opposite angle, normalized to be -180 to 180."""
+    return normalize_signed(angle + __UNITS/2)
+
+
 def is_within_bounds(val, lower, upper):
     """Determine whether lower < val < upper.
 
@@ -67,7 +77,7 @@ def is_within_bounds(val, lower, upper):
 
 def is_on_right(angle, ref):
     """Determine whether the specified angle is within the 180 degrees to the right of the reference.
-    
+
     Args:
         angle The angle to check
         ref The reference angle to compare against
@@ -84,7 +94,7 @@ def is_on_right(angle, ref):
 
 def is_on_left(angle, ref):
     """Determine whether the specified angle is within the 180 degrees to the left of the reference.
-    
+
     Args:
         angle The angle to check
         ref The reference angle to compare against
