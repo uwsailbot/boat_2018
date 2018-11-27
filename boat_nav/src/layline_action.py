@@ -107,6 +107,10 @@ class LaylineAction(object):
 		while (self.tacking_client.get_state() is GoalStatus.ACTIVE or\
 			   self.tacking_client.get_state() is GoalStatus.PENDING) and rospy.Time.now() < endtime and not did_hit_midpoint:
 
+			# If we reach approximately half of the perpendicular distance, we know we must cancel the layline action
+			# and return to our original tack. We use 48% rather than 50% here since the boat cannot respond instantly
+			# due to intertia, etc. So this provides us a bit of buffer to get back on track
+			# TODO: Tune this constant
 			pos = self.cur_pos
 			cur_d_perp = abs(a*pos.x + b*pos.y + c)/math.sqrt(a*a+b*b)
 			if cur_d_perp < d_perp*0.48:
