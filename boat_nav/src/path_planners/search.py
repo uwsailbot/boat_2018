@@ -61,7 +61,7 @@ class SearchPlanner(Planner):
 		if self.vision_target is ():
 
 			if len(self.waypoints) > 0:
-				self.traverse_waypoints_planner()
+				self._traverse_waypoints_planner()
 
 			# If we ran through all the waypoints set without finding anything, restart the planner
 			else:
@@ -72,7 +72,7 @@ class SearchPlanner(Planner):
 			self.publish_target(Waypoint(self.vision_target, Waypoint.TYPE_INTERSECT))
 
 			#Once we intercept the vision target, publish and complete
-			if self.boat_reached_target(): #TODO: Add additional 'complete' criteria to ensure contact
+			if self._boat_reached_target(): #TODO: Add additional 'complete' criteria to ensure contact
 				self.found_pub.publish(True)
 				self.set_minor_state(BoatState.MIN_COMPLETE) #TODO: Add MIN_SHUTDOWN??
 

@@ -59,6 +59,7 @@ class LaylineAction(object):
 		self.compass = compass.data
 		self.update_apparent_wind()
 
+
 	def update_apparent_wind(self):
 		self.apparent_wind_heading = angles.normalize(self.ane_reading + self.compass)
 		self.wind_coming =  angles.opposite(self.apparent_wind_heading)

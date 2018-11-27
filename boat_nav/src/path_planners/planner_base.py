@@ -70,7 +70,7 @@ class Planner:
 		NotImplementedError("Class %s doesn't implement planner()" % (self.__class__.__name__))
 
 
-	def traverse_waypoints_planner(self):
+	def _traverse_waypoints_planner(self):
 		"""Navigate through the waypoints on the waypoints_raw topic sequentially."""
 		waypoints = self.waypoints
 
@@ -78,7 +78,7 @@ class Planner:
 		if len(waypoints) > 0:
 
 			# If the boat is close enough to the waypoint, start navigating towards the next waypoint in the path
-			if self.boat_reached_target():
+			if self._boat_reached_target():
 				rospy.loginfo(rospy.get_caller_id() + " Reached intermediate waypoint (lat: %.2f, long: %.2f)", waypoints[0].pt.y, waypoints[0].pt.x)
 
 				del waypoints[0]
@@ -112,10 +112,7 @@ class Planner:
 
 	@staticmethod
 	def set_minor_state(minor):
-		"""Set the minor state of the BoatState.
-
-		@param minor: The state to set
-		"""
+		"""Set the minor state of the BoatState."""
 		Planner.state.minor = minor
 		_boat_state_pub.publish(Planner.state)
 
@@ -126,10 +123,7 @@ class Planner:
 
 	@staticmethod
 	def update_waypoints(new_pts):
-		"""Set and publish the specified waypoints.
-
-		@param new_pts: The waypoints to set
-		"""
+		"""Set and publish the specified waypoints."""
 		Planner.waypoints = new_pts
 		_waypoints_pub.publish(Planner.waypoints)
 
@@ -186,7 +180,7 @@ class Planner:
 		Planner.wind_coming = angles.opposite(Planner.new_wind_heading)
 
 
-	def boat_reached_target(self):
+	def _boat_reached_target(self):
 		"""Determine if the boat is within BUOY_TOL meters of the target_waypoint.
 
 		@return True if the boat is within the tolerance
