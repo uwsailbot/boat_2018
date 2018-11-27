@@ -30,7 +30,7 @@ def boat_state_callback(new_state):
 	global rudder_pos
 	global pid_is_enabled
 	state = new_state
-	
+
 	# If disabled or auto has completed its path, then stop the boat
 	if state.major is BoatState.MAJ_DISABLED or (state.major is BoatState.MAJ_AUTONOMOUS and state.minor is BoatState.MIN_COMPLETE):
 		rudder_pos = 90
@@ -56,9 +56,9 @@ def compass_callback(compass):
 	global wind_heading
 	global pid_input_pub
 	global ane_reading
-	
-	wind_heading = (ane_reading + compass.data) % 360
-	
+
+	wind_heading = angles.normalize(ane_reading + compass.data)
+
 	cur_boat_heading = compass.data
 	heading_msg = Float32(angles.normalize_signed(cur_boat_heading))
 	pid_input_pub.publish(heading_msg)
@@ -68,8 +68,8 @@ def compass_callback(compass):
 # Whenever the PID controller calculates a new effort, apply it to the rudder position
 def pid_callback(output):
 	global rudder_pos
-	
-	rudder_pos =  90.0 + output.data 
+
+	rudder_pos =  90.0 + output.data
 	rudder_pos_pub.publish(Float32(rudder_pos))
 	#rospy.loginfo(rospy.get_caller_id() + " Rudder PID output pos: %f", rudder_pos)
 
@@ -80,18 +80,18 @@ def target_heading_callback(target_heading):
 	global state
 	global pid_is_enabled
 	global rudder_pos
-	
+
 	# Perhaps a worthwhile check, but not really super important because this callback will never be called if these conditions are not met in path_planning_node
 	if state.major is not BoatState.MAJ_AUTONOMOUS or state.minor is not BoatState.MIN_PLANNING:
 		return
-	
+
 	# If the PID isn't enabled, activate it
 	if not pid_is_enabled:
 		pid_is_enabled = True
 		pid_enable_pub.publish(Bool(True))
 		rospy.loginfo(rospy.get_caller_id() + " Enabling rudder PID")
-	
-	# We have a new valid setpoint, therefore output it	
+
+	# We have a new valid setpoint, therefore output it
 	#rospy.loginfo(rospy.get_caller_id() + " New rudder setpoint: %f", target_heading.data)
 
 	pid_setpoint = Float32(angles.normalize_signed(target_heading.data))
@@ -104,25 +104,25 @@ def joy_callback(controller):
 	global pid_is_enabled
 	global rudder_max
 	global rudder_min
-	
+
 	# Make sure we're in RC control mode
 	if state.major is not BoatState.MAJ_RC or state.minor is BoatState.MIN_TACKING:
 		return
-		
+
 	# Make sure the PID is off
 	if pid_is_enabled:
 		pid_is_enabled = False
 		pid_enable_pub.publish(Bool(False))
 		rospy.loginfo(rospy.get_caller_id() + " Disabling rudder PID")
-	
+
 	# If the boat is not currently tacking, then setup a message to send to the /rudder topic
 	rudder_pos_old = rudder_pos
 	position_msg = Float32()
-	
+
 	# Set the rudder position with the right joystick, if close to 90 set dead straight
 	if abs(controller.right_stick_x - (Joy.JOY_RANGE/2.0)) <= 15:
 		position_msg.data = 90.0
-		
+
 	else:
 		position_msg.data = 90 - (rudder_max-rudder_min)/2.0 * ((controller.right_stick_x-(Joy.JOY_RANGE/2.0))/(Joy.JOY_RANGE/2.0))
 

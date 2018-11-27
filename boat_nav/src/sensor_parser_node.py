@@ -6,7 +6,7 @@ from boat_msgs.srv import ConvertPoint, ConvertPointResponse
 from std_msgs.msg import Float32
 from sensor_msgs.msg import Imu, NavSatFix, NavSatStatus
 from tf.transformations import euler_from_quaternion
-from boat_utilities.angles import cosd, sind
+from boat_utilities.angles import cosd, sind, normalize
 
 # Declare global variables needed for the node
 origin_lps = Point()
@@ -29,7 +29,7 @@ compass_pub = rospy.Publisher('compass', Float32, queue_size=10)
 def gps_callback(gps):
 	global gps_pub
 	global lps_pub
-	
+
 	gps_parsed = NavSatFix()
 	gps_parsed.header = gps.header
 	gps_parsed.status.status = gps.status
@@ -37,7 +37,7 @@ def gps_callback(gps):
 	gps_parsed.latitude = gps.latitude
 	gps_parsed.longitude = gps.longitude
 	gps_parsed.altitude = gps.altitude
-	
+
 	# TODO: Add covariance?
 	gps_pub.publish(gps_parsed)
 	local = to_lps(get_coords(gps))
@@ -57,9 +57,9 @@ def orientation_callback(imu):
 
 	explicit_quat = [imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w]
 	roll, pitch, yaw = euler_from_quaternion(explicit_quat)
-	
-	yaw = math.degrees(yaw) % 360
-	
+
+	yaw = normalize(math.degrees(yaw))
+
 	heading = yaw
 	compass_pub.publish(Float32(heading))
 
@@ -77,8 +77,8 @@ def origin_override_callback(gps_coords):
 def gps_to_lps_srv(req):
 	res = ConvertPointResponse()
 	res.pt = to_lps(req.pt)
-	
-	#rospy.loginfo(rospy.get_caller_id() + " Request: GPS (long: %.1f, lat: %.1f)", req.pt.x, req.pt.y)   
+
+	#rospy.loginfo(rospy.get_caller_id() + " Request: GPS (long: %.1f, lat: %.1f)", req.pt.x, req.pt.y)
 	#rospy.loginfo(rospy.get_caller_id() + " Response: LPS (x: %.f, y: %.f)", res.pt.x, res.pt.y)
 	return res
 
@@ -87,7 +87,7 @@ def gps_to_lps_srv(req):
 def lps_to_gps_srv(req):
 	res = ConvertPointResponse()
 	res.pt = to_gps(req.pt)
-	
+
 	#rospy.loginfo(rospy.get_caller_id() + " Request: LPS (x: %.f, y: %.f)", req.pt.x, req.pt.y)
 	#rospy.loginfo(rospy.get_caller_id() + " Response: GPS (long: %.1f, lat: %.1f)", res.pt.x, res.pt.y)
 	return res
@@ -122,9 +122,9 @@ def get_coords(gps):
 # Initialize the node
 def listener():
 	global origin_lps
-	
+
 	rospy.init_node('sensor_parser')
-	
+
 	# Setup first so that simulator can send the origin point
 	srv1 = rospy.Service('lps_to_gps', ConvertPoint, lps_to_gps_srv)
 
@@ -133,7 +133,7 @@ def listener():
 	origin_coords = rospy.wait_for_message('gps_raw', GPS)
 	origin_lps = to_lps(get_coords(origin_coords))
 	rospy.loginfo("Got origin: x:%f y:%f", origin_lps.x, origin_lps.y)
-	
+
 	rospy.Subscriber('imu/data', Imu, orientation_callback)
 	rospy.Subscriber('gps_raw', GPS, gps_callback)
 	rospy.Subscriber('origin_override', Point, origin_override_callback)
