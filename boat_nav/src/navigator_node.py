@@ -83,7 +83,7 @@ def boat_state_callback(new_state):
 
 ##	Callback for setting the apparent wind heading when the `/anemometer` topic is updated
 #
-#	@param new_heading The new anemometer reading, 180 is directly infront of boat increasing CCW
+#	@param new_heading The new anemometer reading, 180 is directly in front of boat increasing CCW
 #
 def anemometer_callback(new_heading):
 	global ane_reading
@@ -236,7 +236,7 @@ def calc_cur_tack_max_vmg(wind_coming):
 		vmg_heading = direct_heading
 
 	# If none of the above, the best heading will be on the opposite tack
-	# however it is extremely unfavorable because clearly no best heading lies on this tack
+	# however it is extremely unfavourable because clearly no best heading lies on this tack
 	else:
 		theoretic_boat_speed = 0
 		vmg_heading = apparent_wind_heading
@@ -381,7 +381,7 @@ def awa_algorithm():
 				target_heading = global_vmg_heading
 				heading_pub.publish(Float32(target_heading))
 
-		#Final leg of the course, traveling on an optimal vmg course, time to get to layline.  Second condition to make sure this doesn't run if we are already on the layline
+		# Final leg of the course, traveling on an optimal vmg course, time to get to layline.  Second condition to make sure this doesn't run if we are already on the layline
 		# TODO: Tolerance correctly, make sure this isnt called on a downwind cuz we mistolerance it.  Shouldnt be because target_heading will constantly be updating to be equal to global_vmg_heading above
 		# TODO: Ensure this is only called once per run. Currently if we have a short laylineaction, it can get repeated
 		elif per_course_left <= 40 and not on_layline(wind_coming, 1.0) and boat_speed >= min_tacking_speed:
