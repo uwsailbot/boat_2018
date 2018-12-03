@@ -4,6 +4,7 @@ import math
 import threading
 
 from std_msgs.msg import Float32, Int32, Bool
+from sensor_msgs.msg import Imu
 from boat_msgs.msg import BoatState, GPS, Point, PointArray, Waypoint, WaypointArray, Joy
 from boat_msgs.srv import ConvertPoint
 
@@ -35,6 +36,17 @@ class ROSServices():
                 return service(p.pt).pt
             else:
                 raise ValueError("p is of invalid type " + str(type(p)) +", must be either Point or Waypoint")
+
+class ROSPublishers():
+    def __init__(self, rospy):
+        self.waypoint_pub = rospy.Publisher('waypoints_raw', WaypointArray, queue_size = 10)
+        self.wind_pub = rospy.Publisher('anemometer', Float32, queue_size = 10)
+        self.gps_pub = rospy.Publisher('gps_raw', GPS, queue_size = 10)
+        self.orientation_pub = rospy.Publisher('imu/data', Imu, queue_size = 10)
+        self.joy_pub = rospy.Publisher('joy', Joy, queue_size = 10)
+        self.square_pub = rospy.Publisher('bounding_box', PointArray, queue_size = 10)
+        self.search_area_pub = rospy.Publisher('search_area', PointArray, queue_size = 10)
+        self.vision_pub = rospy.Publisher('vision', PointArray, queue_size = 10)
 
 class ROSSubscribers():
 
@@ -86,9 +98,8 @@ class ROSSubscribers():
 
     
     def boat_state_callback(self, newState):
-        global state
         self.database["state"] = newState
-        if state.major is not BoatState.MAJ_DISABLED and pause:
+        if self.database["state"].major is not BoatState.MAJ_DISABLED and pause:
             pause_sim()
 
     def winch_callback(self, msg):
@@ -174,9 +185,9 @@ class ROSSubscribers():
 
     def vision_callback(self, new_vision_points_gps):
         self.database["vision_points_gps"] = new_vision_points_gps
-
+        
 class ROSInterfaceManager():
     def __init__(self, rospy=None, all_data=None):
         self.services = ROSServices(rospy)
         self.subscribers = ROSSubscribers(rospy, database=all_data.ros_data, all_data=all_data, ros_services=self.services)
-        
+        self.publishers = ROSPublishers(rospy)

@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 from enum import Enum
+import rospy
 
 from camera import Camera
-from boat_msgs.msg import BoatState, GPS, Point, PointArray, Waypoint, WaypointArray
+from boat_msgs.msg import BoatState, GPS, Point, PointArray, Waypoint, WaypointArray, Joy
 
 class DisplayData():
 	def __init__(self):
@@ -198,6 +199,11 @@ class SimulationData():
 						 "fov_radius": 15,
 						 "camera_velocity": Point(0,0),
 						 "camera_move_speed": 100,
+						 "WINCH_MIN": rospy.get_param('/boat/interfaces/winch_min'),
+						 "WINCH_MAX": rospy.get_param('/boat/interfaces/winch_max'),
+						 "boat_speed": 0, # px/s
+						 "path": PointArray(),
+						 "wind_speed": 0,
 						 }
 
 		self.sim_mode = SimMode.DEFAULT
@@ -209,6 +215,19 @@ class SimulationData():
 		self.clock = 0
 
 		self.wind_speed = 0
+
+		self.should_sim_joy = False
+		self.joy = Joy()
+		self.joy.vr = 545 # Init to midway point
+		self.joy.right_stick_x = Joy.JOY_RANGE/2.0
+
+		self.cur_input = ""
+
+		self.follow_boat = False
+
+		self.pre_pause_speed = 10
+		self.pause = False
+		self.speed_graph = {0 : 0}
 
 	# TODO: Meaning of this
 	def mode_is_replay_or_controller(self):

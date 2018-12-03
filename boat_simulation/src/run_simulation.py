@@ -53,19 +53,21 @@ def init_GLUT(drawer, hmi, display_data, calculator):
 if __name__ == '__main__':
 	rospy.init_node('simulator', anonymous=True, disable_signals=True)
 
-	should_sim_joy = not("-j" in argv or "-J" in argv)
+	
 	
 	pygame.mixer.init()
 	pygame.mixer.music.load(rel_to_abs_filepath("../media/lemme-smash.mp3"))
 	
 	sim_data = SimulationData()
+	sim_data.should_sim_joy = not("-j" in argv or "-J" in argv)
+
 	rim = ROSInterfaceManager(rospy=rospy, all_data=sim_data)
 
 
-	hmi = OpenGLHMI(display_data=sim_data.display_data, all_data=sim_data)
+	hmi = OpenGLHMI(display_data=sim_data.display_data, all_data=sim_data, ros_interfaces=rim)
 	drawer = OpenGLDrawing(display_data=sim_data.display_data, all_data=sim_data, hmi=hmi)
 	
 
-	sim_calc = SimulatorCalculator(rospy,all_data=sim_data)
+	sim_calc = SimulatorCalculator(rospy,all_data=sim_data, camera=hmi.camera, ros_publishers=rim.publishers)
 
 	init_GLUT(drawer, hmi, sim_data.display_data, sim_calc)

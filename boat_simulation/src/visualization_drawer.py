@@ -24,6 +24,8 @@ class OpenGLDrawing():
         self.sliders = {}
         self.cur_slider = ()
 
+        self.hmi.set_sliders(self.sliders)
+
     # Main display rendering callback
     def redraw(self):
         
@@ -174,7 +176,7 @@ class OpenGLDrawing():
 
     # Draw boat's target heading as an arrow centered at (x, y) pointing in the target heading's dirction
     def draw_target_heading_arrow(self):
-        if state.major is not BoatState.MAJ_AUTONOMOUS:
+        if self.all_data.ros_data["state"].major is not BoatState.MAJ_AUTONOMOUS:
             return
         glPushMatrix()
         
@@ -251,88 +253,91 @@ class OpenGLDrawing():
         glPushMatrix()
         
         # Control positions of stuff
-        pos_offset = win_height*0.62
-        state_offset = win_height*0.47
-        boat_offset = win_height*0.25
+        pos_offset = self.display_data.win_height*0.62
+        state_offset = self.display_data.win_height*0.47
+        boat_offset = self.display_data.win_height*0.25
         
         # Draw the box
         panel_width = 120
         glColor3f(1.0, 1.0, 1.0)
         glBegin(GL_QUADS)
-        glVertex2f(win_width,win_height)
-        glVertex2f(win_width, 0)
-        glVertex2f(win_width-panel_width,0)
-        glVertex2f(win_width-panel_width,win_height)
+        glVertex2f(self.display_data.win_width,self.display_data.win_height)
+        glVertex2f(self.display_data.win_width, 0)
+        glVertex2f(self.display_data.win_width-panel_width,0)
+        glVertex2f(self.display_data.win_width-panel_width,self.display_data.win_height)
         glEnd()
         
         # Set font
-        set_font(open_sans_font)
+        self.set_font(self.display_data.open_sans_font)
+
+        win_width = self.display_data.win_width
+        win_height = self.display_data.win_height
         
         # Draw the wind readout
         glColor3f(0.0, 0.0, 0.0)
-        draw_text("Wind: %.1f" % wind_heading, win_width-60, win_height-20, 'center')
-        draw_wind_arrow(win_width-60,win_height-65)
+        draw_text("Wind: %.1f" % self.all_data.ros_data["wind_heading"], win_width-60, win_height-20, 'center', loaded_font=self.display_data.loaded_font)
+        self.draw_wind_arrow(win_width-60,win_height-65)
         
         # Draw wind speed text
-        draw_text("Wind speed ", win_width-60, win_height-125, 'center')
-        sliders["Wind speed"].resize(win_width-100, win_height-160)
-        sliders["Wind speed"].draw()
+        draw_text("Wind speed ", win_width-60, win_height-125, 'center', loaded_font=self.display_data.loaded_font)
+        self.sliders["Wind speed"].resize(win_width-100, win_height-160)
+        self.sliders["Wind speed"].draw()
         
         # Draw the boat pos
         glColor3f(0.0, 0.0, 0.0)
-        draw_text("X: %.1f m" % self.ros_data["pos"].x, win_width-60, pos_offset, 'center')
-        draw_text("Y: %.1f m" % self.ros_data["pos"].y, win_width-60, pos_offset-15, 'center')
-        draw_text("Spd: %.1f m/s" % boat_speed, win_width-60, pos_offset-30, 'center')
-        draw_text("Head: %.1f" % heading, win_width-60, pos_offset-45, 'center')
+        draw_text("X: %.1f m" % self.ros_data["pos"].x, win_width-60, pos_offset, 'center',loaded_font=self.display_data.loaded_font)
+        draw_text("Y: %.1f m" % self.ros_data["pos"].y, win_width-60, pos_offset-15, 'center',loaded_font=self.display_data.loaded_font)
+        draw_text("Spd: %.1f m/s" % self.ros_data["boat_speed"], win_width-60, pos_offset-30, 'center',loaded_font=self.display_data.loaded_font)
+        draw_text("Head: %.1f" % self.all_data.ros_data["heading"], win_width-60, pos_offset-45, 'center', loaded_font=self.display_data.loaded_font)
         
         # Draw the boat state
         major = ""
-        if state.major is BoatState.MAJ_RC:
+        if self.all_data.ros_data["state"].major is BoatState.MAJ_RC:
             major = "RC"
-        elif state.major is BoatState.MAJ_AUTONOMOUS:
+        elif self.all_data.ros_data["state"].major is BoatState.MAJ_AUTONOMOUS:
             major = "Auto"
-        elif state.major is BoatState.MAJ_DISABLED:
+        elif self.all_data.ros_data["state"].major is BoatState.MAJ_DISABLED:
             major = "Disabled"
 
         challenge = ""
-        if state.challenge is BoatState.CHA_STATION:
+        if self.all_data.ros_data["state"].challenge is BoatState.CHA_STATION:
             challenge = "Station"
-        elif state.challenge is BoatState.CHA_NAV:
+        elif self.all_data.ros_data["state"].challenge is BoatState.CHA_NAV:
             challenge = "Navigation"
-        elif state.challenge is BoatState.CHA_LONG:
+        elif self.all_data.ros_data["state"].challenge is BoatState.CHA_LONG:
             challenge = "Long Distance"
-        elif state.challenge is BoatState.CHA_AVOID:
+        elif self.all_data.ros_data["state"].challenge is BoatState.CHA_AVOID:
             challenge = "Avoidance"
-        elif state.challenge is BoatState.CHA_SEARCH:
+        elif self.all_data.ros_data["state"].challenge is BoatState.CHA_SEARCH:
             challenge = "Search"
         
         minor = ""
-        if state.minor is BoatState.MIN_COMPLETE:
+        if self.all_data.ros_data["state"].minor is BoatState.MIN_COMPLETE:
             minor = "Complete"
-        elif state.minor is BoatState.MIN_INITIALIZE:
+        elif self.all_data.ros_data["state"].minor is BoatState.MIN_INITIALIZE:
             minor = "Initilize"
-        elif state.minor is BoatState.MIN_PLANNING:
+        elif self.all_data.ros_data["state"].minor is BoatState.MIN_PLANNING:
             minor = "Planning"
-        elif state.minor is BoatState.MIN_TACKING:
+        elif self.all_data.ros_data["state"].minor is BoatState.MIN_TACKING:
             minor = "Tacking"
 
-        draw_text("State", win_width-60, state_offset, 'center', 24)
-        draw_text("M: " + major, win_width-60, state_offset-20, 'center')
-        draw_text("m: " + minor, win_width-60, state_offset-35, 'center')
-        draw_text("C: " + challenge, win_width-60, state_offset-50, 'center')
+        draw_text("State", win_width-60, state_offset, 'center', 24, loaded_font=self.display_data.loaded_font)
+        draw_text("M: " + major, win_width-60, state_offset-20, 'center', loaded_font=self.display_data.loaded_font)
+        draw_text("m: " + minor, win_width-60, state_offset-35, 'center', loaded_font=self.display_data.loaded_font)
+        draw_text("C: " + challenge, win_width-60, state_offset-50, 'center', loaded_font=self.display_data.loaded_font)
         
         # Draw the boat diagram
-        draw_status_boat(win_width-60, boat_offset)
+        self.draw_status_boat(win_width-60, boat_offset)
         
         # Draw the rudder and winch pos
-        draw_text("Winch: %d" % winch_pos, win_width-60, boat_offset-35, 'center')
-        draw_text("Rudder: %.1f" % rudder_pos, win_width-60, boat_offset-50, 'center')
+        draw_text("Winch: %d" % self.all_data.ros_data["winch_pos"], win_width-60, boat_offset-35, 'center', loaded_font=self.display_data.loaded_font)
+        draw_text("Rudder: %.1f" % self.ros_data["rudder_pos"], win_width-60, boat_offset-50, 'center', loaded_font=self.display_data.loaded_font)
         
         # Draw the simulation speed
-        draw_text("Sim speed ", win_width-60, 50, 'center')
-        sliders["Sim speed"].resize(win_width-100, 20)
-        sliders["Sim speed"].draw()
-        draw_text("Time: %.1f" % clock + "s", win_width-60, 5, 'center')
+        draw_text("Sim speed ", win_width-60, 50, 'center', loaded_font=self.display_data.loaded_font)
+        self.sliders["Sim speed"].resize(win_width-100, 20)
+        self.sliders["Sim speed"].draw()
+        draw_text("Time: %.1f" % self.all_data.clock + "s", win_width-60, 5, 'center', loaded_font=self.display_data.loaded_font)
         
         #draw_speed_graph(75, 75, 100)
         
@@ -340,7 +345,6 @@ class OpenGLDrawing():
 
     # Draw another panel to extend the status panel with more details and readings
     def draw_detailed_status(self):
-        global ane_reading
         global rudder_output
         global rudder_input
         global rudder_setpoint
@@ -351,6 +355,7 @@ class OpenGLDrawing():
         
         # width		
         panel_width = 180
+        win_height = self.display_data.win_height
             
         # Control position of stuff
         rudder_offset = 0.8
@@ -359,24 +364,24 @@ class OpenGLDrawing():
         # Draw the box
         glColor3f(1.0, 1.0, 1.0)
         glBegin(GL_QUADS)
-        glVertex2f(0, win_height)
+        glVertex2f(0, self.display_data.win_height)
         glVertex2f(0, 0)
         glVertex2f(panel_width, 0)
-        glVertex2f(panel_width, win_height)
+        glVertex2f(panel_width, self.display_data.win_height)
         glEnd()
         
         # Set font
-        set_font(open_sans_font)
+        self.set_font(self.display_data.open_sans_font)
         
         # Draw anemometer reading
-        draw_text("Anemometer: %.1f" % ane_reading, panel_width/2, win_height-30, 'center')
+        draw_text("Anemometer: %.1f" % ane_reading, panel_width/2, win_height-30, 'center', loaded_font=self.display_data.loaded_font)
         
         # Draw rudder pid values
-        draw_text("Rudder PID:", panel_width/2, win_height*rudder_offset, 'center', 18)
-        draw_text("output: %.1f" % rudder_output, panel_width/2, win_height*rudder_offset-20, 'center')
-        draw_text("input: %.1f" % rudder_input, panel_width/2, win_height*rudder_offset-35, 'center')
-        draw_text("setpoint: %.1f" % rudder_setpoint, panel_width/2, win_height*rudder_offset-50, 'center')
-        draw_text("enable: %s" % rudder_enable, panel_width/2, win_height*rudder_offset-65, 'center')
+        draw_text("Rudder PID:", panel_width/2, win_height*rudder_offset, 'center', 18, loaded_font=self.display_data.loaded_font)
+        draw_text("output: %.1f" % rudder_output, panel_width/2, win_height*rudder_offset-20, 'center', loaded_font=self.display_data.loaded_font)
+        draw_text("input: %.1f" % rudder_input, panel_width/2, win_height*rudder_offset-35, 'center', loaded_font=self.display_data.loaded_font)
+        draw_text("setpoint: %.1f" % rudder_setpoint, panel_width/2, win_height*rudder_offset-50, 'center', loaded_font=self.display_data.loaded_font)
+        draw_text("enable: %s" % rudder_enable, panel_width/2, win_height*rudder_offset-65, 'center', loaded_font=self.display_data.loaded_font)
         
         # Draw gps_raw values:
         draw_text("GPS Raw:", panel_width/2, win_height*gps_offset, 'center', 18)
@@ -397,8 +402,8 @@ class OpenGLDrawing():
 
     # Draw the arrow for the wind direction centered on (x, y)
     def draw_wind_arrow(self, x,y):
-        draw_image(compass_img, (x, y), 0, (70,70))
-        draw_image(compass_pointer_img, (x, y), wind_heading-90, (7,40))
+        draw_image(self.display_data.compass_img, (x, y), 0, (70,70))
+        draw_image(self.display_data.compass_pointer_img, (x, y), self.all_data.ros_data["wind_heading"]-90, (7,40))
 
     # Draw grid
     def draw_grid(self):
@@ -452,12 +457,12 @@ class OpenGLDrawing():
             (self.display_data.cur_boat_img[1][0]*self.camera.scale, self.display_data.cur_boat_img[1][1]*self.camera.scale))
         
         #draw sail
-        sail_angle = 90 * float(WINCH_MAX - winch_pos)/(WINCH_MAX - WINCH_MIN)
-        if ane_reading <= 180:
+        sail_angle = 90 * float(self.all_data.ros_data["WINCH_MAX"] - self.all_data.ros_data["winch_pos"])/(self.all_data.ros_data["WINCH_MAX"] - self.all_data.ros_data["WINCH_MIN"])
+        if self.all_data.ros_data["ane_reading"] <= 180:
             sail_angle = -sail_angle
         glPushMatrix()
         glTranslatef(x, y, 0)
-        glRotatef(heading-90, 0, 0, 1)
+        glRotatef(self.all_data.ros_data["heading"]-90, 0, 0, 1)
 
         cur_sail_img = self.display_data.cur_sail_img
         draw_image(
@@ -471,19 +476,23 @@ class OpenGLDrawing():
     # Draw the rudder diagram centered on (x, y)
     def draw_status_boat(self, x, y):
         # draw boat
+        cur_boat_img = self.display_data.cur_boat_img
         scale = 60.0/cur_boat_img[1][1]
         draw_image(cur_boat_img[0], (x, y+15), 0, (cur_boat_img[1][0]*scale, cur_boat_img[1][1]*scale))
         
         # draw rudder
+        cur_rudder_img = self.display_data.cur_rudder_img
         rudder_scale = 26.0/cur_rudder_img[1][1]
         draw_image(
             cur_rudder_img[0],
             (x, y-10),
-            90-rudder_pos,
+            90-self.ros_data["rudder_pos"],
             (cur_rudder_img[1][0]*rudder_scale, cur_rudder_img[1][1]*rudder_scale))
         
+        # Draw sail
+        cur_sail_img = self.display_data.cur_sail_img
         sail_scale = 42.0/cur_sail_img[1][1]
-        sail_angle = 90 * float(WINCH_MAX - winch_pos)/(WINCH_MAX - WINCH_MIN)
+        sail_angle = 90 * float(self.all_data.ros_data["WINCH_MAX"] - self.all_data.ros_data["winch_pos"])/(self.all_data.ros_data["WINCH_MAX"] - self.all_data.ros_data["WINCH_MIN"])
         draw_image(
             cur_sail_img[0],
             (x+1, y+20),
@@ -560,11 +569,11 @@ class OpenGLDrawing():
 
 
     def init_sliders(self):
-        wind_speed_slider = Slider(self.display_data.win_width-100,self.display_data.win_height-160,80,25, self.hmi.wind_speed_slider_callback, 0, 15, 5)
+        wind_speed_slider = Slider(self.display_data.win_width-100,self.display_data.win_height-160,80,25, self.hmi.wind_speed_slider_callback, 0, 15, 5, self.display_data)
         wind_speed_slider.set_color(0,0,0)
         self.sliders["Wind speed"] = wind_speed_slider
 
-        sim_speed_slider = Slider(self.display_data.win_width-100,self.display_data.win_height-200,80,25, self.hmi.sim_speed_slider_callback, 0, 1000, 200)
+        sim_speed_slider = Slider(self.display_data.win_width-100,self.display_data.win_height-200,80,25, self.hmi.sim_speed_slider_callback, 0, 1000, 200, self.display_data)
         sim_speed_slider.set_color(0,0,0)
         self.sliders["Sim speed"] = sim_speed_slider
 

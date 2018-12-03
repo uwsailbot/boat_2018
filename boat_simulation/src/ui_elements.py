@@ -2,7 +2,7 @@ from OpenGL.GLUT import *
 from OpenGL.GL import *
 
 class Slider:
-    def __init__(self,x,y,w,h,callback,min_val,max_val,cur_val):
+    def __init__(self,x,y,w,h,callback,min_val,max_val,cur_val, display_data):
         self.x=x
         self.y=y
         self.w=w
@@ -13,6 +13,7 @@ class Slider:
         self.cur_val=float(cur_val)
         self.color=(0,0,0)
         callback(float(cur_val))
+        self.display_data = display_data
     
     def resize(self, x=None, y=None, w=None, h=None):
         if x is None:
@@ -64,7 +65,8 @@ class Slider:
             'center',
             self.h-5,
             2.0,
-            (r,g,b))
+            (r,g,b),
+            self.display_data.loaded_font)
         
         glDisable(GL_BLEND)
     
@@ -135,7 +137,7 @@ def draw_circle(r, x, y, quality=300):
 
 
 # Render the specified text with bottom left corner at (x,y)
-def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0)):
+def draw_text(text, x, y, align='left', h = 15, spacing = 2.0, tint=(0,0,0), loaded_font=None):
     font_texture_id = loaded_font[0]
     font_map =  loaded_font[1]
     
