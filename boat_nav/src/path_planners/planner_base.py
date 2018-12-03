@@ -148,7 +148,7 @@ class Planner:
 		# Perform the neccessary computation to allow rounding of buoys
 		if target_waypoint.type is Waypoint.TYPE_ROUND and target_waypoint in waypoints and waypoints.index(target_waypoint) < len(waypoints)-1:
 
-			r = units.to_degrees(ROUND_DIST)
+			r = units.to_geo_coords(ROUND_DIST)
 			k = ROUND_FACTOR
 
 			# Use the heading from the boat to the buoy and from the buoy to the next to calculate where around the target to place the waypoint.

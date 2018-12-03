@@ -140,7 +140,7 @@ class SearchPlanner(Planner):
 		@param angle: The heading of the incoming wind, in degrees.
 		@param width: The width of the search path, in meters
 		"""
-		width = units.to_degrees(width)
+		width = units.to_geo_coords(width)
 		angle += 90
 		out = []
 		radius = width *1.5

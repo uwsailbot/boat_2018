@@ -15,10 +15,10 @@ NAUT_MILES_TO_METERS = 1852
 MPH_TO_MPS = 0.44704
 KNOTS_TO_MPS = 0.514444
 
-# Coordinates
+# Geographic coordinates
 # NOTE: This is always accurate for latitude. However, longitude varies with latitude,
 # meaning this is only accurate for longitude at 0deg N
-DEGREES_TO_METERS = 111319.492188
+GEO_DEGREES_TO_METERS = 111319.492188
 
 
 def from_lbs(lbs):
@@ -101,11 +101,11 @@ def to_knots(m_per_sec):
     return m_per_sec / KNOTS_TO_MPS
 
 
-def from_degrees(degrees):
-    """Convert degrees lat/long to meters."""
-    return degrees * DEGREES_TO_METERS
+def from_geo_coords(degrees):
+    """Convert geographic coordinates (degrees lat/long) to meters."""
+    return degrees * GEO_DEGREES_TO_METERS
 
 
-def to_degrees(meters):
-    """Convert meters to degrees lat/long."""
-    return meters / DEGREES_TO_METERS
+def to_geo_coords(meters):
+    """Convert meters to geographic coordinates (degrees lat/long)."""
+    return meters / GEO_DEGREES_TO_METERS
