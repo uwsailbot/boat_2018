@@ -46,9 +46,9 @@ class SearchPlanner(Planner):
 		sweep_width = VISION_WIDTH
 
 		# Calculate an expanding square pattern and begin traversing the pattern
-		self.update_waypoints(self._get_expaning_square_pts(wind_heading, sweep_width))
-		self.publish_target(self.waypoints[0])
-		self.set_minor_state(BoatState.MIN_PLANNING)
+		self._update_waypoints(self._get_expanding_square_pts(wind_heading, sweep_width))
+		self._publish_target(self.waypoints[0])
+		self._set_minor_state(BoatState.MIN_PLANNING)
 		self.started_pattern = True
 
 	@overrides
@@ -69,12 +69,12 @@ class SearchPlanner(Planner):
 
 		# If we've seen the target at least once, navigate towards its last seen position
 		else:
-			self.publish_target(Waypoint(self.vision_target, Waypoint.TYPE_INTERSECT))
+			self._publish_target(Waypoint(self.vision_target, Waypoint.TYPE_INTERSECT))
 
 			#Once we intercept the vision target, publish and complete
 			if self._boat_reached_target(): #TODO: Add additional 'complete' criteria to ensure contact
 				self.found_pub.publish(True)
-				self.set_minor_state(BoatState.MIN_COMPLETE) #TODO: Add MIN_SHUTDOWN??
+				self._set_minor_state(BoatState.MIN_COMPLETE) #TODO: Add MIN_SHUTDOWN??
 
 
 				self.irons_client.send_goal(IronsGoal())
@@ -92,7 +92,7 @@ class SearchPlanner(Planner):
 		"""Callback for search area.
 
 		The first Point is the center of the circular area, the second is a point on the edge of the area.
-		That is, the distance between the two points describes the radius of the circlular area, centered on Point 1.
+		That is, the distance between the two points describes the radius of the circular area, centred on Point 1.
 
 		@param search_area: The PointArray describing the search area.
 		"""
@@ -106,7 +106,7 @@ class SearchPlanner(Planner):
 		dy = (search_area.points[1].y - self.area_center.y)
 		self.area_radius = math.sqrt(dx*dx+dy*dy)
 
-		# Start seach routine
+		# Start search routine
 		if self.state.challenge is BoatState.CHA_SEARCH:
 			self.setup()
 
@@ -131,7 +131,7 @@ class SearchPlanner(Planner):
 
 	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Utility Functions =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 
-	def _get_expaning_square_pts(self, angle, width):
+	def _get_expanding_square_pts(self, angle, width):
 		"""Calculate the points required to search the given area, using an expanding square algorithm.
 
 		The square will be oriented such that the first point will be directly downwind. This
@@ -164,7 +164,7 @@ class SearchPlanner(Planner):
 			radius += increment
 
 		# do some sweeping lines while going downwind to cover the areas around center
-		# these points are arbituarily made based on simulator and can be modified based on current needs
+		# these points are arbitrarily made based on simulator and can be modified based on current needs
 		out.append(self._make_waypoint(angle-90, radius*0.6))
 		out.append(self._make_waypoint(angle-45, radius*0.707))
 		out.append(self._make_waypoint(angle-90, radius*0.4))

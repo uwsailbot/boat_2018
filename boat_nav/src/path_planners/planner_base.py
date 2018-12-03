@@ -30,7 +30,7 @@ class Planner:
 		- Utilities
 
 	Implementations should also use the \@overrides (\@overrides.overrides) decorator
-	to ensure proper inheritence on the abstract setup() and planner() methods
+	to ensure proper inheritance on the abstract setup() and planner() methods
 
 	Note that implementations must implement the setup() and planner() methods
 	"""
@@ -82,13 +82,13 @@ class Planner:
 				rospy.loginfo(rospy.get_caller_id() + " Reached intermediate waypoint (lat: %.2f, long: %.2f)", waypoints[0].pt.y, waypoints[0].pt.x)
 
 				del waypoints[0]
-				self.update_waypoints(waypoints)
+				self._update_waypoints(waypoints)
 				if len(waypoints) > 0:
-					self.publish_target(waypoints[0])
+					self._publish_target(waypoints[0])
 
 		# If there are no waypoints left to navigate to, exit
 		else:
-			self.set_minor_state(BoatState.MIN_COMPLETE)
+			self._set_minor_state(BoatState.MIN_COMPLETE)
 			rospy.loginfo(rospy.get_caller_id() + " No waypoints left. Boat State = 'Autonomous - Complete'")
 
 
@@ -111,24 +111,24 @@ class Planner:
 	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Setters =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
 
 	@staticmethod
-	def set_minor_state(minor):
+	def _set_minor_state(minor):
 		"""Set the minor state of the BoatState."""
 		Planner.state.minor = minor
 		_boat_state_pub.publish(Planner.state)
 
 	@staticmethod
-	def clear_waypoints():
-		"""Clear all the waypoints. Equivalent to update_waypoints([])"""
-		Planner.update_waypoints([])
+	def _clear_waypoints():
+		"""Clear all the waypoints. Equivalent to _update_waypoints([])"""
+		Planner._update_waypoints([])
 
 	@staticmethod
-	def update_waypoints(new_pts):
+	def _update_waypoints(new_pts):
 		"""Set and publish the specified waypoints."""
 		Planner.waypoints = new_pts
 		_waypoints_pub.publish(Planner.waypoints)
 
 	@staticmethod
-	def publish_target(*argv):
+	def _publish_target(*argv):
 		"""Publish the target waypoint.
 
 		Publish the target waypoint, performing additional computation if the waypoint is
@@ -145,7 +145,7 @@ class Planner:
 		target_waypoint = Planner.target_waypoint
 		cur_pos = Planner.cur_pos
 
-		# Perform the neccessary computation to allow rounding of buoys
+		# Perform the necessary computation to allow rounding of buoys
 		if target_waypoint.type is Waypoint.TYPE_ROUND and target_waypoint in waypoints and waypoints.index(target_waypoint) < len(waypoints)-1:
 
 			r = units.to_geo_coords(ROUND_DIST)

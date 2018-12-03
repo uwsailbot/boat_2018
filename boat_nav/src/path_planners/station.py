@@ -29,7 +29,7 @@ class StationPlanner(Planner):
 
 		if len(self.box) is not 4:
 			rospy.loginfo(rospy.get_caller_id() + " Box is invalid")
-			self.set_minor_state(BoatState.MIN_COMPLETE)
+			self._set_minor_state(BoatState.MIN_COMPLETE)
 			return
 
 		rospy.loginfo(rospy.get_caller_id() + " Beginning station challenge path planner routine")
@@ -37,7 +37,7 @@ class StationPlanner(Planner):
 		rospy.Timer(rospy.Duration(5*60), self._timer_callback, oneshot=True)
 
 		# Clear previous points
-		self.clear_waypoints()
+		self._clear_waypoints()
 
 		# Determine wall angles and box widths, as well as slope of the bottom of the box, as long as it's not vertical
 		m_bottom = 0
@@ -102,8 +102,8 @@ class StationPlanner(Planner):
 			end_station.x = start_station.x + station_width
 			end_station.y = m_bottom * end_station.x + y_int + station_height
 
-		self.publish_target(Waypoint(start_station, Waypoint.TYPE_INTERSECT))
-		self.set_minor_state(BoatState.MIN_PLANNING)
+		self._publish_target(Waypoint(start_station, Waypoint.TYPE_INTERSECT))
+		self._set_minor_state(BoatState.MIN_PLANNING)
 
 
 	@overrides
@@ -112,14 +112,14 @@ class StationPlanner(Planner):
 		# If time is up and we've fully exited the box, stop
 		if self.station_timeout:
 			if self._boat_reached_target():
-				self.set_minor_state(BoatState.MIN_COMPLETE)
+				self._set_minor_state(BoatState.MIN_COMPLETE)
 				self.station_timeout = False
 				rospy.loginfo(rospy.get_caller_id() + " Exited box. Boat State = 'Autonomous - Complete'")
 			return
 
 		# If the box is ever invalid, stop
 		if len(self.box) is not 4 and self.state.minor is not BoatState.MIN_COMPLETE:
-			self.set_minor_state(BoatState.MIN_COMPLETE)
+			self._set_minor_state(BoatState.MIN_COMPLETE)
 			rospy.loginfo(rospy.get_caller_id() + " Box is invalid. Boat State = 'Autonomous - Complete'")
 			return
 
@@ -130,15 +130,15 @@ class StationPlanner(Planner):
 			for p in self.box:
 				x_avr += p.x / float(len(self.box))
 				y_avr += p.y / float(len(self.box))
-			self.publish_target(Waypoint(Point(x_avr, y_avr), Waypoint.TYPE_INTERSECT))
+			self._publish_target(Waypoint(Point(x_avr, y_avr), Waypoint.TYPE_INTERSECT))
 			return
 
 		# If we've reached the set waypoint, flip around
 		if self._boat_reached_target():
 			if points.is_within_dist(self.target_waypoint.pt, self.start_station, 0.0001):
-				self.publish_target(Waypoint(self.end_station, Waypoint.TYPE_INTERSECT))
+				self._publish_target(Waypoint(self.end_station, Waypoint.TYPE_INTERSECT))
 			else:
-				self.publish_target(Waypoint(self.start_station, Waypoint.TYPE_INTERSECT))
+				self._publish_target(Waypoint(self.start_station, Waypoint.TYPE_INTERSECT))
 
 
 	# =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*= Callbacks =*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=
@@ -172,7 +172,7 @@ class StationPlanner(Planner):
 		final_direction = {0 : "Left", 1: "Top", 2: "Right", 3: "Bottom"}
 		rospy.loginfo(rospy.get_caller_id() + " Exiting bounding box through: " + final_direction[i])
 
-		self.publish_target(Waypoint(final_point[i], Waypoint.TYPE_INTERSECT))
+		self._publish_target(Waypoint(final_point[i], Waypoint.TYPE_INTERSECT))
 
 
 	def _bounding_box_callback(self, bounding_box):

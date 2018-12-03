@@ -11,11 +11,11 @@ class NavPlanner(Planner):
 	def setup(self):
 		if len(self.waypoints) is 0:
 			rospy.loginfo(rospy.get_caller_id() + " No points to nav")
-			self.set_minor_state(BoatState.MIN_COMPLETE)
+			self._set_minor_state(BoatState.MIN_COMPLETE)
 			return
 
-		self.publish_target(self.waypoints[0])
-		self.set_minor_state(BoatState.MIN_PLANNING)
+		self._publish_target(self.waypoints[0])
+		self._set_minor_state(BoatState.MIN_PLANNING)
 
 
 	@overrides
