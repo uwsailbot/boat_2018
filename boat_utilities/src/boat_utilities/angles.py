@@ -1,8 +1,18 @@
 #!/usr/bin/env python
 
+from enum import Enum
+
 # NOTE: All operations in this module use degrees CCW from East, as in a unit circle
 # TODO: Switch to rads
 __UNITS = 360.0
+
+
+class ComparisonResult(Enum):
+    """The result of comparing two angles using `get_side()`."""
+    EQUAL=0
+    LEFT=1
+    RIGHT=2
+    OPPOSITE=3
 
 
 def cosd(angle):
@@ -53,13 +63,14 @@ def opposite_signed(angle):
     return normalize_signed(angle + __UNITS/2)
 
 
-def is_within_bounds(val, lower, upper):
+def is_within_bounds(val, lower, upper, inclusive=False):
     """Determine whether lower < val < upper.
 
     Args:
         val The value to check
         lower The lower bound
         upper The upper bound
+        inclusive Whether to include exact equality with the limits (Default: False)
     Returns:
         `True` if the value is between the specified bounds
     """
@@ -72,15 +83,21 @@ def is_within_bounds(val, lower, upper):
     if lower > upper:
         lower -= __UNITS
 
-    return lower <= val and val <= upper
+    if inclusive:
+        return lower <= val and val <= upper
+    else:
+        return lower < val < upper
 
 
-def is_on_right(angle, ref):
+def is_on_right(angle, ref, inclusive=False):
     """Determine whether the specified angle is within the 180 degrees to the right of the reference.
+
+    Note: It is recommended to use `get_side()` in most cases instead.
 
     Args:
         angle The angle to check
         ref The reference angle to compare against
+        inclusive Whether to include exact equality with the reference and opposite angles (Default: False)
     Returns:
         `True` if `angle` is within 180 degrees to the right of `ref`
     """
@@ -89,15 +106,18 @@ def is_on_right(angle, ref):
     ref_opp = normalize(ref + __UNITS/2)
 
     # We check if ref_opp < angle < ref
-    return is_within_bounds(angle, ref_opp, ref)
+    return is_within_bounds(angle, ref_opp, ref, inclusive)
 
 
-def is_on_left(angle, ref):
+def is_on_left(angle, ref, inclusive=False):
     """Determine whether the specified angle is within the 180 degrees to the left of the reference.
+
+    Note: It is recommended to use `get_side()` in most cases instead.
 
     Args:
         angle The angle to check
         ref The reference angle to compare against
+        inclusive Whether to include exact equality with the reference and opposite angles (Default: False)
     Returns:
         `True` if `angle` is within 180 degrees to the left of `ref`
     """
@@ -106,4 +126,25 @@ def is_on_left(angle, ref):
     ref_opp = normalize(ref + __UNITS/2)
 
     # We check if ref < angle < ref_opp
-    return is_within_bounds(angle, ref, ref_opp)
+    return is_within_bounds(angle, ref, ref_opp, inclusive)
+
+
+def get_side(angle, ref):
+    """Determine on which side of a reference the specified angle lies.
+
+    Args:
+        angle The angle to check
+        ref The reference angle to compare against
+    Returns:
+        The corresponding `ComparisonResult` enum value
+    """
+    if angle == ref:
+        return ComparisonResult.EQUAL
+
+    if is_on_left(angle, ref, False):
+        return ComparisonResult.LEFT
+
+    if is_on_right(angle, ref, False):
+        return ComparisonResult.RIGHT
+
+    return ComparisonResult.OPPOSITE
