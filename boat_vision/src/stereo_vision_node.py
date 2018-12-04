@@ -98,8 +98,8 @@ def get_buoy_coords(img, pub):
     hsv_img = cv2.cvtColor(filtered, cv2.COLOR_BGR2HSV)
     #threshold_img = cv2.inRange(hsv_img, nparray([0, 165, 130]), nparray([15, 255, 255])) # Good, old
     #threshold_img = cv2.inRange(hsv_img, nparray([0, 125, 100]), nparray([25, 255, 255])) # Wide
-    threshold_img = cv2.inRange(hsv_img, nparray([0, 165, 200]),
-                                nparray([14, 245, 255]))  # Overcast
+    threshold_img = cv2.inRange(hsv_img, nparray([0, 165, 200]), nparray([14, 245,
+                                                                          255]))  # Overcast
 
     # Blur
     threshold_img = cv2.medianBlur(threshold_img, 3)
@@ -107,14 +107,7 @@ def get_buoy_coords(img, pub):
 
     # Get center via Hough Circles
     circles = cv2.HoughCircles(
-        threshold_img,
-        cv2.HOUGH_GRADIENT,
-        1,
-        2,
-        param1=200,
-        param2=15,
-        minRadius=0,
-        maxRadius=0)
+        threshold_img, cv2.HOUGH_GRADIENT, 1, 2, param1=200, param2=15, minRadius=0, maxRadius=0)
 
     if circles is not None:
 
@@ -130,8 +123,7 @@ def get_buoy_coords(img, pub):
             found = True
 
     # Get center via contours
-    edge_detected_image = cv2.convertScaleAbs(
-        cv2.Canny(threshold_img, 75, 200))
+    edge_detected_image = cv2.convertScaleAbs(cv2.Canny(threshold_img, 75, 200))
     _, contours, _ = cv2.findContours(edge_detected_image, cv2.RETR_EXTERNAL,
                                       cv2.CHAIN_APPROX_SIMPLE)
 
@@ -218,10 +210,8 @@ def initialize_node():
 
     #left = cam_thread(cv2.VideoCapture(1))
     #right = cam_thread(cv2.VideoCapture(2))
-    left = cam_thread(
-        cv2.VideoCapture(rospy.get_param("/stereo_vision/left_cam")))
-    right = cam_thread(
-        cv2.VideoCapture(rospy.get_param("/stereo_vision/right_cam")))
+    left = cam_thread(cv2.VideoCapture(rospy.get_param("/stereo_vision/left_cam")))
+    right = cam_thread(cv2.VideoCapture(rospy.get_param("/stereo_vision/right_cam")))
 
     left.start()
     right.start()
@@ -241,8 +231,7 @@ def initialize_node():
         CAM_WIDTH = left.cam.get(cv2.CAP_PROP_FRAME_WIDTH)
         CAM_HEIGHT = left.cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
-        points = map(get_buoy_coords, [left_img, right_img],
-                     [left_pub, right_pub])
+        points = map(get_buoy_coords, [left_img, right_img], [left_pub, right_pub])
         if points[0] is not False and points[1] is not False:
             polar = process_cams(points[0], points[1], CAM_SPACING)
             msg = VisionTarget()

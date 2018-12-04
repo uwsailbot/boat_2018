@@ -33,8 +33,7 @@ def compass_callback(data):
 def initialize_node():
     rospy.init_node('vision_parser')
 
-    rospy.Subscriber(
-        'vision_target', VisionTarget, vision_callback, queue_size=1)
+    rospy.Subscriber('vision_target', VisionTarget, vision_callback, queue_size=1)
     rospy.Subscriber(
         'lps', Point, position_callback,
         queue_size=1)  # Only want it to receive the most recent position
