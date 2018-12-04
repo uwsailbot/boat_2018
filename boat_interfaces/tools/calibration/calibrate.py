@@ -33,7 +33,7 @@ def read_line():
 
 def wait_for_string(s):
 	global cur_index
-	
+
 	count = 0
 
 	while True:
@@ -44,9 +44,9 @@ def wait_for_string(s):
 		else:
 			cur_index = substr_index
 			return
-		
+
 		read_line()
-		
+
 		if count > 1000:
 			raise Exception("Looped too many times, please check output above for abnormalities.")
 		else:
@@ -54,7 +54,7 @@ def wait_for_string(s):
 
 def get_next_number():
 	global cur_index
-	
+
 	count = 0
 
 	while True:
@@ -70,9 +70,9 @@ def get_next_number():
 					cur_index += len(num_str)
 					return float(num_str)
 				else:
-					break;
+					break
 			cur_index += 1
-		
+
 		read_line()
 
 		if count > 1000:

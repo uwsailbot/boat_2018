@@ -19,6 +19,7 @@
   <exec_depend>boat_msgs</exec_depend>
   <exec_depend>boat_nav</exec_depend>
   <exec_depend>boat_vision</exec_depend>
+  <exec_depend>boat_utilities</exec_depend>
 
   <export>
     <metapackage/>

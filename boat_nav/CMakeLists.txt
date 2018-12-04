@@ -8,12 +8,13 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib
   std_msgs
   boat_msgs
+  boat_utilities
   tf
 )
 
 # Declare a catkin package
 catkin_package(
-  CATKIN_DEPENDS rospy actionlib std_msgs boat_msgs tf
+  CATKIN_DEPENDS rospy actionlib std_msgs boat_msgs boat_utilities tf
 )
 
 # Mark executable scripts (ie. Those with a __main__) for installation
