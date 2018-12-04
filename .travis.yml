@@ -1,6 +1,6 @@
 dist: xenial
 sudo: required
-language: generic
+language: python
 
 notifications:
   slack: uwsailbot:5Q2oPJ7OdRTvkEu8R7OH8fCV
