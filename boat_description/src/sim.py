@@ -35,7 +35,7 @@ show_details = False
 
 # set camera move speed (pixels per second)
 # should camera follow boat?
-follow_boat = False
+
 #raw mouse records
 mouse_pos = Point()
 
@@ -53,16 +53,15 @@ sim_mode = SimMode.DEFAULT
 # Simulation data and consts
 should_sim_joy = False
 sim_is_running = True
-pre_pause_speed = 10
-pause = False
+
 boat_speed = 0 # px/s
 POS_OFFSET = rospy.get_param('/boat/nav/pos_offset')
 WINCH_MIN = rospy.get_param('/boat/interfaces/winch_min')
 WINCH_MAX = rospy.get_param('/boat/interfaces/winch_max')
 wind_speed = 0
-speed_graph = {0 : 0}
+
 display_path = True
-path = PointArray()
+
 prev_path_time = 0
 reset_origin_on_next_gps=False
 gps_publish_interval = 0.5
@@ -71,9 +70,7 @@ gps_last_published = 0
 
 # ROS data
 wind_speed = 0
-joy = Joy()
-joy.vr = 545 # Init to midway point
-joy.right_stick_x = Joy.JOY_RANGE/2.0
+
 
 
 
@@ -152,18 +149,7 @@ def update_vision():
 	
 	vision_pub.publish(vision_points_gps)
 
-def update_wind():
-	global wind_heading
-	global heading
-	global ane_reading
-	global boat_speed
-	
-	apparent_wind = calc_direction(calc_apparent_wind(wind_heading, boat_speed, heading))
-	ane_reading = (apparent_wind - heading) % 360
-	if ane_reading < 0:
-		ane_reading = ane_reading + 360
-	
-	wind_pub.publish(Float32(ane_reading))
+
 
 
 
@@ -197,75 +183,11 @@ def search_area_callback(new_search_area):
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Physics =*=*=*=*=*=*=*=*=*=*=*=*=
 
-def calc_apparent_wind(true_wind, boat_speed, boat_heading):
-	# Use constant wind speed of 8 m/s
-	x = wind_speed*math.cos(math.radians(true_wind))
-	x += boat_speed*math.cos(math.radians(boat_heading + 180))
-	y = wind_speed*math.sin(math.radians(true_wind))
-	y += boat_speed*math.sin(math.radians(boat_heading + 180))
-	return (x, y)
-
-
-def calc_direction(v):
-	angle = math.degrees(math.atan2(v[1], v[0]))
-	if angle < 0:
-		angle += 360
-	return angle
-
-
-# returns -1 for port, 1 for starboard
-def calc_tack(boat_heading, wind_heading): 
-	diff = (wind_heading - boat_heading)
-	if diff > 180:
-		diff -= 360
-	elif diff < -180:
-		diff += 360
-	
-	# Dead run	
-	if diff == 0:
-		return 1.0
-	return diff/abs(diff)
-
-# returns heading of vector point from end of boom to mast
-def calc_boom_heading(boat_heading, wind_heading, winch):
-	winch_range = WINCH_MAX - WINCH_MIN
-	
-	tack = calc_tack(boat_heading, wind_heading)
-	# Note close-hauled boom is not quite parallel with boat
-	return boat_heading - tack * ((WINCH_MAX - winch) * 75/winch_range + 15)
-
-def pause_sim():
-	global pause
-	global speed
-	global pre_pause_speed
-
-	pause = not pause
-	if pause is True:
-		pre_pause_speed = speed
-		speed = 0
-	else:
-		speed = pre_pause_speed
-	sliders["Sim speed"].change_val(speed*100)
 
 
 
 
 
-# Returns magnitude of projection of u onto v
-def proj(u,v):
-	v_mag = math.sqrt(v[0]**2 + v[1]**2)
-	return (u[0]*v[0] + u[1]*v[1])/v_mag
-
-
-# Returns (x,y), given radius and angle in degrees
-def polar_to_rect(rad, ang):
-	return (rad * math.cos(math.radians(ang)), rad * math.sin(math.radians(ang)))
-
-def cosd(angle):
-	return math.cos(math.radians(angle))
-
-def sind(angle):
-	return math.sin(math.radians(angle))
 
 # =*=*=*=*=*=*=*=*=*=*=*=*= Initialization =*=*=*=*=*=*=*=*=*=*=*=*=
 

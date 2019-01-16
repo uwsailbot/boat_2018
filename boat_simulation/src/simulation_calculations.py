@@ -4,6 +4,7 @@ import math
 from std_msgs.msg import Float32
 from rosgraph_msgs.msg import Clock
 from simulation_data import SimMode
+from boat_msgs.msg import Point, PointArray
 
 class SimulatorCalculator():
     def __init__(self, rospy, all_data, camera, ros_publishers):
@@ -29,8 +30,8 @@ class SimulatorCalculator():
             self.clock_pub.publish(time_msg)
 
         if self.all_data.follow_boat:
-            self.camera.x = pos.x
-            self.camera.y = pos.y
+            self.camera.x = self.all_data.ros_data["pos"].x
+            self.camera.y = self.all_data.ros_data["pos"].y
         else:	
             # Move camera when mouse is near edge of screen
             # I put this in here so that camera move speed is bound to time and not fps
@@ -81,20 +82,20 @@ class SimulatorCalculator():
             
             self.all_data.speed_graph[int(self.all_data.ros_data["ane_reading"])%360] = self.all_data.ros_data["boat_speed"]
             
-            pos.x += math.cos(math.radians(self.all_data.ros_data["heading"])) * self.all_data.ros_data["boat_speed"] * dt
-            pos.y += math.sin(math.radians(self.all_data.ros_data["heading"])) * self.all_data.ros_data["boat_speed"] * dt
+            self.all_data.ros_data["pos"].x += math.cos(math.radians(self.all_data.ros_data["heading"])) * self.all_data.ros_data["boat_speed"] * dt
+            self.all_data.ros_data["pos"].y += math.sin(math.radians(self.all_data.ros_data["heading"])) * self.all_data.ros_data["boat_speed"] * dt
             
             # Reset boat if out of bounds
-            if abs(pos.x) > 10000 or abs(pos.y) > 10000:
-                pos.x = 0
-                pos.y = 0
+            if abs(self.all_data.ros_data["pos"].x) > 10000 or abs(self.all_data.ros_data["pos"].y) > 10000:
+                self.all_data.ros_data["pos"].x = 0
+                self.all_data.ros_data["pos"].y = 0
                 self.camera.x = 0
                 self.camera.y = 0
                 path = PointArray()
             
-            update_vision()
+            self.update_vision()
             
-            update_gps()
+            self.update_gps()
             
             # Don't let drawn path be too long 
             if display_path:
@@ -103,8 +104,8 @@ class SimulatorCalculator():
                 # Only add current point every half second
                 if clock > 0.5 + prev_path_time:
                     pt = Point()
-                    pt.x = pos.x
-                    pt.y = pos.y
+                    pt.x = self.all_data.ros_data["pos"].x
+                    pt.y = self.all_data.ros_data["pos"].y
                     path.points.append(pt)
                     prev_path_time = clock
         
@@ -179,3 +180,42 @@ class SimulatorCalculator():
             self.all_data.ros_data["ane_reading"] = self.all_data.ros_data["ane_reading"] + 360
         
         self.ros_publishers.wind_pub.publish(Float32(self.all_data.ros_data["ane_reading"]))
+
+    def update_vision(self):
+        # TODO for obstacles as well        
+        vision_points_gps = PointArray()
+        for waypoint in self.all_data.ros_data["waypoint_gps"].points:
+            if point_is_in_fov(to_lps(waypoint)) and state.challenge is not BoatState.CHA_SEARCH:
+                vision_points_gps.points.append(waypoint.pt)
+        
+        if self.all_data.search_area.target is not None and point_is_in_fov(search_area.target):
+            vision_points_gps.points.append(to_gps(search_area.target))
+        
+        vision_pub.publish(vision_points_gps)
+
+    def update_gps(self, force=False):
+        if not force and (time.time() - gps_last_published)*speed < gps_publish_interval:
+            return
+        gps_last_published = time.time()
+
+        gps = GPS()
+        gps.status = GPS.STATUS_FIX
+        # simulate position of gps at back of boat
+        pos_with_offset = Point(pos.x-POS_OFFSET*cosd(heading), pos.y-POS_OFFSET*sind(heading))
+        coords = to_gps(pos_with_offset)
+        gps.latitude = coords.y
+        gps.longitude = coords.x
+        gps.track = (450-heading)%360
+        gps.speed = boat_speed * 1.94384 # m/s to KNOTS
+        gps_pub.publish(gps)
+
+        orientation = quaternion_from_euler(0,0,math.radians(heading))
+        imu = Imu()
+        
+        # Convertion because they are different types
+        imu.orientation.x = orientation[0]
+        imu.orientation.y = orientation[1]
+        imu.orientation.z = orientation[2]
+        imu.orientation.w = orientation[3]
+        
+        orientation_pub.publish(imu)
