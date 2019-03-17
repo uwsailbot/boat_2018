@@ -10,7 +10,7 @@
 #include <boat_msgs/Joy.h>
 
 #define CH_1_PIN 5 // RUDDER
-#define CH_3_PIN 6 // SAIL 
+#define CH_3_PIN 6 // SAIL
 #define CH_5_PIN 9 // SWITCH_A
 #define CH_6_PIN 10 // VR
 #define BUFFER_SIZE 5
@@ -31,7 +31,7 @@ void setup() {
   pinMode(CH_6_PIN, INPUT);
 
   //Serial.begin(115200);
-  
+
   nh.initNode();
   nh.advertise(joy_pub);
 }
@@ -42,7 +42,7 @@ void loop() {
   ch_3_buf[counter] = pulseIn(CH_3_PIN, HIGH, 10000);
   int ch_5_val = pulseIn(CH_5_PIN, HIGH, 10000);
   ch_6_buf[counter] = pulseIn(CH_6_PIN, HIGH, 10000);
-  
+
   // Lookup table for switch position
   int switch_state = 0;
   if (ch_5_val < 1300){
@@ -54,7 +54,7 @@ void loop() {
   else{
     switch_state = joy.SWITCH_MIDDLE;
   }
-  
+
   // Write averaged values to ROS, pwm oscillates slightly, so we average the readings in a buffer
   joy.right_stick_x = average(ch_1_buf) - 995;
   joy.left_stick_y = average(ch_3_buf) - 995 ;
@@ -89,4 +89,4 @@ int average(int buffer[]){
   }
   return sum/valid_data_counter;
 }
-  
+
