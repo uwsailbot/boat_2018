@@ -23,6 +23,7 @@ install(PROGRAMS
   src/tacking_action.py
   src/pid.py
   src/boat_state_controller_node.py
+  src/cantp_interface_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
