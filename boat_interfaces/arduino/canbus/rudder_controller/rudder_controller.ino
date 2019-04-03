@@ -1,10 +1,11 @@
 #include "mcp2515_iso_tp.h"
 
-#define MCP2515_CS_PIN (4)  // SPI channel select
+#define MCP2515_CS_PIN (4) // SPI channel select
 #define RUDDER_1_PIN (2)
 #define RUDDER_2_PIN (3)
 
-#define RUDDER_CMD_MSG_ID (0b000011111)  // CAN msg ID
+#define RUDDER_CMD_MSG_RX_ID (0b00100100001)
+#define RUDDER_CMD_MSG_TX_ID (0b00100100000)
 
 MCP2515 mcp2515(MCP2515_CS_PIN);
 Mcp2515IsoTP can_wrapper(&mcp2515);
@@ -25,6 +26,8 @@ void setup() {
 
   servo_rudder1.write(90);
   servo_rudder2.write(90);
+
+  can_wrapper.configFlowFrame(RUDDER_CMD_MSG_RX_ID, RUDDER_CMD_MSG_TX_ID, 1, 5);
 }
 
 void loop() {

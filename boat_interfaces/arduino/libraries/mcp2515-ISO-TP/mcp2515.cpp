@@ -1,3 +1,6 @@
+// Based on https://github.com/autowp/arduino-mcp2515/blob/master/mcp2515.h
+// TODO: Proper licensing, etc
+
 #include "mcp2515.h"
 
 const struct MCP2515::TXBn_REGS MCP2515::TXB[MCP2515::N_TXBUFFERS] = {

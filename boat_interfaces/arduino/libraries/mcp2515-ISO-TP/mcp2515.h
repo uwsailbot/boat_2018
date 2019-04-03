@@ -1,3 +1,6 @@
+// Based on https://github.com/autowp/arduino-mcp2515/blob/master/mcp2515.h
+// TODO: Proper licensing, etc
+
 #ifndef _MCP2515_H_
 #define _MCP2515_H_
 

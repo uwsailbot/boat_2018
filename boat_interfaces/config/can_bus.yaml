@@ -1,0 +1,84 @@
+# Define message types and their ROS mappings
+
+# CANBus Arbitration IDs:
+#
+# Priorities:
+#   0: RC msgs (RC->Odroid)
+#   1: Rudder cmds (Odroid->Rudder)
+#   2: Winch cmds (Odroid->Winch)
+#   3: Sensor msgs (Sensor->Odroid)
+#   4: E-Paper cmds (Odroid->E-Paper)
+#
+# Destinations:
+#   0: Odroid
+#   1: Rudder Control Board
+#   2: Winch Control Board
+#   3: Futaba Receiver
+#   4: Sensor Board
+#   5: E-Paper Display
+#
+# Arbitration schema:
+#   Bits 0-2: Priority (0-4)
+#   Bits 3-5: Destination ID (0-5)
+#   Bits 6-9: Additional data. Can describe data type, identify different sensor boards if we add more, etc
+#   Bit   10: 1 for data frame, 0 for flow frame (response)
+#
+# Examples:
+# - RC msg from Futaba to Odroid:        ID: 0b000 000 0000 0/1
+# - Rudder cmds from Odroid to Rudder:   ID: 0b001 001 0000 0/1
+# - Compass msg from Sensor to Odroid:   ID: 0b011 000 0000 0/1, for example
+# - E-Paper cmds from Odroid to E-Paper: ID: 0b100 101 XXXX 0/1, where X describes the data type
+
+
+# YAML format:
+#
+# Each message contains the following fields:
+# - tx_id       (int, mandatory):       The transmit message ID, following the format described above
+# - rx_id       (int, mandatory):       The receive message ID, following the format described above
+# - topic       (string, mandatory):    The ROS topic that maps to this CAN message
+# - topic_type  (string, recommended):  The message type coressponding to the topic.
+#                                         If not specified, the message type is retrieved from the topic.
+#                                         However, if the topic doesn't yet exist, this will fail.
+#                                         It is therefore recommended to specify this type.
+
+# ROS Subscriber -> CAN Write
+output_msgs:
+  rudder_cmd:
+    tx_id: 0b00100100001
+    rx_id: 0b00100100000
+    topic: "/rudder"
+    topic_type: "std_msgs/Float32"
+
+  winch_cmd:
+    tx_id: 0b01001000001
+    rx_id: 0b01001000000
+    topic: "/winch"
+    topic_type: "std_msgs/Int32"
+
+  # TODO: E-Paper commands
+
+# CAN Read -> ROS Publisher
+input_msgs:
+  rc_msg:
+    tx_id: 0b00000000000
+    rx_id: 0b00000000001
+    topic:  "/joy"
+    topic_type: "boat_msgs/Joy"
+
+  gps_msg:
+    tx_id: 0b0110000000
+    rx_id: 0b0110000001
+    topic: "/gps_raw"
+    topic_type: "boat_msgs/GPS"
+
+  compass_msg:
+    tx_id: 0b0110000010
+    rx_id: 0b0110000011
+    topic: "/compass"
+    topic_type: "std_msgs/Float32"
+
+  anemometer_msg:
+    tx_id: 0b0110000100
+    rx_id: 0b0110000101
+    topic: "/anemometer"
+    topic_type: "std_msgs/Float32"

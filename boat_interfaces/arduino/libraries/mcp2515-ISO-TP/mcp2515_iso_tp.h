@@ -43,7 +43,7 @@ private:
     bool waiting;                   // Is waiting for flow frame
     uint16_t sequence;              // Sequence of last sent consecutive frame
     uint8_t remaining_frames;       // Remaining num of frames that may be sent
-    unsigned long prev_frame_time;  // Time the last frame was sent, in usF
+    unsigned long prev_frame_time;  // Time the last frame was sent, in us
 
     // Configuration
     uint16_t separation;  // Separation time between frames, in 0.1ms

@@ -1,15 +1,16 @@
 #include "mcp2515_iso_tp.h"
 
-#define MCP2515_CS_PIN (4)  // SPI channel select
-#define CH_1_PIN (5)        // Futaba ch1, rudder control
-#define CH_3_PIN (6)        // Futaba ch3, sail control
-#define CH_5_PIN (9)        // Futaba ch5, switch A
-#define CH_6_PIN (10)       // Futaba ch6, VR
-#define BUFFER_SIZE (5)     // Filter size
+#define MCP2515_CS_PIN (4) // SPI channel select
+#define CH_1_PIN (5)       // Futaba ch1, rudder control
+#define CH_3_PIN (6)       // Futaba ch3, sail control
+#define CH_5_PIN (9)       // Futaba ch5, switch A
+#define CH_6_PIN (10)      // Futaba ch6, VR
+#define BUFFER_SIZE (5)    // Filter size
 
 MCP2515 mcp2515(MCP2515_CS_PIN);
 Mcp2515IsoTP can_wrapper(&mcp2515);
-iso_tp::Message futaba_msg(21, 0b11111111110, 0b11111111111);
+
+iso_tp::Message futaba_msg(21, 0b00000000001, 0b00000000000);
 
 uint32_t ch_1_buf[BUFFER_SIZE] = {0};
 uint32_t ch_3_buf[BUFFER_SIZE] = {0};
@@ -34,7 +35,7 @@ void loop() {
   can_wrapper.update();
 
   static unsigned long last_time = millis();
-  if ((millis() - last_time) >= 20) {  // 50hz
+  if ((millis() - last_time) >= 20) { // 50hz
 
     // Read PWM pins
     ch_1_buf[counter] = pulseIn(CH_1_PIN, HIGH, 10000);
@@ -84,7 +85,8 @@ uint32_t average(uint32_t* buffer) {
   uint8_t valid_data_counter = 0;
   for (uint8_t i = 0; i < BUFFER_SIZE; i++) {
     sum += buffer[i];
-    if (buffer[i] != 0) valid_data_counter++;
+    if (buffer[i] != 0)
+      valid_data_counter++;
   }
   return sum / valid_data_counter;
 }

@@ -10,9 +10,9 @@
 MCP2515 mcp2515(MCP2515_CS);
 Mcp2515IsoTP can_wrapper(&mcp2515);
 
-iso_tp::Message ane_msg(4, 0b11000000000);
-iso_tp::Message gps_msg(26, 0b11100000000, 0b11100000001);
-iso_tp::Message imu_msg(40, 0b11110000000, 0b11110000001);
+iso_tp::Message ane_msg(4, 0b0110000101, 0b0110000100);
+iso_tp::Message gps_msg(26, 0b0110000001, 0b0110000000);
+iso_tp::Message imu_msg(40, 0b0110000011, 0b0110000010);
 
 template <typename T>
 struct vec3 {
