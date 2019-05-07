@@ -34,9 +34,8 @@ def initialize_node():
     rospy.init_node('vision_parser')
 
     rospy.Subscriber('vision_target', VisionTarget, vision_callback, queue_size=1)
-    rospy.Subscriber(
-        'lps', Point, position_callback,
-        queue_size=1)  # Only want it to receive the most recent position
+    rospy.Subscriber('lps', Point, position_callback,
+                     queue_size=1)  # Only want it to receive the most recent position
     rospy.Subscriber('compass', Float32, compass_callback, queue_size=1)
 
     rospy.wait_for_service("lps_to_gps")

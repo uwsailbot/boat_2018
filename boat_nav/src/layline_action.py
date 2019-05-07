@@ -14,8 +14,10 @@ class LaylineAction(object):
 
     def __init__(self, name):
         self._name = name
-        self._as = SimpleActionServer(
-            self._name, LaylineActionMsg, execute_cb=self.layline_callback, auto_start=False)
+        self._as = SimpleActionServer(self._name,
+                                      LaylineActionMsg,
+                                      execute_cb=self.layline_callback,
+                                      auto_start=False)
         self._as.start()
         self.tacking_client = SimpleActionClient('tacking_action', TackingAction)
         self.cur_pos = Point()

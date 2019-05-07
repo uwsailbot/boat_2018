@@ -211,8 +211,8 @@ class SearchArea:
             section_x = self.center.x + fov_radius * i + fov_radius / 2.0
             for j in range(-sections_per_half_row, sections_per_half_row):
                 section_y = self.center.y + fov_radius * j + fov_radius / 2.0
-                section = SearchAreaSection(
-                    Point(section_x, section_y), fov_radius, self.resolution, self)
+                section = SearchAreaSection(Point(section_x, section_y), fov_radius,
+                                            self.resolution, self)
                 section.update()  # update once to finish setting up
                 sections.append(section)
         self.sections = sections

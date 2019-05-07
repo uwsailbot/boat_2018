@@ -13,8 +13,10 @@ class IronsAction(object):
 
     def __init__(self, name):
         self._name = name
-        self._as = SimpleActionServer(
-            self._name, IronsActionMsg, execute_cb=self.execute, auto_start=False)
+        self._as = SimpleActionServer(self._name,
+                                      IronsActionMsg,
+                                      execute_cb=self.execute,
+                                      auto_start=False)
         self._as.start()
 
         self.ane_reading = 0

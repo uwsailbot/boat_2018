@@ -106,8 +106,14 @@ def get_buoy_coords(img, pub):
     threshold_img = cv2.GaussianBlur(threshold_img, (5, 5), 2, 2)
 
     # Get center via Hough Circles
-    circles = cv2.HoughCircles(
-        threshold_img, cv2.HOUGH_GRADIENT, 1, 2, param1=200, param2=15, minRadius=0, maxRadius=0)
+    circles = cv2.HoughCircles(threshold_img,
+                               cv2.HOUGH_GRADIENT,
+                               1,
+                               2,
+                               param1=200,
+                               param2=15,
+                               minRadius=0,
+                               maxRadius=0)
 
     if circles is not None:
 

@@ -126,8 +126,9 @@ def joy_callback(controller):
         position_msg.data = 90.0
 
     else:
-        position_msg.data = 90 - (rudder_max - rudder_min) / 2.0 * (
-            (controller.right_stick_x - (Joy.JOY_RANGE / 2.0)) / (Joy.JOY_RANGE / 2.0))
+        position_msg.data = 90 - (rudder_max - rudder_min) / 2.0 * ((controller.right_stick_x -
+                                                                     (Joy.JOY_RANGE / 2.0)) /
+                                                                    (Joy.JOY_RANGE / 2.0))
 
     if position_msg.data > rudder_max:
         position_msg.data = rudder_max

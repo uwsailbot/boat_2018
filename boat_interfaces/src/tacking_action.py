@@ -13,8 +13,10 @@ class TackingAction(object):
 
     def __init__(self, name):
         self._name = name
-        self._as = SimpleActionServer(
-            self._name, TackingActionMsg, execute_cb=self.tacking_callback, auto_start=False)
+        self._as = SimpleActionServer(self._name,
+                                      TackingActionMsg,
+                                      execute_cb=self.tacking_callback,
+                                      auto_start=False)
         self._as.start()
         self.layline = rospy.get_param('/boat/nav/layline')
         self.rudder_max = rospy.get_param('boat/interfaces/rudder_max')

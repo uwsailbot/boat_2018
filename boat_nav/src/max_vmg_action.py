@@ -14,8 +14,10 @@ class MaxVMGAction(object):
 
     def __init__(self, name):
         self._name = name
-        self._as = SimpleActionServer(
-            self._name, MaxVMGActionMsg, execute_cb=self.execute, auto_start=False)
+        self._as = SimpleActionServer(self._name,
+                                      MaxVMGActionMsg,
+                                      execute_cb=self.execute,
+                                      auto_start=False)
         self._as.start()
 
         self.layline = rospy.get_param('/boat/nav/layline')

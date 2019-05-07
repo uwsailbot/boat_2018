@@ -100,9 +100,8 @@ class Slider:
 
         glPopMatrix()
 
-        draw_text(
-            str(self.cur_val), self.x + 0.5 * self.w, self.y + 5, 'center', self.h - 5, 2.0,
-            (r, g, b))
+        draw_text(str(self.cur_val), self.x + 0.5 * self.w, self.y + 5, 'center', self.h - 5, 2.0,
+                  (r, g, b))
 
         glDisable(GL_BLEND)
 

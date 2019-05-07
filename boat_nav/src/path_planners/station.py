@@ -57,8 +57,8 @@ class StationPlanner(Planner):
         # Determine width at the height we will be traveling
         station_width = (bottom_box_width +
                          (top_box_width - bottom_box_width) * HEIGHT_TO_TRAVEL) * MAX_WIDTH
-        station_height = (left_box_height + (right_box_height - left_box_height) * (
-            (1 - MAX_WIDTH) / 2.0)) * HEIGHT_TO_TRAVEL
+        station_height = (left_box_height + (right_box_height - left_box_height) *
+                          ((1 - MAX_WIDTH) / 2.0)) * HEIGHT_TO_TRAVEL
 
         # Determine the two points that will alternate, first find centre point of box
         y_sum = 0
@@ -295,8 +295,8 @@ class StationPlanner(Planner):
         for i in range(4):
             # Make sure line is not vertical
             if abs(inner_box[(i + 1) % 4].x - inner_box[i].x) > 0.0001:
-                m_box = (inner_box[(i + 1) % 4].y - inner_box[i].y) / (inner_box[
-                    (i + 1) % 4].x - inner_box[i].x)
+                m_box = (inner_box[(i + 1) % 4].y - inner_box[i].y) / (inner_box[(i + 1) % 4].x -
+                                                                       inner_box[i].x)
                 b_box = inner_box[i].y - m_box * inner_box[i].x
 
                 # If the slopes are the same they will never intersect
