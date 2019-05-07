@@ -9,8 +9,10 @@ LiquidCrystal display(8, 9, 4, 5, 6, 7);
 
 void displayMsg(iso_tp::Message* canMsg) {
   display.clear();
-  display.print("ID ");
-  display.print(canMsg->rx_id);
+  display.print("ID:0x");
+  display.print(canMsg->rx_id, HEX);
+  display.print(" LEN:");
+  display.print(canMsg->len);
   display.setCursor(0, 1);
 
   for (int i = 0; i < canMsg->len && i < 16; i++) {
