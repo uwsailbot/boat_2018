@@ -31,7 +31,7 @@ class SingleFrame(can.Message):
 
         assert len(data) <= 7, 'Data is too large'
 
-        self.can_dlc = len(data)
+        self.can_dlc = len(data) + 1
         self.data = []
         self.data.append((SingleFrame.FRAME_TYPE << 4) | (self.can_dlc & 0x0F))
         self.data += data

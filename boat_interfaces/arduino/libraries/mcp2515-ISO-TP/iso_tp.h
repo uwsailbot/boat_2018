@@ -75,12 +75,12 @@ struct SingleFrame : can_frame {
 
   explicit SingleFrame(uint16_t msg_len) : SingleFrame() {
     data[0] |= msg_len & 0x0F;
-    can_dlc = min(msg_len + 1, 7);
+    can_dlc = min(msg_len + 1, 8);
   }
 
   explicit SingleFrame(uint16_t msg_len, const uint8_t* msg_data)
       : SingleFrame(msg_len) {
-    arrcpy(data + 1, msg_data, can_dlc);
+    arrcpy(data + 1, msg_data, can_dlc - 1);
   }
 
   explicit SingleFrame(const Message* msg) : SingleFrame(msg->len, msg->data) {
