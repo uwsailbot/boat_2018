@@ -29,7 +29,7 @@ Package containing all nodes and files relevant to communication with the onboar
 ## boat_msgs
 Custom messages for path planning, gps coordinates and boat states in order to facilitate the communication of other packages.
 
-## boat_nav 
+## boat_nav
 Package for planning boat navigation given the specified task. This package is "the brains" of the boat, and decides how the boat should sail autonomously.
 
 ## boat_utilities
@@ -47,7 +47,7 @@ Previously, this stack relied on the `phidgets_imu` package. This is no longer r
 Make sure to read the README.md in their repo and follow some extra steps to setup the phidgets package.
 You need to download the library from this [link](https://www.phidgets.com/downloads/phidget22/libraries/linux/libphidget22.tar.gz) and you must run this in the libphidget folder to build it:
 Run this in the libphidget folder to build it:
-	
+
 	$ ./configure --prefix=/usr && make && sudo make install
 
 Also be sure to download the phidgets compass calibration program [See here](https://www.phidgets.com/?tier=3&catid=10&pcid=8&prodid=32)
