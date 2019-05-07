@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Checking code style with yapf..."
-yapf --diff --recursive . > /dev/null
+yapf --diff --recursive ./boat_* > /dev/null
 
 if [ $? -ne 0 ]; then
 	echo >&2 "Code does not meet style requirements! Please run yapf to lint and format the code."
