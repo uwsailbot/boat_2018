@@ -100,6 +100,11 @@ void Mcp2515IsoTP::readBuffer(MCP2515::RXBn buffer) {
 
     // Received frame is a Single Frame
     case SingleFrame::FRAME_TYPE: {
+      for (uint8_t i = 0; i < num_rx_msgs_; i++) {
+        RxConfig* msg = &rx_msgs_[i];
+        if (msg->msg.rx_id != recv_msg.can_id) return;
+      }
+
       Message* msg = insertReadyMsg(recv_msg.can_id);
       if (msg != nullptr) {
         msg->resize(recv_msg.can_dlc - 1);
@@ -151,7 +156,10 @@ void Mcp2515IsoTP::readBuffer(MCP2515::RXBn buffer) {
         // Append the new data
         uint16_t start = (msg->sequence * 7) - 1;
         arrcpy(msg->msg.data + start, recv_msg.data + 1, recv_msg.can_dlc - 1);
-        msg->remaining_frames--;
+
+        if (msg->block_size != 0) {
+          msg->remaining_frames--;
+        }
 
         // If this is the last frame in the message, add the message to the
         // ready buffer and reset
@@ -170,7 +178,7 @@ void Mcp2515IsoTP::readBuffer(MCP2515::RXBn buffer) {
 
         // If this is not the last frame of the message, but it is the last
         // frame of the block, send the next flow frame
-        else if (msg->remaining_frames == 0) {
+        else if (msg->block_size != 0 && msg->remaining_frames == 0) {
           sendFlowFrame(msg, 0);
           msg->remaining_frames = msg->block_size;
         }
