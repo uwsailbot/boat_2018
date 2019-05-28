@@ -19,7 +19,7 @@ uint8_t counter = 0;
 
 void setup() {
   mcp2515.reset();
-  mcp2515.setBitrate(CAN_125KBPS);
+  mcp2515.setBitrate(CAN_125KBPS, MCP_8MHZ);
   mcp2515.setFilterMask(MCP2515::MASK0, false, 0x7FF);
   mcp2515.setFilterMask(MCP2515::MASK1, false, 0x7FF);
   mcp2515.setFilter(MCP2515::RXF0, false, futaba_msg.rx_id);
@@ -38,10 +38,12 @@ void loop() {
   if ((millis() - last_time) >= 20) { // 50hz
 
     // Read PWM pins
+    nointerrupts();
     ch_1_buf[counter] = pulseIn(CH_1_PIN, HIGH, 10000);
     ch_3_buf[counter] = pulseIn(CH_3_PIN, HIGH, 10000);
     uint32_t ch_5_val = pulseIn(CH_5_PIN, HIGH, 10000);
     ch_6_buf[counter] = pulseIn(CH_6_PIN, HIGH, 10000);
+    interrupts();
 
     // Lookup table for switch position
     uint8_t switch_state = 0;

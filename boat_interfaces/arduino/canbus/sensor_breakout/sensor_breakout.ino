@@ -53,7 +53,7 @@ void setup() {
   Serial.begin(115200);
 
   mcp2515.reset();
-  mcp2515.setBitrate(CAN_125KBPS);
+  mcp2515.setBitrate(CAN_125KBPS, MCP_8MHZ);
   mcp2515.setFilterMask(MCP2515::MASK0, false, 0x7FF);
   mcp2515.setFilterMask(MCP2515::MASK1, false, 0x7FF);
   mcp2515.setFilter(MCP2515::RXF0, false, gps_msg.rx_id);

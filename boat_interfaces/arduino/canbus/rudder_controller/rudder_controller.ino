@@ -15,7 +15,7 @@ Servo servo_rudder2;
 
 void setup() {
   mcp2515.reset();
-  mcp2515.setBitrate(CAN_125KBPS);
+  mcp2515.setBitrate(CAN_125KBPS, MCP_8MHZ);
   mcp2515.setFilterMask(MCP2515::MASK0, false, 0x7FF);
   mcp2515.setFilterMask(MCP2515::MASK1, false, 0x7FF);
   mcp2515.setFilter(MCP2515::RXF0, false, RUDDER_CMD_MSG_ID);

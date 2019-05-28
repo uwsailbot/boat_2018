@@ -15,7 +15,7 @@ void displayMsg(iso_tp::Message* canMsg) {
   display.print(canMsg->len);
   display.setCursor(0, 1);
 
-  for (int i = 0; i < canMsg->len && i < 16; i++) {
+  for (int i = 1; i < canMsg->len && i < 16; i++) {
     display.print((char)canMsg->data[i]);
   }
 }
@@ -24,10 +24,10 @@ void setup() {
   display.begin(16, 2);
 
   mcp2515.reset();
-  mcp2515.setBitrate(CAN_125KBPS);
+  mcp2515.setBitrate(CAN_125KBPS, MCP_8MHZ);
   mcp2515.setNormalMode();
 
-  can_wrapper.configFlowFrame(0b11110000000, 0b11110000001, 0, 5);
+  can_wrapper.configFlowFrame(0b11110000001, 0b11110000000, 0, 5);
 }
 
 void loop() {
