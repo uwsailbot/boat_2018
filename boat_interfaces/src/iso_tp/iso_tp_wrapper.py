@@ -10,12 +10,14 @@ def get_time_micros():
 
 
 class IsoTPWrapper(object):
+
     class ArbitrationMode(enum.Enum):
         PRIORITY_ID = 0
         LIFO = 1
         FIFO = 2
 
     class TxConfig(object):
+
         def __init__(self):
             self.msg = iso_tp_headers.Message()
 
@@ -31,6 +33,7 @@ class IsoTPWrapper(object):
             self.separation = 0  # Separation time between frames, in 0.1ms
 
     class RxConfig(object):
+
         def __init__(self):
             self.msg = iso_tp_headers.Message()
 
@@ -58,6 +61,7 @@ class IsoTPWrapper(object):
             self._arbitration_mode = arbitration_mode
 
         class CallbackListener(can.Listener):
+
             def __init__(self, callback):
                 super(CallbackListener, self).__init__()
                 self.callback = callback
@@ -99,7 +103,8 @@ class IsoTPWrapper(object):
 
         # Check if outgoing messages are ready to send their next consecutive frame
         for tx_msg in self._tx_msgs[:]:
-            if tx_msg.waiting or (get_time_micros() - tx_msg.prev_frame_time) / 100 < tx_msg.separation:
+            if tx_msg.waiting or (get_time_micros() -
+                                  tx_msg.prev_frame_time) / 100 < tx_msg.separation:
                 continue
 
             # Update the msg data

@@ -86,8 +86,7 @@ class ConsecutiveFrame(can.Message):
         offset = (sequence * 7) - 1
 
         payload = bytearray()
-        payload.append((ConsecutiveFrame.FRAME_TYPE << 4)
-                       | (self.sequence & 0x0F))
+        payload.append((ConsecutiveFrame.FRAME_TYPE << 4) | (self.sequence & 0x0F))
         payload += data[offset:offset + (min(len(data) - offset, 7))]
 
         super(ConsecutiveFrame, self).__init__(data=payload, extended_id=False)

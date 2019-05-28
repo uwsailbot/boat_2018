@@ -40,6 +40,7 @@ input_msgs = {}
 
 
 class MessageConfig(object):
+
     def __init__(self):
         self.tx_id = 0
         self.rx_id = 0
@@ -111,7 +112,8 @@ def CAN_read(msg):
     if msg.rx_id not in input_msgs:
         return
 
-    rospy.logdebug("CAN RX ID: {0}, raw data: '{1}', ts: {2}".format(msg.rx_id, bytearray(msg.data), msg.timestamp))
+    rospy.logdebug("CAN RX ID: {0}, raw data: '{1}', ts: {2}".format(msg.rx_id, bytearray(msg.data),
+                                                                     msg.timestamp))
 
     config = input_msgs[msg.rx_id]
 
@@ -162,7 +164,8 @@ def CAN_read(msg):
 
     # If the message has a header, populate the timestamp with the time the message was received on the bus
     if config['msg_type']._has_header:
-        data[config['msg_type']._slot_types.index('std_msgs/Header')].stamp = rospy.Time().from_sec(msg.timestamp)
+        data[config['msg_type']._slot_types.index('std_msgs/Header')].stamp = rospy.Time().from_sec(
+            msg.timestamp)
 
     # Convert the data array to a ROS msg, and publish it
     msg = config['msg_type'](*data)
@@ -204,7 +207,8 @@ def subscriber_callback(data, msg_config):
 
     format = msg_config.format.format(*string_lengths)
 
-    wrapper.send_data(msg_config.tx_id, msg_config.rx_id, bytearray(struct.pack("!" + format, *packed_data)))
+    wrapper.send_data(msg_config.tx_id, msg_config.rx_id,
+                      bytearray(struct.pack("!" + format, *packed_data)))
 
 
 # Initialize ROS, open the CAN bus, and setup the inputs & outputs
@@ -214,7 +218,8 @@ def initialize_node():
     rospy.init_node('can_interface')
 
     # Fetch the CAN configurations from the yaml file
-    bus_config = yaml.load(open(rospkg.RosPack().get_path('boat_interfaces') + "/config/can_bus.yaml"))
+    bus_config = yaml.load(
+        open(rospkg.RosPack().get_path('boat_interfaces') + "/config/can_bus.yaml"))
 
     # Open the CAN bus
     #bus = can.interfaces.serial.serial_can.SerialBus(channel="/dev/ttyUSB0") # For real CAN interface
@@ -224,19 +229,25 @@ def initialize_node():
     # Setup all the ROS Subscribe -> CAN Write configurations
     for msg_name, config in bus_config['output_msgs'].items():
         msg_config = parse_msg_config(config)
-        rospy.loginfo('Creating ROS->CAN config for msg {name}\t- ROS topic={topic},\tCAN TX_ID={tx_id}'.format(
-            name=msg_name, topic=msg_config.topic, tx_id=msg_config.tx_id))
+        rospy.loginfo(
+            'Creating ROS->CAN config for msg {name}\t- ROS topic={topic},\tCAN TX_ID={tx_id}'.
+            format(name=msg_name, topic=msg_config.topic, tx_id=msg_config.tx_id))
         rospy.Subscriber(msg_config.topic, msg_config.msg_type, subscriber_callback, msg_config)
 
     # Setup all the CAN Read -> ROS Publish configurations
     for _, config in bus_config['input_msgs'].items():
         msg_config = parse_msg_config(config)
 
-        rospy.loginfo('Creating CAN->ROS config for msg {name}\t- ROS topic={topic},\tCAN RX_ID={rx_id}'.format(
-            name=msg_name, topic=msg_config.topic, rx_id=msg_config.rx_id))
+        rospy.loginfo(
+            'Creating CAN->ROS config for msg {name}\t- ROS topic={topic},\tCAN RX_ID={rx_id}'.
+            format(name=msg_name, topic=msg_config.topic, rx_id=msg_config.rx_id))
 
         pub = rospy.Publisher(msg_config.topic, msg_config.msg_type, queue_size=10)
-        input_msgs[msg_config.rx_id] = {'publisher': pub, 'msg_type': msg_config.msg_type, 'format': msg_config.format}
+        input_msgs[msg_config.rx_id] = {
+            'publisher': pub,
+            'msg_type': msg_config.msg_type,
+            'format': msg_config.format
+        }
 
         wrapper.config_flow_frame(msg_config.rx_id, msg_config.tx_id, 1, 5)
 
