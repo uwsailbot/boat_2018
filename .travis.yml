@@ -1,28 +1,25 @@
-
-# Use ubuntu trusty (14.04) with sudo privileges. Xenial is not yet supported
-dist: trusty
+dist: xenial
 sudo: required
-language: generic
+language: python
+python: 2.7
 
-env:
-  global:
-    - CI_SOURCE_PATH=$(pwd)
-    - DEPEND_FILE=$CI_SOURCE_PATH/dependencies.sh
-    - BEFORE_SCRIPT='if [[ -f $DEPEND_FILE ]] ; then . $DEPEND_FILE ; fi'
-    # Set the python path manually to include /usr/-/python2.7/dist-packages
-    # as this is where apt-get installs python packages.
-    - PYTHONPATH=$PYTHONPATH:/usr/lib/python2.7/dist-packages:/usr/local/lib/python2.7/dist-packages
-    - USE_DEB=true  ROS_DISTRO="kinetic"   ROS_REPOSITORY_PATH=http://packages.ros.org/ros/ubuntu
-    - USE_DEB=true  ROS_DISTRO="kinetic"   ROS_REPOSITORY_PATH=http://packages.ros.org/ros-shadow-fixed/ubuntu
-matrix:
-  allow_failures:
-    - env: USE_DEB=true  ROS_DISTRO="kinetic"   ROS_REPOSITORY_PATH=http://packages.ros.org/ros-shadow-fixed/ubuntu
 notifications:
   slack: uwsailbot:5Q2oPJ7OdRTvkEu8R7OH8fCV
+
+env:
+  matrix:
+    - ROS_DISTRO="kinetic" ROS_REPOSITORY_PATH=http://packages.ros.org/ros/ubuntu
+    - ROS_DISTRO="kinetic" ROS_REPOSITORY_PATH=http://packages.ros.org/ros-shadow-fixed/ubuntu
+
+matrix:
+  allow_failures:
+    - env: ROS_DISTRO="kinetic" ROS_REPOSITORY_PATH=http://packages.ros.org/ros-shadow-fixed/ubuntu
 
 ################################################################################
 
 install:
+  - ./scripts/dependencies.sh
   - git clone https://github.com/ros-industrial/industrial_ci.git .ci_config
 script:
+  - ./scripts/check_code_style.sh
   - .ci_config/travis.sh

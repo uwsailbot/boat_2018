@@ -9,10 +9,10 @@ __UNITS = 360.0
 
 class ComparisonResult(Enum):
     """The result of comparing two angles using `get_side()`."""
-    EQUAL=0
-    LEFT=1
-    RIGHT=2
-    OPPOSITE=3
+    EQUAL = 0
+    LEFT = 1
+    RIGHT = 2
+    OPPOSITE = 3
 
 
 def cosd(angle):
@@ -48,19 +48,19 @@ def normalize(angle):
 def normalize_signed(angle):
     """Normalize the angle to be -180 to 180."""
     angle = normalize(angle)
-    if angle > __UNITS/2:
+    if angle > __UNITS / 2:
         angle -= __UNITS
     return angle
 
 
 def opposite(angle):
     """Calculate the opposite angle, normalized to be 0 to 360."""
-    return normalize(angle + __UNITS/2)
+    return normalize(angle + __UNITS / 2)
 
 
 def opposite_signed(angle):
     """Calculate the opposite angle, normalized to be -180 to 180."""
-    return normalize_signed(angle + __UNITS/2)
+    return normalize_signed(angle + __UNITS / 2)
 
 
 def is_within_bounds(val, lower, upper, inclusive=False):
@@ -103,7 +103,7 @@ def is_on_right(angle, ref, inclusive=False):
     """
     angle = normalize(angle)
     ref = normalize(ref)
-    ref_opp = normalize(ref + __UNITS/2)
+    ref_opp = normalize(ref + __UNITS / 2)
 
     # We check if ref_opp < angle < ref
     return is_within_bounds(angle, ref_opp, ref, inclusive)
@@ -123,7 +123,7 @@ def is_on_left(angle, ref, inclusive=False):
     """
     angle = normalize(angle)
     ref = normalize(ref)
-    ref_opp = normalize(ref + __UNITS/2)
+    ref_opp = normalize(ref + __UNITS / 2)
 
     # We check if ref < angle < ref_opp
     return is_within_bounds(angle, ref, ref_opp, inclusive)
