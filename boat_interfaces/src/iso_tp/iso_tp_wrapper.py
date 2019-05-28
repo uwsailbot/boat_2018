@@ -57,7 +57,15 @@ class IsoTPWrapper(object):
         else:
             self._arbitration_mode = arbitration_mode
 
-        can.Notifier(bus, [self._read_next])
+        class CallbackListener(can.Listener):
+            def __init__(self, callback):
+                super(CallbackListener, self).__init__()
+                self.callback = callback
+
+            def on_message_received(self, msg):
+                self.callback(msg)
+
+        can.Notifier(bus, [CallbackListener(self._read_next)])
 
         self._callbacks = []
 
@@ -127,7 +135,6 @@ class IsoTPWrapper(object):
         """
         Queue a message of arbitrary length for transmission
         """
-        print('Sending msg, TX={0}, data={1}'.format(msg.tx_id, msg.data))
 
         # If the message is very short, send a Single Frame
         if len(msg.data) < 8:

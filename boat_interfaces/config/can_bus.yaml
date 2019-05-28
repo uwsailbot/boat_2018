@@ -43,6 +43,13 @@
 
 # ROS Subscriber -> CAN Write
 output_msgs:
+
+  test_msg:
+    tx_id: 0b11110000001
+    rx_id: 0b11110000000
+    topic: "/test"
+    topic_type: "std_msgs/String"
+
   rudder_cmd:
     tx_id: 0b00100100001
     rx_id: 0b00100100000
@@ -59,6 +66,12 @@ output_msgs:
 
 # CAN Read -> ROS Publisher
 input_msgs:
+  test_in_msg:
+    tx_id: 0b11110000010
+    rx_id: 0b11110000011
+    topic: "/input"
+    topic_type: "std_msgs/Float32"
+
   rc_msg:
     tx_id: 0b00000000000
     rx_id: 0b00000000001

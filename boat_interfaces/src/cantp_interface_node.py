@@ -111,7 +111,7 @@ def CAN_read(msg):
     if msg.rx_id not in input_msgs:
         return
 
-    rospy.loginfo("CAN RX ID: {0}, raw data: '{1}', ts: {2}".format(msg.rx_id, bytearray(msg.data), msg.timestamp))
+    rospy.logdebug("CAN RX ID: {0}, raw data: '{1}', ts: {2}".format(msg.rx_id, bytearray(msg.data), msg.timestamp))
 
     config = input_msgs[msg.rx_id]
 
@@ -173,7 +173,7 @@ def subscriber_callback(data, msg_config):
     """
     Callback for receiving messages from ROS topics, to be forwarded to the CAN bus
     """
-    rospy.loginfo('Got ROS msg on topic {0}\t\t{1}'.format(msg_config.topic, data))
+    rospy.logdebug('Got ROS msg on topic {0}\t\t{1}'.format(msg_config.topic, data))
 
     packed_data = []
     string_lengths = []
@@ -204,7 +204,7 @@ def subscriber_callback(data, msg_config):
 
     format = msg_config.format.format(*string_lengths)
 
-    wrapper.send_data(msg_config.tx_id, msg_config.rx_id, struct.pack("!" + format, *packed_data))
+    wrapper.send_data(msg_config.tx_id, msg_config.rx_id, bytearray(struct.pack("!" + format, *packed_data)))
 
 
 # Initialize ROS, open the CAN bus, and setup the inputs & outputs
@@ -218,7 +218,7 @@ def initialize_node():
 
     # Open the CAN bus
     #bus = can.interfaces.serial.serial_can.SerialBus(channel="/dev/ttyUSB0") # For real CAN interface
-    bus = can.Bus('vcan0', bustype='virtual', receive_own_messages=True, fd=True)  # For debugging
+    bus = can.Bus('slcan0', bustype='socketcan')
     wrapper = iso_tp_wrapper.IsoTPWrapper(bus)
 
     # Setup all the ROS Subscribe -> CAN Write configurations

@@ -27,14 +27,13 @@ class SingleFrame(can.Message):
     FRAME_TYPE = 0
 
     def __init__(self, data=[]):
-        super(SingleFrame, self).__init__()
-
         assert len(data) <= 7, 'Data is too large'
 
-        self.can_dlc = len(data) + 1
-        self.data = []
-        self.data.append((SingleFrame.FRAME_TYPE << 4) | (self.can_dlc & 0x0F))
-        self.data += data
+        payload = bytearray()
+        payload.append((SingleFrame.FRAME_TYPE << 4) | (len(data) & 0x0F))
+        payload += data
+
+        super(SingleFrame, self).__init__(data=payload, extended_id=False)
 
 
 class FirstFrame(can.Message):
@@ -52,15 +51,15 @@ class FirstFrame(can.Message):
     FRAME_TYPE = 1
 
     def __init__(self, data=[]):
-        super(FirstFrame, self).__init__()
-
         assert len(data) <= 4095, 'Data is too large'
 
-        self.can_dlc = 8
-        self.data = []
-        self.data.append((FirstFrame.FRAME_TYPE << 4) | (len(data) >> 8 & 0x0F))
-        self.data.append(len(data) & 0xFF)
-        self.data += data[:6]
+        # Payload will always be of length 8
+        payload = bytearray()
+        payload.append((FirstFrame.FRAME_TYPE << 4) | (len(data) >> 8 & 0x0F))
+        payload.append(len(data) & 0xFF)
+        payload += data[:6]
+
+        super(FirstFrame, self).__init__(data=payload, extended_id=False)
 
 
 class ConsecutiveFrame(can.Message):
@@ -81,17 +80,17 @@ class ConsecutiveFrame(can.Message):
     FRAME_TYPE = 2
 
     def __init__(self, sequence=0, data=[]):
-        super(ConsecutiveFrame, self).__init__()
-
         assert len(data) <= 4095, 'Data is too large'
 
         self.sequence = sequence
-        self.data = []
-        self.data.append((ConsecutiveFrame.FRAME_TYPE << 4) | (self.sequence & 0x0F))
-
         offset = (sequence * 7) - 1
-        self.can_dlc = min(len(data) - offset, 7) + 1
-        self.data += data[offset:offset + (self.can_dlc - 1)]
+
+        payload = bytearray()
+        payload.append((ConsecutiveFrame.FRAME_TYPE << 4)
+                       | (self.sequence & 0x0F))
+        payload += data[offset:offset + (min(len(data) - offset, 7))]
+
+        super(ConsecutiveFrame, self).__init__(data=payload, extended_id=False)
 
 
 class FlowFrame(can.Message):
@@ -126,10 +125,11 @@ class FlowFrame(can.Message):
     STATUS_ABORT = 2
 
     def __init__(self, status, num_frames, separation):
-        super(FlowFrame, self).__init__()
 
-        self.can_dlc = 3
-        self.data = []
-        self.data.append((FlowFrame.FRAME_TYPE << 4) | (status & 0x0F))
-        self.data.append(num_frames)
-        self.data.append(separation)
+        # Payload will always be of length 3
+        payload = bytearray()
+        payload.append((FlowFrame.FRAME_TYPE << 4) | (status & 0x0F))
+        payload.append(num_frames)
+        payload.append(separation)
+
+        super(FlowFrame, self).__init__(data=payload, extended_id=False)
