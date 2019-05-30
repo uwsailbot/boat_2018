@@ -10,12 +10,6 @@ import yaml
 
 from iso_tp import iso_tp_wrapper
 
-# TODO: Currently, only primitive types (including Time and Duration) are supported in messages.
-# Consider decomposing non-primitive types into their primitive types and sending/receiving purely primitive data,
-# rather than just skipping non-primitive types
-
-# TODO: Check if strings work
-
 # Conversion of ROS message primitives to format characters
 FORMAT_CHARACTERS = {
     'bool': '?',  # 1 byte
@@ -38,6 +32,9 @@ FORMAT_CHARACTERS = {
 # Key is RX ID
 input_msgs = {}
 
+# The iso_tp_wrapper instance
+wrapper = ()
+
 
 class MessageConfig(object):
 
@@ -50,6 +47,22 @@ class MessageConfig(object):
         self.format = ''
 
 
+def close_bracket(start_idx, text):
+    """
+    Find the index of the closing bracket of matching depth.
+    """
+    nest_level = 1
+    for i, c in enumerate(text[start_idx + 1:]):
+        if c == '[':
+            nest_level += 1
+        elif c == ']':
+            nest_level -= 1
+            if nest_level == 0:
+                end_idx = start_idx + 2 + i
+                return end_idx
+    return -1
+
+
 def parse_msg_format(msg_type):
     """
     Convert the datatypes of a ROS message to the appropriate format string
@@ -57,10 +70,40 @@ def parse_msg_format(msg_type):
     """
     format = ""
     for type in msg_type._slot_types:
+
+        # Handle primitives
         if type in FORMAT_CHARACTERS:
             format += FORMAT_CHARACTERS[type]
+
+        # Handle arrays
+        elif type[-1] == ']':
+
+            # Variable-size arrays
+            if type[-2] == '[':
+                format += 'b['
+                base_type = type[:-2]
+
+                if base_type in FORMAT_CHARACTERS:
+                    format += FORMAT_CHARACTERS[base_type]
+                else:
+                    format += parse_msg_format(get_msg_from_type(base_type))
+
+                format += ']'
+
+            # Fixed-size arrays
+            else:
+                base_type = type.split('[')[0]
+                arr_len = int(type.split('[')[1][:-1])
+
+                if base_type in FORMAT_CHARACTERS:
+                    format += FORMAT_CHARACTERS[base_type] * arr_len
+                elif type != 'std_msgs/Header':
+                    format += parse_msg_format(get_msg_from_type(base_type)) * arr_len
+
+        # Handle nested msg objects, excluding Headers
         else:
-            format += 'x'
+            if type != 'std_msgs/Header':
+                format += parse_msg_format(get_msg_from_type(type))
     return format
 
 
@@ -103,6 +146,166 @@ def parse_msg_config(yaml):
     return msg_config
 
 
+def unpack(data_format, raw_data):
+
+    data = []
+    array_lengths = []
+    cur_bit = 0
+
+    i = 0
+    while i < len(data_format):
+        f = data_format[i]
+        i += 1
+
+        # Determine the length of the next value
+        if f in ['?', 'b', 'B']:
+            data_len = 1
+        elif f in ['h', 'H']:
+            data_len = 2
+        elif f in ['i', 'I', 'f']:
+            data_len = 4
+        elif f in ['q', 'Q', 'd']:
+            data_len = 8
+
+        # Strings
+        elif f in ['{', '}']:
+            continue
+        elif f in ['f']:
+            data_len = data[-1]
+            data.pop()
+            f = str(data_len) + f
+
+        # Variable-length arrays
+        elif f in ['[']:
+            arr_len = data[-1]
+            data.pop()
+            array_lengths.append(arr_len)
+
+            start_idx = i - 1
+            end_idx = close_bracket(start_idx, data_format)
+
+            array_format = data_format[start_idx + 1:end_idx - 1]
+            array_contents = []
+            for i in range(arr_len):
+                contents, num_bits = unpack(array_format, raw_data[cur_bit:])
+                cur_bit += num_bits
+                array_contents.append(list(contents))
+            data.append(array_contents)
+
+            i += (end_idx - start_idx) + 1
+            continue
+
+        else:
+            print('Error')
+
+        data.append(struct.unpack('!' + f, bytearray(raw_data[cur_bit:cur_bit + data_len]))[0])
+        cur_bit += data_len
+
+    return data, cur_bit
+
+
+def list_to_msg(data, ros_msg):
+    """
+    Convert a list of fields to its corresponding ROS message
+    """
+
+    for type_name, slot in zip(ros_msg._slot_types, ros_msg.__slots__):
+
+        # Skip headers
+        if type_name == 'std_msgs/Header':
+            continue
+
+        # Handle arrays
+        elif type_name[-1] == ']':
+
+            # Append every element of the list
+            for element in data[0]:
+                if '/' in type_name:
+                    getattr(ros_msg, slot).append(
+                        list_to_msg(element,
+                                    get_msg_from_type(type_name.split('[')[0])()))
+                else:
+                    getattr(ros_msg, slot).append(element[0])
+            del data[0]
+
+        # Handle special primitives - time and duration
+        elif type_name == 'time' or type_name == 'duration':
+            getattr(ros_msg, slot).secs = data[0]
+            getattr(ros_msg, slot).nsecs = data[1]
+            del data[0]
+            del data[1]
+
+        # Handle primitives
+        elif type_name in FORMAT_CHARACTERS:
+            setattr(ros_msg, slot, data[0])
+            del data[0]
+
+        # Handle nested messages
+        else:
+            setattr(ros_msg, slot, list_to_msg(data, get_msg_from_type(type_name)()))
+            del data[0]
+
+    return ros_msg
+
+
+def msg_to_list(msg):
+    """
+    Convert a ROS message to an array of its fields
+    """
+
+    packed_data = []
+    string_lengths = []
+    array_lengths = []
+    for i, slot in enumerate(msg.__slots__):
+
+        # Skip headers:
+        if msg._slot_types[i] == 'std_msgs/Header':
+            continue
+
+        # Handle arrays
+        elif msg._slot_types[i][-1] == ']':
+
+            # For variable-size arrays, append the array length
+            if msg._slot_types[i][-2] == '[':
+                array_lengths.append(len(getattr(msg, slot)))
+                packed_data.append(len(getattr(msg, slot)))
+
+            # Append every element of the list
+            for data in getattr(msg, slot):
+                if hasattr(data, '__slots__'):
+                    new_packed_data, new_string_lengths, new_array_lengths = msg_to_list(data)
+                    packed_data += new_packed_data
+                    string_lengths += new_string_lengths
+                    array_lengths += new_array_lengths
+                else:
+                    packed_data.append(data)
+
+        # Handle special primitives - time and duration
+        elif msg._slot_types[i] == 'time' or msg._slot_types[i] == 'duration':
+            packed_data.append(getattr(msg, slot).secs)
+            packed_data.append(getattr(msg, slot).nsecs)
+
+        # Handle special primitives - string
+        elif msg._slot_types[i] == 'string':
+            string_lengths.append(len(getattr(msg, slot)))
+            packed_data.append(len(getattr(msg, slot)))
+            packed_data.append(getattr(msg, slot))
+
+        # Handle primitives
+        elif msg._slot_types[i] in FORMAT_CHARACTERS:
+            packed_data.append(getattr(msg, slot))
+
+        # Handle nested messages
+        else:
+            new_packed_data, new_string_lengths, new_array_lengths = msg_to_list(getattr(msg, slot))
+
+            packed_data += new_packed_data
+            string_lengths += new_string_lengths
+            array_lengths += new_array_lengths
+
+    return packed_data, string_lengths, array_lengths
+
+
 def CAN_read(msg):
     """
     Callback for receiving messages from the CAN bus, to be forwarded to ROS topics
@@ -118,58 +321,18 @@ def CAN_read(msg):
     config = input_msgs[msg.rx_id]
 
     # Parse the message from the CAN bus into an array
-    data = []
-    cur_bit = 0
+    data, _ = unpack(config['format'], msg.data)
 
-    for i, f in enumerate(config['format']):
-
-        # Determine the length of the next value in the message
-        if f in ['?', 'b', 'B']:
-            data_len = 1
-        elif f in ['h', 'H']:
-            data_len = 2
-        elif f in ['i', 'I', 'f']:
-            data_len = 4
-        elif f in ['q', 'Q', 'd']:
-            data_len = 8
-
-        elif f in ['s']:
-            data_len = data[-1]
-            data.pop()
-            f = str(data_len) + f
-
-        # If we have an x, we have an invalid data type. Insert an empty obj into the data array, and continue
-        elif f is 'x':
-            field_type = config['msg_type']._slot_types[i]
-            data.append(get_msg_from_type(field_type)())
-            cur_bit += 1
-            continue
-        else:
-            # Uh oh, not sure how we ended up here
-            # TODO: Need to handle this
-            continue
-
-        data.append(struct.unpack('!' + f, bytearray(msg.data[cur_bit:cur_bit + data_len]))[0])
-        cur_bit += data_len
-
-    for i, type in enumerate(config['msg_type']._slot_types):
-        if type is 'time':
-            time = rospy.Time(secs=data[i], nsecs=data[i + 1])
-            data[i] = time
-            del data[i + 1]
-        elif type is 'duration':
-            duration = rospy.Duration(secs=data[i], nsecs=data[i + 1])
-            data[i] = duration
-            del data[i + 1]
+    # Convert the data array to a ROS msg
+    ros_msg = list_to_msg(data, config['msg_type']())
 
     # If the message has a header, populate the timestamp with the time the message was received on the bus
-    if config['msg_type']._has_header:
-        data[config['msg_type']._slot_types.index('std_msgs/Header')].stamp = rospy.Time().from_sec(
-            msg.timestamp)
+    if ros_msg._has_header:
+        field_name = ros_msg.__slots__[ros_msg._slot_types.index('std_msgs/Header')]
+        getattr(ros_msg, field_name).stamp = rospy.Time().from_sec(msg.timestamp)
 
-    # Convert the data array to a ROS msg, and publish it
-    msg = config['msg_type'](*data)
-    config['publisher'].publish(msg)
+    # Publish the msg
+    config['publisher'].publish(ros_msg)
 
 
 def subscriber_callback(data, msg_config):
@@ -178,41 +341,30 @@ def subscriber_callback(data, msg_config):
     """
     rospy.logdebug('Got ROS msg on topic {0}\t\t{1}'.format(msg_config.topic, data))
 
-    packed_data = []
-    string_lengths = []
-    cur_char = 0
-    for i, slot in enumerate(data.__slots__):
+    # Convert the msg to a list of fields
+    packed_data, string_lengths, array_lengths = msg_to_list(data)
 
-        # If the data is a timestamp or duration, format it appropriately
-        if data._slot_types[i] is 'time' or data._slot_types[i] is 'duration':
-            packed_data.append(getattr(data, slot).secs)
-            packed_data.append(getattr(data, slot).nsecs)
-            cur_char += 2
+    # Parse the message format, expanding arrays and inserting string lengths
+    data_format = msg_config.format
+    for arrlen in array_lengths:
+        start_idx = data_format.find('[')
+        end_idx = close_bracket(start_idx, data_format)
 
-        # If the data is a string, format it appropriately
-        elif data._slot_types[i] is 'string':
-            string_lengths.append(len(getattr(data, slot)))
-            packed_data.append(len(getattr(data, slot)))
-            packed_data.append(getattr(data, slot))
-            cur_char += 4
+        data_format = data_format.replace(data_format[start_idx:end_idx],
+                                          data_format[start_idx + 1:end_idx - 1] * arrlen, 1)
 
-        # If the data is not a primitive, skip it
-        elif msg_config.format[cur_char] is 'x':
-            cur_char += 1
+    data_format = data_format.format(*string_lengths)
 
-        # If the data is any other valid type (Any other primitive), append it
-        else:
-            packed_data.append(getattr(data, slot))
-            cur_char += 1
-
-    format = msg_config.format.format(*string_lengths)
-
+    # Convert the data to a bytearray and send it on the bus
+    # print(data_format, packed_data, list(bytearray(struct.pack("!" + data_format, *packed_data))))
     wrapper.send_data(msg_config.tx_id, msg_config.rx_id,
-                      bytearray(struct.pack("!" + format, *packed_data)))
+                      bytearray(struct.pack("!" + data_format, *packed_data)))
 
 
-# Initialize ROS, open the CAN bus, and setup the inputs & outputs
 def initialize_node():
+    """
+    Initialize ROS node, open the CAN bus, and setup the inputs & outputs
+    """
     global wrapper
     global input_msgs
     rospy.init_node('can_interface')
@@ -222,7 +374,6 @@ def initialize_node():
         open(rospkg.RosPack().get_path('boat_interfaces') + "/config/can_bus.yaml"))
 
     # Open the CAN bus
-    #bus = can.interfaces.serial.serial_can.SerialBus(channel="/dev/ttyUSB0") # For real CAN interface
     bus = can.Bus('slcan0', bustype='socketcan')
     wrapper = iso_tp_wrapper.IsoTPWrapper(bus)
 
