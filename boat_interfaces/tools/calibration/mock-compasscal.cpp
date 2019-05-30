@@ -43,4 +43,3 @@ int main (){
     waitForEnterKey();
     return 0;
 }
-

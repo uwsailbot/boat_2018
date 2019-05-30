@@ -58,5 +58,3 @@ float angleDifference(float a1, float a2) {
   float diff = fmod(a2 - a1, 360);
   return fmod(2 * diff, 360) - diff;
 }
-
-

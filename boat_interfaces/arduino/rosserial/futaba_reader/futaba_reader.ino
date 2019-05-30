@@ -89,4 +89,3 @@ int average(int buffer[]){
   }
   return sum/valid_data_counter;
 }
-

@@ -10,4 +10,3 @@ int32 right_stick_x
 int32 right_stick_y
 int8 switch_a
 int32 vr
-

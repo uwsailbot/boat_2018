@@ -6,7 +6,7 @@
 
 #include <Adafruit_GPS.h>
 #include <SoftwareSerial.h>
-#include <Servo.h> 
+#include <Servo.h>
 #include <ros.h>
 #include <std_msgs/Float32.h>
 #include <std_msgs/Int32.h>
@@ -65,11 +65,11 @@ ros::Publisher gps("gps_raw", &gpsData);
 ros::Publisher compass("compass", &compassData);
 
 void setup(){
-    // setup subscribers 
+    // setup subscribers
     if(DEBUG_SERIAL){
         Serial2.begin(115200);
     }
-    
+
     nh.initNode();
     nh.subscribe(sub_rudder);
     nh.subscribe(sub_winch);
@@ -91,7 +91,7 @@ void setup(){
     // Set the update rate
     GPS.sendCommand(PMTK_SET_NMEA_UPDATE_2HZ);   // 2 Hz update rate
     useInterrupt(true);
-    
+
     Serial3.begin(9600, SERIAL_8N2);
 
     bubbleSortlookupTable();
@@ -120,27 +120,27 @@ void loop(){
         // Map 0-1023 ADC value to 0-360
         anemometerTimer = millis();
         calWindDirection = mapf(analogRead(WIND_VANE_PIN), 0.0, 1023.0, 0.0, 360.0);
-      
+
         // Ensure the wind direction is between 0 and 360
         while(calWindDirection >= 360.0)
             calWindDirection = calWindDirection - 360.0;
         while(calWindDirection < 0)
             calWindDirection = calWindDirection + 360;
-  
+
         calWindDirection = medianFilter(exponentialFilter(calWindDirection));
-    
+
         // Convert to true value through lookup table
         calWindDirection = lookupTrueWindDirection(calWindDirection);
-        
-        // Only update the topic if change greater than 2 degrees. 
+
+        // Only update the topic if change greater than 2 degrees.
         if(abs(calWindDirection - lastWindDirection) >= 2.0)
-        { 
+        {
              lastWindDirection = calWindDirection;
              winddir.data = calWindDirection;
-             anemometer.publish(&winddir);       
+             anemometer.publish(&winddir);
         }
     }
-    
+
     //Read compass
     /*if ((millis() - compassTimer) > compassInterval){
         compassTimer = millis();
@@ -157,17 +157,17 @@ void loop(){
             compass.publish(&compassData);
         }
     }*/
-    
-    
+
+
     // if a sentence is received, we can check the checksum, parse it...
     if (GPS.newNMEAreceived()) {
         if (!GPS.parse(GPS.lastNMEA()))   // this also sets the newNMEAreceived() flag to false
             return;  // we can fail to parse a sentence in which case we should just wait for another
-    }  
+    }
     // approximately publish at 1 HZ the current stats
     if (millis() - GPS_timer > 500) {
       GPS_timer = millis(); // reset the timer
-      
+
       if (DEBUG_SERIAL){
           Serial2.print("\nTime: ");
           Serial2.print(GPS.hour, DEC); Serial2.print(':');
@@ -179,25 +179,25 @@ void loop(){
           Serial2.print(GPS.month, DEC); Serial2.print("/20");
           Serial2.println(GPS.year, DEC);
           Serial2.print("Fix: "); Serial2.print((int)GPS.fix);
-          Serial2.print(" quality: "); Serial2.println((int)GPS.fixquality); 
-          
+          Serial2.print(" quality: "); Serial2.println((int)GPS.fixquality);
+
           if (GPS.fix) {
               Serial2.print("Location: ");
               Serial2.print(GPS.latitude, 4); Serial2.print(GPS.lat);
-              Serial2.print(", "); 
+              Serial2.print(", ");
               Serial2.print(GPS.longitude, 4); Serial2.println(GPS.lon);
               Serial2.print("Location (in degrees, works with Google Maps): ");
               Serial2.print(GPS.latitudeDegrees, 4);
-              Serial2.print(", "); 
+              Serial2.print(", ");
               Serial2.println(GPS.longitudeDegrees, 4);
-          
+
               Serial2.print("Speed (knots): "); Serial2.println(GPS.speed);
               Serial2.print("Angle: "); Serial2.println(GPS.angle);
               Serial2.print("Altitude: "); Serial2.println(GPS.altitude);
               Serial2.print("Satellites: "); Serial2.println((int)GPS.satellites);
           }
       }
-      
+
       if (GPS.fix) {
           if (GPS.fixquality == 1){
               gpsData.status = gpsData.STATUS_FIX;
@@ -217,18 +217,17 @@ void loop(){
     }
      //only publish is readings have changes
     if (((last_lat != gpsData.latitude) ||
-          (last_long != gpsData.longitude) || 
-          (last_track != gpsData.track) || 
+          (last_long != gpsData.longitude) ||
+          (last_track != gpsData.track) ||
           (last_speed != gpsData.speed)) &&
           gpsData.status != gpsData.STATUS_NO_FIX){
           gps.publish(&gpsData);
-      
+
           last_lat = gpsData.latitude;
           last_long = gpsData.longitude;
           last_track = gpsData.track;
-          last_speed = gpsData.speed;      
-    }  
-    
+          last_speed = gpsData.speed;
+    }
+
     nh.spinOnce();
 }
-
