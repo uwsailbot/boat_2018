@@ -6,10 +6,11 @@ class Message(object):
     A general message structure, containing data of an arbitrary length
     """
 
-    def __init__(self, tx_id=0, rx_id=0, data=[]):
+    def __init__(self, tx_id=0, rx_id=0, data=[], maxlen=0):
         self.tx_id = tx_id
         self.rx_id = rx_id
         self.data = data
+        self.maxlen = 0
         self.timestamp = None
 
 

@@ -153,8 +153,14 @@ void Mcp2515IsoTP::readBuffer(MCP2515::RXBn buffer) {
           return;
         }
 
-        // Append the new data
         uint16_t start = (msg->sequence * 7) - 1;
+        if (start + recv_msg.can_dlc - 1 > msg->msg.len) {
+          // TODO: Error, Consecutive Frame too large
+          Serial.println("Err: Got consec frame, data too long");
+          return;
+        }
+
+        // Append the new data
         arrcpy(msg->msg.data + start, recv_msg.data + 1, recv_msg.can_dlc - 1);
 
         if (msg->block_size != 0) {

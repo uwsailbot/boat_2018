@@ -185,6 +185,9 @@ class IsoTPWrapper(object):
                     continue
 
                 # Append the new data, prepare for consecutive frames
+                rx_msg.msg.maxlen = recv_msg.data[1]
+                rx_msg.msg.maxlen |= (recv_msg.data[0] & 0x0F) << 8
+
                 rx_msg.msg.data = recv_msg.data[2:]
                 rx_msg.sequence = 0
                 rx_msg.is_active = True
@@ -210,12 +213,17 @@ class IsoTPWrapper(object):
                     print('Err: Got consec frame, bad sequence')
                     return
 
+                start = (rx_msg.sequence * 7) - 1
+                if (start + len(recv_msg.data) - 1 > rx_msg.msg.maxlen):
+                    print("Err: Got consec frame, data too long")
+                    return
+
+
                 # Append the new data
                 rx_msg.msg.data.extend(recv_msg.data[1:])
                 rx_msg.remaining_frames -= 1
 
                 # If this is the last frame in the message, trigger the callback and cleanup
-                start = (rx_msg.sequence * 7) - 1
                 if start + 7 > len(rx_msg.msg.data):
                     rx_msg.msg.timestamp = recv_msg.timestamp
                     for callback in self._callbacks:
