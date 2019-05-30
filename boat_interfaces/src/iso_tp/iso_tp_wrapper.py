@@ -218,7 +218,6 @@ class IsoTPWrapper(object):
                     print("Err: Got consec frame, data too long")
                     return
 
-
                 # Append the new data
                 rx_msg.msg.data.extend(recv_msg.data[1:])
                 rx_msg.remaining_frames -= 1

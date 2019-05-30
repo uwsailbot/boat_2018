@@ -147,6 +147,9 @@ def parse_msg_config(yaml):
 
 
 def unpack(data_format, raw_data):
+    """
+    Unpack a raw byte array to a list of values based on the specified data format
+    """
 
     data = []
     array_lengths = []
@@ -306,7 +309,7 @@ def msg_to_list(msg):
     return packed_data, string_lengths, array_lengths
 
 
-def CAN_read(msg):
+def can_to_ros(msg):
     """
     Callback for receiving messages from the CAN bus, to be forwarded to ROS topics
     """
@@ -335,7 +338,7 @@ def CAN_read(msg):
     config['publisher'].publish(ros_msg)
 
 
-def subscriber_callback(data, msg_config):
+def ros_to_can(data, msg_config):
     """
     Callback for receiving messages from ROS topics, to be forwarded to the CAN bus
     """
@@ -383,7 +386,7 @@ def initialize_node():
         rospy.loginfo(
             'Creating ROS->CAN config for msg {name}\t- ROS topic={topic},\tCAN TX_ID={tx_id}'.
             format(name=msg_name, topic=msg_config.topic, tx_id=msg_config.tx_id))
-        rospy.Subscriber(msg_config.topic, msg_config.msg_type, subscriber_callback, msg_config)
+        rospy.Subscriber(msg_config.topic, msg_config.msg_type, ros_to_can, msg_config)
 
     # Setup all the CAN Read -> ROS Publish configurations
     for _, config in bus_config['input_msgs'].items():
@@ -402,7 +405,7 @@ def initialize_node():
 
         wrapper.config_flow_frame(msg_config.rx_id, msg_config.tx_id, 1, 5)
 
-    wrapper.register_msg_callback(CAN_read)
+    wrapper.register_msg_callback(can_to_ros)
 
     # Spin until shutdown
     while not rospy.is_shutdown():
